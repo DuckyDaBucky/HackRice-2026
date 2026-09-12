@@ -1,10 +1,17 @@
+import { Hero } from "@/components/marketing/Hero";
+import { HowItWorks } from "@/components/marketing/HowItWorks";
+import { TrustSection } from "@/components/marketing/TrustSection";
+import { WaitlistCta } from "@/components/marketing/WaitlistCta";
+import { Workspaces } from "@/components/marketing/Workspaces";
+
 export default function Home() {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-      <h1 className="text-3xl font-semibold">HackRice 2026</h1>
-      <p className="text-zinc-600 dark:text-zinc-400">
-        Sign in or sign up to get started.
-      </p>
-    </div>
+    <>
+      <Hero />
+      <HowItWorks />
+      <Workspaces />
+      <TrustSection />
+      <WaitlistCta />
+    </>
   );
 }

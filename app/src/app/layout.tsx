@@ -1,12 +1,8 @@
-import {
-  ClerkProvider,
-  SignInButton,
-  SignUpButton,
-  Show,
-  UserButton,
-} from "@clerk/nextjs";
+import { ClerkProvider } from "@clerk/nextjs";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { Footer } from "@/components/marketing/Footer";
+import { Nav } from "@/components/marketing/Nav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,8 +16,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HackRice 2026",
-  description: "HackRice 2026",
+  title: "GetMeHired: Interview practice that knows your resume",
+  description:
+    "GetMeHired is a pre-launch technical-behavioral interview practice and screening platform. Get notified when recorded practice interviews open.",
+  metadataBase: new URL("https://getmehired.today"),
+  openGraph: {
+    title: "GetMeHired",
+    description:
+      "Contextual interview practice and employer screening, grounded in your actual resume and transcript-linked evidence.",
+    url: "https://getmehired.today",
+    siteName: "GetMeHired",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GetMeHired",
+    description: "Interview practice that knows your resume. Coming soon.",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -32,16 +43,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <ClerkProvider>
-          <header className="flex items-center justify-end gap-4 p-4">
-            <Show when="signed-out">
-              <SignInButton />
-              <SignUpButton />
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
-          </header>
-          {children}
+          <Nav />
+          <main className="flex-1">{children}</main>
+          <Footer />
         </ClerkProvider>
       </body>
     </html>
