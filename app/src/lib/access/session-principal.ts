@@ -5,6 +5,7 @@ import { getV2ResumeState } from "@/lib/interviews/persistence";
 import type { HiringInterviewPolicy, SessionPrincipal } from "@/lib/hiring/contracts";
 import { DEFAULT_HIRING_POLICY } from "@/lib/hiring/contracts";
 import { requireOrgMembership, getProvisionedOrganization } from "@/lib/hiring/access";
+import { isHiringSuperadmin } from "@/lib/hiring/superadmin";
 
 export async function resolveSessionPrincipal(sessionId: string): Promise<SessionPrincipal | null> {
   const { userId } = await auth();
@@ -37,7 +38,8 @@ export async function resolveSessionPrincipal(sessionId: string): Promise<Sessio
     if (clerkOrgId) {
       try {
         const membership = await requireOrgMembership(clerkOrgId);
-        if (await getProvisionedOrganization(clerkOrgId)) {
+        const provisioned = await getProvisionedOrganization(clerkOrgId);
+        if (provisioned || (await isHiringSuperadmin(userId))) {
           return {
             kind: "org_recruiter",
             clerkUserId: userId,
@@ -47,6 +49,15 @@ export async function resolveSessionPrincipal(sessionId: string): Promise<Sessio
           };
         }
       } catch {
+        if (await isHiringSuperadmin(userId)) {
+          return {
+            kind: "org_recruiter",
+            clerkUserId: userId,
+            sessionId,
+            organizationId: hire.organization_id,
+            role: "admin",
+          };
+        }
         return null;
       }
     }

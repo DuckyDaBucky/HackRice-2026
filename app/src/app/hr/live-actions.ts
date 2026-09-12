@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { requireHiringEnabled } from "@/lib/hiring/config";
 import { provisionOrganization, requireOrgMembership } from "@/lib/hiring/access";
+import { resolveHiringClerkOrgId } from "@/lib/hiring/superadmin";
 import { createJob } from "@/lib/hiring/jobs-service";
 import {
   createCandidacyDraft,
@@ -28,8 +29,9 @@ export async function hrLiveCreateSession(input: {
   candidateEmail: string;
 }) {
   requireHiringEnabled();
-  const { userId, orgId: clerkOrgId } = await auth();
-  if (!userId || !clerkOrgId) throw new Error("Sign in with a Clerk organization selected.");
+  const { userId } = await auth();
+  const clerkOrgId = await resolveHiringClerkOrgId();
+  if (!userId || !clerkOrgId) throw new Error("Sign in to use the HR live demo.");
 
   await requireOrgMembership(clerkOrgId);
   const organizationId = await provisionOrganization({

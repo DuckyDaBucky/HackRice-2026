@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { hiringEnabled } from "@/lib/hiring/config";
 import { hrListJobs, hrGetOrganization, setupOrganization } from "./actions";
+import { resolveHiringClerkOrgId } from "@/lib/hiring/superadmin";
 
 export default async function HrHomePage() {
   if (!hiringEnabled()) {
@@ -16,8 +17,9 @@ export default async function HrHomePage() {
     );
   }
 
-  const { orgId, userId } = await auth();
+  const { userId } = await auth();
   if (!userId) redirect("/sign-in");
+  const orgId = await resolveHiringClerkOrgId();
   if (!orgId) {
     return (
       <div className="mx-auto max-w-2xl px-6 py-16 text-zinc-300">
@@ -29,7 +31,7 @@ export default async function HrHomePage() {
 
   let org = await hrGetOrganization(orgId);
   if (!org) {
-    await setupOrganization(orgId, "Organization");
+    await setupOrganization(orgId, "Hiring workspace");
     org = await hrGetOrganization(orgId);
   }
 

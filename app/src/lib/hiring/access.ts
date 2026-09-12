@@ -2,6 +2,7 @@ import "server-only";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { requireHiringEnabled } from "./config";
+import { isHiringSuperadmin } from "./superadmin";
 
 export type OrgRole = "admin" | "recruiter";
 
@@ -14,6 +15,9 @@ export async function requireSignedInUser() {
 export async function requireOrgMembership(clerkOrgId: string): Promise<{ userId: string; role: OrgRole }> {
   requireHiringEnabled();
   const userId = await requireSignedInUser();
+  if (await isHiringSuperadmin(userId)) {
+    return { userId, role: "admin" };
+  }
   const client = await clerkClient();
   const memberships = await client.users.getOrganizationMembershipList({ userId });
   const membership = memberships.data.find((m) => m.organization.id === clerkOrgId);
