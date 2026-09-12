@@ -8,6 +8,13 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--marketing-surface, #131b2c);
+  --color-border: var(--marketing-border, #232e42);
+  --color-muted: var(--marketing-muted, #93a1b5);
+  --color-accent: #1ec9b3;
+  --color-accent-hover: #22e0c7;
+  --color-accent-deep: #14b8a6;
+  --color-bg-elevated: #0d1420;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -16,4 +23,19 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+.marketing {
+  --background: #0b1120;
+  --foreground: #f4f7fa;
+  background: var(--background);
+  color: var(--foreground);
+}
+@media (prefers-reduced-motion: reduce) {
+  .marketing *, .marketing *::before, .marketing *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

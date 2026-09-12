@@ -9,7 +9,7 @@ export function SiteHeader() {
   const pathname = usePathname();
   if (!clerkEnabled || pathname.startsWith("/interview")) return null;
 
-  return (
+  const header = (
     <header className="flex items-center justify-between gap-4 px-6 py-4">
       <span className="text-sm font-medium tracking-tight text-zinc-100">HackRice</span>
       <div className="flex items-center gap-3">
@@ -37,4 +37,5 @@ export function SiteHeader() {
       </div>
     </header>
   );
+  return pathname === "/" ? <Show when="signed-in">{header}</Show> : header;
 }

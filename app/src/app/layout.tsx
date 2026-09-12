@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HackRice 2026",
-  description: "HackRice 2026",
+  title: "GetMeHired: Interview practice that knows your resume",
+  description: "Personalized interview practice and evidence-based feedback. Built at HackRice 2026.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
