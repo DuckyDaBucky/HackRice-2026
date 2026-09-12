@@ -75,8 +75,8 @@ export async function beginSessionPlanning(input: BeginPlanningInput): Promise<P
     await client.query(
       `INSERT INTO interview_session_configs
          (session_id, revision, content_types, target_role, seniority, focus_area,
-          time_budget_seconds, voice_id, mood)
-       VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8)`,
+          time_budget_seconds, voice_id, mood, biometrics_enabled)
+       VALUES ($1, 1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         sessionId,
         input.setup.contentTypes,
@@ -86,6 +86,7 @@ export async function beginSessionPlanning(input: BeginPlanningInput): Promise<P
         input.setup.timeBudgetSeconds,
         input.setup.voiceId,
         input.setup.mood,
+        input.setup.biometricsEnabled,
       ],
     );
     await client.query(
@@ -231,8 +232,9 @@ export async function getV2ResumeState(sessionId: string, clerkUserId: string): 
     time_budget_seconds: InterviewSetup["timeBudgetSeconds"];
     voice_id: string | null;
     mood: InterviewSetup["mood"];
+    biometrics_enabled: boolean;
   }>(
-    `SELECT revision, content_types, target_role, seniority, focus_area, time_budget_seconds, voice_id, mood
+    `SELECT revision, content_types, target_role, seniority, focus_area, time_budget_seconds, voice_id, mood, biometrics_enabled
      FROM interview_session_configs
      WHERE session_id = $1 AND revision = $2`,
     [sessionId, session.active_config_revision ?? 1],
@@ -288,6 +290,7 @@ export async function getV2ResumeState(sessionId: string, clerkUserId: string): 
       timeBudgetSeconds: config.time_budget_seconds,
       voiceId: config.voice_id,
       mood: config.mood,
+      biometricsEnabled: config.biometrics_enabled,
     },
     questions: questions.rows.map((question) => ({
       id: question.id,

@@ -41,6 +41,7 @@ export default function InterviewSetupPage() {
   const [seniority, setSeniority] = useState<Seniority>("junior");
   const [mood, setMood] = useState<InterviewMood>(DEFAULT_MOOD);
   const [focusArea, setFocusArea] = useState("");
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,6 +74,7 @@ export default function InterviewSetupPage() {
           timeBudgetSeconds,
           voiceId,
           mood,
+          biometricsEnabled,
         }),
       });
       const data = await response.json() as { sessionId?: string; error?: string };
@@ -173,6 +175,25 @@ export default function InterviewSetupPage() {
           })}
         </div>
         <VoicePicker voiceId={voiceId} onChange={setVoiceId} />
+      </section>
+
+      <section className="flex flex-col gap-3" aria-labelledby="interview-biometrics">
+        <h2 id="interview-biometrics" className="text-sm font-medium text-zinc-300">Experimental</h2>
+        <label className="flex items-start gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
+          <input
+            type="checkbox"
+            checked={biometricsEnabled}
+            onChange={(event) => setBiometricsEnabled(event.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-sky-500"
+          />
+          <span className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-zinc-200">Biometric readout (beta)</span>
+            <span className="text-xs leading-relaxed text-zinc-500">
+              Analyzes your recorded video with presage-api after the session for a heart
+              rate/breathing summary on your report. Off by default.
+            </span>
+          </span>
+        </label>
       </section>
 
       <div className="flex flex-col gap-2">

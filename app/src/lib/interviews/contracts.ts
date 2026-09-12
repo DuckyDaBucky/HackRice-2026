@@ -30,6 +30,7 @@ export const interviewSetupSchema = z.object({
   timeBudgetSeconds: timeBudgetSchema,
   voiceId: z.string().trim().min(1).max(200).nullable(),
   mood: interviewMoodSchema,
+  biometricsEnabled: z.boolean().default(false),
 });
 
 export type InterviewContentType = z.infer<typeof interviewContentTypeSchema>;

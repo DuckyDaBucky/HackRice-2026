@@ -1,16 +1,18 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getSessionReport, getSessionTimelineForReport } from "@/app/interview/report-actions";
+import { getSessionBiometrics, getSessionReport, getSessionTimelineForReport } from "@/app/interview/report-actions";
 import { GenerateReportButton } from "@/components/reports/GenerateReportButton";
 import { FindingsPanel, InterviewTimeline } from "@/components/reports/InterviewReportView";
+import { BiometricsCard } from "@/components/reports/BiometricsCard";
 
 export default async function InterviewReportPage({
   params,
 }: PageProps<"/interview/session/[sessionId]/report">) {
   const { sessionId } = await params;
-  const [report, timeline] = await Promise.all([
+  const [report, timeline, biometrics] = await Promise.all([
     getSessionReport(sessionId),
     getSessionTimelineForReport(sessionId),
+    getSessionBiometrics(sessionId),
   ]);
   if (!timeline) notFound();
 
@@ -50,6 +52,8 @@ export default async function InterviewReportPage({
         <h2 className="text-sm font-medium text-zinc-400">Timeline</h2>
         <InterviewTimeline timeline={timeline} />
       </section>
+
+      <BiometricsCard sessionId={sessionId} analyses={biometrics} />
     </div>
   );
 }

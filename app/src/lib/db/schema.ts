@@ -449,6 +449,7 @@ export const biometricAnalyses = pgTable(
   (table) => [
     index("biometric_analyses_session_idx").on(table.sessionId, table.createdAt),
     index("biometric_analyses_artifact_idx").on(table.artifactId),
+    unique("biometric_analyses_artifact_provider_key").on(table.artifactId, table.provider),
   ],
 );
 

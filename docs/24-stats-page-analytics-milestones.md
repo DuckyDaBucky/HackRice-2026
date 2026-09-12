@@ -157,7 +157,34 @@ server relays the already-uploaded clip to `presage-api` over the internal docke
 
 ### Gate result
 
-`Not started`
+`In progress` — implemented on `t3code/presage-biometric-relay`.
+
+### S4 implementation evidence — Sep 12, 2026
+
+- Added `app/migrations/0008_biometric_analysis_queue.sql` (unique `(artifact_id, provider)`
+  constraint so a re-confirmed upload never queues a duplicate analysis).
+- Added `app/src/lib/biometrics/`: `contracts.ts` (Zod-validated `VideoAnalysis` response shape,
+  `PresageBusyError` for the SDK's single-active-session `409`), `presage-client.ts` (fetches the
+  clip via a new `getObjectBuffer` helper in `app/src/lib/storage/r2.ts`, POSTs multipart to
+  `PRESAGE_API_URL`, default `http://presage-api:8080` — the docker-compose internal hostname,
+  never reachable from the browser), `persistence.ts` (queue, and a `pg_try_advisory_lock`-guarded
+  batch runner serializing calls to respect presage-api's one-session-per-process limit),
+  `processor.ts` (runs pending analyses sequentially, marks `completed`/`retryable_failed`).
+- Added the `biometricsEnabled` opt-in end to end: `interviewSetupSchema`
+  (`app/src/lib/interviews/contracts.ts`), the setup form checkbox
+  (`app/src/app/interview/setup/page.tsx`, off by default), `beginSessionPlanning`'s insert and
+  `getV2ResumeState`'s read (`app/src/lib/interviews/persistence.ts`).
+- Wired the trigger in `confirmPersistedAnswerUpload`
+  (`app/src/app/interview/v2-actions.ts`): queues an analysis and kicks a best-effort background
+  run when an artifact upload is confirmed for a biometrics-enabled session; failures there never
+  fail the upload confirmation itself.
+- Added a manual retry path (`retrySessionBiometrics` in
+  `app/src/app/interview/report-actions.ts`) and a `BiometricsCard` on the report page, separate
+  from `FindingsPanel` — biometric output never feeds `report_findings`.
+- `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm test --run` (125 tests, 4 new) and `pnpm build` all
+  pass. Not yet verified against a running `presage-api` container or a real recorded clip — this
+  worktree has no development database or docker environment; that end-to-end pass, plus a real
+  `SMARTSPECTRA_API_KEY`, is the remaining S4 work before this can leave "in progress."
 
 ---
 

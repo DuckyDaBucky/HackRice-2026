@@ -11,6 +11,8 @@ import {
   isOwnedCompletedSession,
 } from "@/lib/reports/persistence";
 import { buildSessionTimeline } from "@/lib/reports/timeline";
+import { getBiometricAnalysesForSession } from "@/lib/biometrics/persistence";
+import { runBiometricAnalysesForSession } from "@/lib/biometrics/processor";
 
 /** Returns the latest report for an owned session, or null if none has been requested yet. */
 export async function getSessionReport(sessionId: string) {
@@ -25,6 +27,23 @@ export async function getSessionTimelineForReport(sessionId: string) {
   if (!userId) return null;
   const report = await getLatestReport(sessionId, userId);
   return buildSessionTimeline({ sessionId, clerkUserId: userId, findings: report?.findings ?? [] });
+}
+
+/** Biometric readouts (presage-api), kept separate from rubric findings. */
+export async function getSessionBiometrics(sessionId: string) {
+  const { userId } = await auth();
+  if (!userId) return [];
+  return getBiometricAnalysesForSession(sessionId, userId);
+}
+
+/** Retries any queued/failed biometric analyses for an owned session. */
+export async function retrySessionBiometrics(sessionId: string) {
+  const { userId } = await auth();
+  if (!userId) throw new Error("Sign in to run biometric analysis.");
+  const eligible = await isOwnedCompletedSession(sessionId, userId);
+  if (!eligible) throw new Error("Biometric analysis is only available once this interview is completed.");
+  await runBiometricAnalysesForSession(sessionId);
+  return getBiometricAnalysesForSession(sessionId, userId);
 }
 
 /**
