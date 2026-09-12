@@ -44,6 +44,34 @@ export function overallScore(scores: SkillScores): number {
   return Math.round(values.reduce((a, b) => a + b, 0) / values.length);
 }
 
+export function readinessLabel(score: number): string {
+  if (score >= 85) return "Strong";
+  if (score >= 70) return "Good";
+  if (score >= 50) return "Developing";
+  return "Needs work";
+}
+
+/** Percent change vs. the previous score, or null when there's nothing to compare against. */
+export function readinessDelta(previous: number | null, current: number): number | null {
+  if (previous === null || previous === 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+export function weakestCategory(scores: SkillScores): SkillCategory {
+  return [...SKILL_CATEGORIES].sort((a, b) => scores[a] - scores[b])[0];
+}
+
+const FOCUS_COPY: Record<SkillCategory, string> = {
+  Technical: "Sharpen this by narrating trade-offs out loud as you work through a problem.",
+  Communication: "Focus on clear, structured explanations in your next few sessions.",
+  Confidence: "Practice pacing your answers so they land with more certainty under pressure.",
+  Structure: "Lean on a clear framework, like STAR, to organize your answers.",
+};
+
+export function focusCopy(category: SkillCategory): string {
+  return FOCUS_COPY[category];
+}
+
 const TECHNICAL_STRENGTHS = ["Strong technical answers", "Clear problem breakdown", "Solid trade-off reasoning"];
 const TECHNICAL_IMPROVEMENTS = ["Improve concision", "Go deeper on edge cases", "Explain complexity more clearly"];
 const BEHAVIORAL_STRENGTHS = ["Strong communication", "Clear STAR structure", "Concrete, specific examples"];

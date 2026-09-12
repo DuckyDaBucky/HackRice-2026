@@ -13,7 +13,7 @@ export function SkillBars({ scores, className = "" }: { scores: SkillScores; cla
           <span className="w-28 shrink-0 text-sm text-[#5b6474]">{label}</span>
           <div className="h-1.5 flex-1 rounded-full bg-[#eef1f6]">
             <div
-              className="h-1.5 rounded-full bg-accent"
+              className="h-1.5 rounded-full bg-accent transition-[width] duration-500 ease-out"
               style={{ width: `${value}%` }}
             />
           </div>

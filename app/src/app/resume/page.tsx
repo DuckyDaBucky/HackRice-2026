@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
+import { FileArrowUpIcon } from "@phosphor-icons/react/ssr";
 import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ResumeUploadButton } from "@/components/dashboard/ResumeUploadButton";
@@ -28,24 +29,38 @@ export default async function ResumePage() {
         {!account ? (
           <>
             <div>
-              <h1 className="text-[26px] font-semibold tracking-tight text-[#0b1120]">Resume</h1>
+              <h1 className="text-[28px] font-semibold tracking-tight text-[#0b1120]">Resume</h1>
               <p className="mt-1 text-sm text-[#6b7280]">
                 Personalize your interviews using your experience.
               </p>
             </div>
-            <div className="flex flex-col items-start gap-2 rounded-lg border border-[#eef1f6] bg-white px-5 py-6">
-              <ResumeUploadButton label="Upload resume" />
-              <p className="text-xs text-[#93a1b5]">PDF or DOCX</p>
+            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#d8dee7] bg-[#fbfcfc] px-8 py-12 text-center transition-colors duration-150 hover:border-accent/50 hover:bg-[#f8fefc]">
+              <FileArrowUpIcon size={26} weight="light" className="text-[#93a1b5]" />
+              <h2 className="mt-1.5 text-base font-semibold text-[#0b1120]">Add your resume</h2>
+              <p className="max-w-sm text-sm text-[#6b7280]">
+                We&rsquo;ll use your experience and skills to personalize your interview questions.
+              </p>
+              <div className="mt-3.5">
+                <ResumeUploadButton label="Choose resume" />
+              </div>
+              <p className="mt-1 text-xs text-[#93a1b5]">PDF or DOCX · Max 10 MB</p>
             </div>
           </>
         ) : (
           <>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h1 className="text-[26px] font-semibold tracking-tight text-[#0b1120]">
+                <p className="text-xs text-[#93a1b5]">
+                  Last updated{" "}
+                  {new Date(account.updatedAt).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                  })}
+                </p>
+                <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-[#0b1120]">
                   {user.fullName ?? user.firstName ?? "Your profile"}
                 </h1>
-                <p className="mt-1 text-sm text-[#6b7280]">
+                <p className="mt-0.5 text-sm text-[#6b7280]">
                   {LEVEL_LABEL[account.profile.experienceLevel]}
                 </p>
               </div>
@@ -61,7 +76,7 @@ export default async function ResumePage() {
                   {account.profile.skills.map((skill) => (
                     <span
                       key={skill}
-                      className="rounded-md border border-[#e3e7ee] px-2.5 py-1 text-xs font-medium text-[#0b1120]"
+                      className="rounded-md border border-[#e3e7ee] bg-[#f9fafb] px-2.5 py-1 text-xs font-medium text-[#0b1120]"
                     >
                       {skill}
                     </span>
@@ -75,7 +90,7 @@ export default async function ResumePage() {
                 <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
                   Projects
                 </h2>
-                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
                   {account.profile.projects.map((project) => (
                     <li key={project.id} className="px-4 py-3">
                       <div className="text-sm font-medium text-[#0b1120]">{project.name}</div>
@@ -93,7 +108,7 @@ export default async function ResumePage() {
                 <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
                   Experience
                 </h2>
-                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
                   {account.profile.sections
                     .filter((s) => s.kind !== EDUCATION_KIND)
                     .map((section, i) => (
@@ -116,7 +131,7 @@ export default async function ResumePage() {
                 <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
                   Education
                 </h2>
-                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
                   {account.profile.sections
                     .filter((s) => s.kind === EDUCATION_KIND)
                     .map((section, i) => (

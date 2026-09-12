@@ -39,7 +39,7 @@ export function DashboardShell({
           <Logo size="sm" onLight />
         </Link>
 
-        <nav className="mt-7 flex flex-1 flex-col gap-0.5 px-3">
+        <nav className="mt-7 flex flex-1 flex-col gap-1 px-3">
           {NAV_ITEMS.map((item) => {
             const isActive = item.label === active || pathname === item.href;
             const Icon = item.icon;
@@ -47,13 +47,13 @@ export function DashboardShell({
               <Link
                 key={item.label}
                 href={item.href}
-                className={`flex items-center gap-2.5 border-l-2 py-1.5 pl-3 pr-3 text-[13.5px] font-medium transition-colors ${
+                className={`flex items-center gap-2.5 rounded-r-md border-l-2 py-1.5 pl-3 pr-3 text-[13.5px] font-medium transition-colors duration-150 ${
                   isActive
-                    ? "border-accent bg-[#f4f5f7] text-[#0b1120]"
+                    ? "border-accent bg-[#eef8f6] text-[#0b1120]"
                     : "border-transparent text-[#6b7280] hover:bg-[#f4f5f7] hover:text-[#0b1120]"
                 }`}
               >
-                <Icon size={16.5} weight="regular" />
+                <Icon size={17} weight="regular" className={isActive ? "text-accent-deep" : ""} />
                 {item.label}
               </Link>
             );

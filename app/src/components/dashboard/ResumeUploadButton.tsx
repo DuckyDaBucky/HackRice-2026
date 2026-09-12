@@ -52,7 +52,7 @@ export function ResumeUploadButton({
         type="button"
         disabled={status === "uploading"}
         onClick={() => inputRef.current?.click()}
-        className={`inline-flex h-9 w-fit items-center rounded-md px-4 text-sm font-medium transition-colors disabled:opacity-60 ${
+        className={`inline-flex h-9 w-fit items-center rounded-md px-4 text-sm font-medium transition-colors duration-150 active:scale-[0.98] disabled:opacity-60 disabled:active:scale-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
           variant === "primary"
             ? "bg-accent font-semibold text-[#03231e] hover:bg-accent-hover"
             : "border border-[#e3e7ee] text-[#0b1120] hover:bg-[#f4f5f7]"
