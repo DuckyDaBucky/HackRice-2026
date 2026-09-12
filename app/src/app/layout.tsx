@@ -24,6 +24,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      // The dark-mode script below sets data-theme on this element before
+      // hydration (to avoid a flash), which deliberately differs from the
+      // server-rendered markup — expected, not a real mismatch.
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
         <script
