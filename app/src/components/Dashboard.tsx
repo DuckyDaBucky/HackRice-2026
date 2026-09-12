@@ -1,17 +1,17 @@
 import Link from "next/link";
-import {
-  ArrowRightIcon,
-  CalendarCheckIcon,
-  ChatCircleDotsIcon,
-  CheckCircleIcon,
-  ClockCounterClockwiseIcon,
-  CodeIcon,
-  FireIcon,
-  ListChecksIcon,
-  TargetIcon,
-} from "@phosphor-icons/react/ssr";
+import { ArrowRightIcon, ChatCircleDotsIcon, CodeIcon } from "@phosphor-icons/react/ssr";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { formatRelativeTime } from "@/lib/format-relative-time";
+import { SkillBars } from "@/components/dashboard/SkillBars";
+import { JoinInterview } from "@/components/dashboard/JoinInterview";
+import { SAMPLE_EMPLOYER_INVITES } from "@/lib/dashboard/employer-invites";
+import {
+  overallScore,
+  sessionDurationMinutes,
+  sessionHighlight,
+  sessionScore,
+  shortDate,
+  skillBreakdown,
+} from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord, SessionStats } from "@/lib/sessions";
 import type { InterviewMode } from "@/lib/questions/types";
@@ -40,18 +40,6 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
   return { label: "Practice again", href: "/interview/setup" };
 }
 
-const STATUS_LABEL: Record<SessionRecord["status"], string> = {
-  completed: "Completed",
-  in_progress: "Incomplete",
-  abandoned: "Abandoned",
-};
-
-const STATUS_STYLE: Record<SessionRecord["status"], string> = {
-  completed: "bg-[#e9f6f1] text-[#0f9d78]",
-  in_progress: "bg-amber-50 text-amber-600",
-  abandoned: "bg-[#f4f5f7] text-[#93a1b5]",
-};
-
 function greeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -63,166 +51,186 @@ export function Dashboard({
   firstName,
   stats,
   sessions,
-  answeredCounts,
   hasResume,
 }: {
   firstName: string | null;
   stats: SessionStats;
   sessions: SessionRecord[];
-  answeredCounts: Record<string, number>;
   hasResume: boolean;
 }) {
+  const hasCompleted = stats.completedSessions > 0;
+  const mostRecentCompleted = sessions.find((s) => s.status === "completed");
+  const scores = mostRecentCompleted ? skillBreakdown(mostRecentCompleted.id) : null;
+  const overall = scores ? overallScore(scores) : null;
+
   return (
     <DashboardShell active="Home" firstName={firstName}>
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0b1120] sm:text-3xl">
+      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-9">
+        <div>
+          <h1 className="text-[26px] font-semibold tracking-tight text-[#0b1120]">
             {firstName ? `${greeting()}, ${firstName}.` : `${greeting()}.`}
           </h1>
-          <p className="text-sm text-[#5b6474]">Practice today. Perform tomorrow.</p>
+          <p className="mt-1 text-sm text-[#6b7280]">Practice today. Perform tomorrow.</p>
         </div>
 
-        <Link
-          href="/interview/setup"
-          className="group flex flex-col items-start justify-between gap-5 rounded-2xl border border-[#eef1f6] bg-white p-6 transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_20px_40px_-28px_rgba(11,17,32,0.35)] sm:flex-row sm:items-center"
-        >
-          <div className="flex items-center gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#e9f6f1] text-[#0f9d78]">
-              <TargetIcon size={22} weight="light" />
-            </span>
-            <div className="flex flex-col gap-1">
-              <span className="text-base font-medium text-[#0b1120]">
-                Start a practice interview
-              </span>
-              <p className="text-sm leading-relaxed text-[#5b6474]">
-                Get personalized questions based on your resume and target role.
-              </p>
-            </div>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#0b1120] px-4 py-2 text-sm font-medium text-white transition-opacity group-hover:opacity-90">
-            Start practicing
-            <ArrowRightIcon size={14} />
-          </span>
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link
+            href="/interview/setup"
+            className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-semibold text-[#03231e] transition-colors hover:bg-accent-hover"
+          >
+            Start practice interview
+          </Link>
+          <JoinInterview />
+        </div>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-[#5b6474]">Your progress</h2>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatCard icon={ListChecksIcon} label="Practice interviews" value={stats.totalSessions} />
-            <StatCard icon={CheckCircleIcon} label="Completed" value={stats.completedSessions} />
-            <StatCard icon={FireIcon} label="This week" value={stats.last7Days} />
-          </div>
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-[#5b6474]">Recent interviews</h2>
-            {sessions.length > 0 && (
-              <Link
-                href="/interviews"
-                className="inline-flex items-center gap-1 text-sm font-medium text-accent-deep hover:text-accent"
-              >
-                View all
-                <ArrowRightIcon size={12} />
-              </Link>
-            )}
-          </div>
-          {sessions.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#e3e7ee] bg-white px-6 py-14 text-center">
-              <ClockCounterClockwiseIcon size={28} weight="light" className="text-[#c4cbd6]" />
-              <p className="text-sm text-[#5b6474]">
-                No sessions yet — start a practice interview above and it will show up here.
-              </p>
-            </div>
-          ) : (
-            <ul className="flex flex-col divide-y divide-[#eef1f6] rounded-2xl border border-[#eef1f6] bg-white">
-              {sessions.map((session) => {
-                const Icon = MODE_ICON[session.mode];
-                const answered = answeredCounts[session.id] ?? 0;
-                const action = actionFor(session);
-                return (
-                  <li
-                    key={session.id}
-                    className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f4f5f7] text-[#5b6474]">
-                        <Icon size={18} weight="light" />
-                      </span>
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate text-sm font-medium text-[#0b1120]">
-                          {MODE_LABEL[session.mode]} practice ·{" "}
-                          {MOOD_LABEL[session.mood] ?? "Neutral"}
-                        </span>
-                        <span className="text-xs text-[#93a1b5] tabular-nums">
-                          {formatRelativeTime(session.createdAt)} · {answered} of{" "}
-                          {session.questionCount} answered
-                        </span>
-                      </div>
+        {SAMPLE_EMPLOYER_INVITES.length > 0 && (
+          <section>
+            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+              Employer interviews
+            </h2>
+            <div className="mt-3 divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+              {SAMPLE_EMPLOYER_INVITES.map((invite) => (
+                <div
+                  key={invite.id}
+                  className="flex items-center justify-between gap-4 px-4 py-3.5"
+                >
+                  <div>
+                    <div className="text-sm font-medium text-[#0b1120]">
+                      {invite.role} · {invite.company}
                     </div>
+                    <div className="mt-0.5 text-xs text-[#93a1b5]">
+                      {invite.stage} · Due {invite.dueDate} · ~{invite.durationMinutes} minutes
+                    </div>
+                  </div>
+                  <Link
+                    href="/interview/setup"
+                    className="inline-flex h-8 shrink-0 items-center rounded-md border border-[#e3e7ee] px-3 text-sm font-medium text-[#0b1120] transition-colors hover:bg-[#f4f5f7]"
+                  >
+                    Start interview
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-                    <div className="flex shrink-0 items-center gap-3 pl-[52px] sm:pl-0">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[session.status]}`}
-                      >
-                        {STATUS_LABEL[session.status]}
-                      </span>
+        {!hasCompleted ? (
+          <section className="rounded-lg border border-[#eef1f6] bg-white px-5 py-6">
+            <p className="text-sm font-medium text-[#0b1120]">No interviews yet</p>
+            <p className="mt-1 text-sm text-[#6b7280]">
+              Complete your first practice interview to start tracking your progress.
+            </p>
+            <Link
+              href="/interview/setup"
+              className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-accent-deep hover:text-accent"
+            >
+              Start practicing
+              <ArrowRightIcon size={12} />
+            </Link>
+          </section>
+        ) : (
+          <>
+            <section>
+              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                Your performance
+              </h2>
+              <div className="mt-3 grid grid-cols-1 gap-8 sm:grid-cols-[140px_1fr]">
+                <div>
+                  <div className="text-4xl font-semibold tabular-nums text-[#0b1120]">{overall}</div>
+                  <div className="mt-1 text-xs text-[#6b7280]">Overall score</div>
+                </div>
+                {scores && <SkillBars scores={scores} className="max-w-sm" />}
+              </div>
+            </section>
+
+            <section>
+              <div className="flex items-center justify-between">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                  Recent interviews
+                </h2>
+                <Link
+                  href="/interviews"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-accent-deep hover:text-accent"
+                >
+                  View all
+                  <ArrowRightIcon size={11} />
+                </Link>
+              </div>
+
+              <ul className="mt-3 divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+                {sessions.slice(0, 4).map((session) => {
+                  const Icon = MODE_ICON[session.mode];
+                  const action = actionFor(session);
+                  const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
+                  const isScored = session.status === "completed";
+                  const score = isScored ? sessionScore(session.id) : null;
+                  const highlight = isScored ? sessionHighlight(session.id, session.mode) : null;
+
+                  return (
+                    <li key={session.id} className="flex items-center gap-4 px-4 py-3.5">
+                      <Icon size={16} weight="light" className="shrink-0 text-[#93a1b5]" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-baseline gap-2">
+                          <span className="truncate text-sm font-medium text-[#0b1120]">
+                            {MODE_LABEL[session.mode]} practice · {MOOD_LABEL[session.mood] ?? "Neutral"}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 truncate text-xs text-[#93a1b5]">
+                          {shortDate(session.createdAt)}
+                          {duration ? ` · ${duration} min` : ""}
+                          {highlight ? ` · ${highlight.strength}` : ""}
+                        </div>
+                      </div>
+                      {score !== null && (
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-[#0b1120]">
+                          {score}
+                        </span>
+                      )}
                       <Link
                         href={action.href}
-                        className="text-sm font-medium text-accent-deep hover:text-accent"
+                        className="shrink-0 text-sm font-medium text-accent-deep hover:text-accent"
                       >
                         {action.label}
                       </Link>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
 
-        <section className="flex items-center justify-between gap-4 rounded-2xl border border-[#eef1f6] bg-white p-5">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eef1f6] text-[#5b6474]">
-              <CalendarCheckIcon size={18} weight="light" />
-            </span>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-[#0b1120]">Your resume</span>
-              <span className="text-xs text-[#93a1b5]">
-                {hasResume ? "On file — used to personalize your questions." : "Not added yet."}
-              </span>
+            <section className="rounded-lg border border-[#eef1f6] bg-white px-5 py-4">
+              <p className="text-sm leading-relaxed text-[#0b1120]">
+                {mostRecentCompleted?.mode === "technical"
+                  ? "Balance things out with a behavioral round next — alternating keeps both skill sets sharp."
+                  : "Mix in a technical round next — alternating keeps both skill sets sharp."}
+              </p>
+              <Link
+                href="/interview/setup"
+                className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-accent-deep hover:text-accent"
+              >
+                Go to practice
+                <ArrowRightIcon size={11} />
+              </Link>
+            </section>
+          </>
+        )}
+
+        <section className="flex items-center justify-between border-t border-[#eef1f6] pt-5">
+          <div>
+            <div className="text-sm font-medium text-[#0b1120]">Resume</div>
+            <div className="mt-0.5 text-xs text-[#93a1b5]">
+              {hasResume ? "On file — personalizing your questions." : "Not added yet."}
             </div>
           </div>
           <Link
             href="/resume"
-            className="shrink-0 rounded-lg border border-[#e3e7ee] px-3.5 py-2 text-sm font-medium text-[#0b1120] transition-colors hover:bg-[#f4f5f7]"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent-deep hover:text-accent"
           >
             {hasResume ? "View resume" : "Add resume"}
+            <ArrowRightIcon size={11} />
           </Link>
         </section>
       </div>
     </DashboardShell>
-  );
-}
-
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof CodeIcon;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="flex items-center gap-3 rounded-2xl border border-[#eef1f6] bg-white px-5 py-4">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#e9f6f1] text-[#0f9d78]">
-        <Icon size={17} weight="light" />
-      </span>
-      <div className="flex flex-col">
-        <span className="text-xl font-semibold text-[#0b1120] tabular-nums">{value}</span>
-        <span className="text-xs text-[#5b6474]">{label}</span>
-      </div>
-    </div>
   );
 }

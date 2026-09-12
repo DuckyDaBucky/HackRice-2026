@@ -6,7 +6,7 @@ import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 // Routes that own their full chrome (the marketing nav, or DashboardShell's
 // sidebar + user menu) and therefore don't need this generic top bar.
-const OWN_HEADER_ROUTES = ["/", "/interviews", "/resume", "/analytics", "/resources"];
+const OWN_HEADER_ROUTES = ["/", "/interviews", "/resume", "/analytics"];
 
 /** Hidden on /interview routes: the call UI is full-bleed and owns its own header. */
 export function SiteHeader() {

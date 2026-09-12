@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
-import { FileTextIcon } from "@phosphor-icons/react/ssr";
 import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { ResumeUploadButton } from "@/components/dashboard/ResumeUploadButton";
 import { getProfile } from "@/lib/profiles";
 
 const LEVEL_LABEL: Record<string, string> = {
@@ -10,8 +10,10 @@ const LEVEL_LABEL: Record<string, string> = {
   entry: "Entry level",
   mid: "Mid level",
   senior: "Senior",
-  unknown: "Not yet classified",
+  unknown: "Experience level not yet classified",
 };
+
+const EDUCATION_KIND = "education";
 
 export default async function ResumePage() {
   if (!clerkEnabled) redirect("/");
@@ -22,62 +24,118 @@ export default async function ResumePage() {
 
   return (
     <DashboardShell active="Resume" firstName={user.firstName}>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0b1120] sm:text-3xl">
-            Resume
-          </h1>
-          <p className="text-sm text-[#5b6474]">
-            Your resume is what makes practice questions specific to you.
-          </p>
-        </div>
-
-        {account ? (
-          <div className="flex flex-col gap-5 rounded-2xl border border-[#eef1f6] bg-white p-6">
-            <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#e9f6f1] text-[#0f9d78]">
-                <FileTextIcon size={18} weight="light" />
-              </span>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-[#0b1120]">Profile on file</span>
-                <span className="text-xs text-[#93a1b5]">
-                  Last updated{" "}
-                  {new Date(account.updatedAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
+      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
+        {!account ? (
+          <>
+            <div>
+              <h1 className="text-[26px] font-semibold tracking-tight text-[#0b1120]">Resume</h1>
+              <p className="mt-1 text-sm text-[#6b7280]">
+                Personalize your interviews using your experience.
+              </p>
             </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <SummaryStat label="Experience level" value={LEVEL_LABEL[account.profile.experienceLevel]} />
-              <SummaryStat label="Projects" value={String(account.profile.projects.length)} />
-              <SummaryStat label="Skills tracked" value={String(account.profile.skills.length)} />
+            <div className="flex flex-col items-start gap-2 rounded-lg border border-[#eef1f6] bg-white px-5 py-6">
+              <ResumeUploadButton label="Upload resume" />
+              <p className="text-xs text-[#93a1b5]">PDF or DOCX</p>
             </div>
-          </div>
+          </>
         ) : (
-          <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-[#e3e7ee] bg-white px-6 py-14 text-center">
-            <FileTextIcon size={28} weight="light" className="text-[#c4cbd6]" />
-            <p className="text-sm text-[#5b6474]">You haven&rsquo;t added a resume yet.</p>
-          </div>
-        )}
+          <>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h1 className="text-[26px] font-semibold tracking-tight text-[#0b1120]">
+                  {user.fullName ?? user.firstName ?? "Your profile"}
+                </h1>
+                <p className="mt-1 text-sm text-[#6b7280]">
+                  {LEVEL_LABEL[account.profile.experienceLevel]}
+                </p>
+              </div>
+              <ResumeUploadButton label="Replace resume" variant="outline" />
+            </div>
 
-        <p className="text-xs text-[#93a1b5]">
-          Resume upload and editing from your dashboard is coming soon — for now this reflects
-          whatever profile has been parsed for your account.
-        </p>
+            {account.profile.skills.length > 0 && (
+              <section>
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                  Skills
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {account.profile.skills.map((skill) => (
+                    <span
+                      key={skill}
+                      className="rounded-md border border-[#e3e7ee] px-2.5 py-1 text-xs font-medium text-[#0b1120]"
+                    >
+                      {skill}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {account.profile.projects.length > 0 && (
+              <section>
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                  Projects
+                </h2>
+                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+                  {account.profile.projects.map((project) => (
+                    <li key={project.id} className="px-4 py-3">
+                      <div className="text-sm font-medium text-[#0b1120]">{project.name}</div>
+                      {project.description && (
+                        <p className="mt-0.5 text-sm text-[#5b6474]">{project.description}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
+            {account.profile.sections.filter((s) => s.kind !== EDUCATION_KIND).length > 0 && (
+              <section>
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                  Experience
+                </h2>
+                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+                  {account.profile.sections
+                    .filter((s) => s.kind !== EDUCATION_KIND)
+                    .map((section, i) => (
+                      <li key={i} className="px-4 py-3">
+                        <div className="text-sm font-medium text-[#0b1120]">
+                          {section.title}
+                          {section.organization ? ` · ${section.organization}` : ""}
+                        </div>
+                        {section.dates && (
+                          <div className="mt-0.5 text-xs text-[#93a1b5]">{section.dates}</div>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            )}
+
+            {account.profile.sections.filter((s) => s.kind === EDUCATION_KIND).length > 0 && (
+              <section>
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                  Education
+                </h2>
+                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-lg border border-[#eef1f6]">
+                  {account.profile.sections
+                    .filter((s) => s.kind === EDUCATION_KIND)
+                    .map((section, i) => (
+                      <li key={i} className="px-4 py-3">
+                        <div className="text-sm font-medium text-[#0b1120]">
+                          {section.title}
+                          {section.organization ? ` · ${section.organization}` : ""}
+                        </div>
+                        {section.dates && (
+                          <div className="mt-0.5 text-xs text-[#93a1b5]">{section.dates}</div>
+                        )}
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            )}
+          </>
+        )}
       </div>
     </DashboardShell>
-  );
-}
-
-function SummaryStat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-[#f4f5f7] px-4 py-3">
-      <div className="text-base font-semibold text-[#0b1120]">{value}</div>
-      <div className="text-xs text-[#5b6474]">{label}</div>
-    </div>
   );
 }
