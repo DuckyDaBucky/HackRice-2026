@@ -115,12 +115,12 @@ export function SetupForm() {
         </p>
       </div>
 
-      <section className="relative overflow-hidden rounded-xl border border-dash-border bg-dash-surface px-6 py-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-8">
+      <section className="relative rounded-xl border border-dash-border bg-dash-surface px-6 py-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-8">
         <div
-          className="pointer-events-none absolute inset-0 [background:radial-gradient(120%_100%_at_100%_0%,color-mix(in_srgb,var(--color-accent)_10%,transparent),transparent_60%)]"
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl [background:radial-gradient(120%_100%_at_100%_0%,color-mix(in_srgb,var(--color-accent)_10%,transparent),transparent_60%)]"
           aria-hidden="true"
         />
-        <div className="relative flex flex-col gap-3">
+        <div className="relative z-[1] flex flex-col gap-3">
           <SectionHeading step="1" title="What role are you practicing for?" />
           <RoleCombobox value={targetRole} onChange={setTargetRole} />
           <p className="text-xs text-dash-text-faint">

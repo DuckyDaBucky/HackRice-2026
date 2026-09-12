@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { filterRoles } from "@/lib/roles";
 
 interface Option {
@@ -8,6 +9,12 @@ interface Option {
   label: string;
   custom: boolean;
 }
+
+type ListPosition = {
+  top: number;
+  left: number;
+  width: number;
+};
 
 /**
  * Target-role combobox: focus with an empty field shows popular roles;
@@ -23,7 +30,10 @@ export function RoleCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
+  const [mounted, setMounted] = useState(false);
+  const [listPosition, setListPosition] = useState<ListPosition | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const listId = useId();
 
   const query = value.trim();
@@ -35,12 +45,43 @@ export function RoleCombobox({
   }
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updateListPosition = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    setListPosition({
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: rect.width,
+    });
+  };
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    updateListPosition();
+    const onLayoutChange = () => updateListPosition();
+    window.addEventListener("resize", onLayoutChange);
+    window.addEventListener("scroll", onLayoutChange, true);
+    return () => {
+      window.removeEventListener("resize", onLayoutChange);
+      window.removeEventListener("scroll", onLayoutChange, true);
+    };
+  }, [open, value]);
+
+  useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+      if (rootRef.current && !rootRef.current.contains(event.target as Node)) {
+        const list = document.getElementById(listId);
+        if (list?.contains(event.target as Node)) return;
+        setOpen(false);
+      }
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, []);
+  }, [listId]);
 
   useEffect(() => {
     setHighlight(0);
@@ -51,9 +92,52 @@ export function RoleCombobox({
     setOpen(false);
   };
 
+  const listbox =
+    open && options.length > 0 && listPosition ? (
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label={typing ? "Matching roles" : "Popular roles"}
+        style={{
+          top: listPosition.top,
+          left: listPosition.left,
+          width: listPosition.width,
+        }}
+        className="fixed z-[100] max-h-80 overflow-y-auto rounded-xl border border-[#e3e7ee] bg-white p-1.5 shadow-[0_12px_40px_rgba(15,23,42,0.12)] [color-scheme:light]"
+      >
+        <li
+          aria-hidden="true"
+          className="sticky top-0 bg-white px-3 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-[#93a1b5] uppercase"
+        >
+          {typing ? "Matching roles" : "Popular roles"}
+        </li>
+        {options.map((option, index) => (
+          <li key={option.key} role="option" aria-selected={index === highlight}>
+            <button
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                choose(option);
+              }}
+              onMouseEnter={() => setHighlight(index)}
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition-colors duration-150 ${
+                index === highlight
+                  ? "bg-[#f4f5f7] text-[#0b1120]"
+                  : "text-[#6b7280] hover:bg-[#f9fafb] hover:text-[#0b1120]"
+              }`}
+            >
+              <span>{option.label}</span>
+              {option.custom && <span className="text-xs font-medium text-[#14b8a6]">Custom</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    ) : null;
+
   return (
     <div ref={rootRef} className="relative">
       <input
+        ref={inputRef}
         id="target-role"
         role="combobox"
         aria-expanded={open}
@@ -64,7 +148,10 @@ export function RoleCombobox({
           onChange(event.target.value);
           setOpen(true);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          setOpen(true);
+          updateListPosition();
+        }}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" && options.length > 0) {
             event.preventDefault();
@@ -83,37 +170,9 @@ export function RoleCombobox({
         placeholder="e.g. Backend engineer — pick a popular role or type your own"
         maxLength={160}
         autoComplete="off"
-        className="h-12 w-full rounded-lg border border-dash-border-strong bg-dash-surface px-4 text-[15px] text-dash-text shadow-sm outline-none placeholder:text-dash-text-faint focus:border-accent"
+        className="h-12 w-full rounded-lg border border-dash-border-strong bg-white px-4 text-[15px] text-[#0b1120] shadow-sm outline-none placeholder:text-dash-text-faint focus:border-accent [color-scheme:light]"
       />
-      {open && options.length > 0 && (
-        <ul
-          id={listId}
-          role="listbox"
-          aria-label={typing ? "Matching roles" : "Popular roles"}
-          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-dash-border bg-dash-surface p-1.5 shadow-xl"
-        >
-          <li aria-hidden="true" className="px-3 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-dash-text-faint uppercase">
-            {typing ? "Matching roles" : "Popular roles"}
-          </li>
-          {options.map((option, index) => (
-            <li key={option.key} role="option" aria-selected={index === highlight}>
-              <button
-                type="button"
-                onMouseDown={(event) => {
-                  // Fire before the input's blur closes the list.
-                  event.preventDefault();
-                  choose(option);
-                }}
-                onMouseEnter={() => setHighlight(index)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 ${index === highlight ? "bg-dash-nav-active text-dash-text" : "text-dash-text-muted"}`}
-              >
-                <span>{option.label}</span>
-                {option.custom && <span className="text-xs font-medium text-accent-deep">Custom</span>}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {mounted && listbox ? createPortal(listbox, document.body) : null}
     </div>
   );
 }
