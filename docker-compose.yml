@@ -1,0 +1,84 @@
+name: get-me-hired
+
+services:
+  app:
+    build:
+      context: ./app
+      args:
+        NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}
+        NEXT_PUBLIC_CLERK_SIGN_IN_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/sign-in}
+        NEXT_PUBLIC_CLERK_SIGN_UP_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}
+        NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: ${NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL:-/}
+        NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: ${NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL:-/}
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    expose:
+      - "3000"
+
+  presage-api:
+    build:
+      context: ./presage-api
+    init: true
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8080
+    expose:
+      - "8080"
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  nginx:
+    build:
+      context: ./deploy/nginx
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+      presage-api:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - certbot-challenges:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/nginx-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      nginx:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/opt/certbot/run-certbot.sh"]
+    volumes:
+      - ./deploy/certbot/run-certbot.sh:/opt/certbot/run-certbot.sh:ro
+      - certbot-challenges:/var/www/certbot
+      - letsencrypt:/etc/letsencrypt
+
+volumes:
+  certbot-challenges:
+  letsencrypt:
