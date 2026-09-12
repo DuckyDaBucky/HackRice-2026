@@ -27,6 +27,7 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 | [First-push handoff](13-first-push-handoff.md) | How to reconcile this baseline with the first code push |
 | [Current codebase](14-current-codebase.md) | Verified stack, routes, authentication, database utility and implementation gaps |
 | [Development guide](15-development-guide.md) | Source-backed setup commands, configuration and verification steps |
+| [Data model slice](18-data-model-slice.md) | Minimal interview-practice schema (sessions/questions/answer attempts), verified against the real DEV database |
 | [Change log](CHANGELOG.md) | Documentation changes and future implementation reconciliation |
 
 ## Status conventions
