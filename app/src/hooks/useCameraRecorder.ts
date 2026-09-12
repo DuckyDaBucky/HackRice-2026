@@ -15,8 +15,12 @@ export interface UseCameraRecorder {
    * — callers that need to act on the outcome (e.g. speak the first
    * question) should use the return value, not read `state`/`stream`
    * afterward, since that's a stale closure in an event handler.
+   *
+   * Pass device IDs (chosen in the pre-join lobby) to open those inputs
+   * instead of the defaults. A device that was unplugged since selection
+   * falls back to the default rather than failing the join.
    */
-  start: () => Promise<MediaStream | null>;
+  start: (devices?: RecorderDevices) => Promise<MediaStream | null>;
   /** Begins recording the current question into a fresh MediaRecorder. */
   record: () => void;
   pause: () => void;
@@ -27,6 +31,11 @@ export interface UseCameraRecorder {
   reset: () => void;
   /** Stops all tracks and releases the camera. Call on unmount / session end. */
   release: () => void;
+}
+
+export interface RecorderDevices {
+  videoDeviceId?: string | null;
+  audioDeviceId?: string | null;
 }
 
 export function useCameraRecorder(): UseCameraRecorder {
@@ -64,29 +73,57 @@ export function useCameraRecorder(): UseCameraRecorder {
     [],
   );
 
-  const start = useCallback(async (): Promise<MediaStream | null> => {
+  const start = useCallback(async (devices?: RecorderDevices): Promise<MediaStream | null> => {
     setError(null);
     dispatch({ type: "REQUEST_PERMISSION" });
+    // Re-acquiring (e.g. lobby Join after the preview stream) must not leak
+    // the previously owned tracks.
+    if (currentStreamRef.current) {
+      const previous = currentStreamRef.current;
+      currentStreamRef.current = null;
+      previous.getTracks().forEach((track) => track.stop());
+    }
+    // Echo cancellation + noise suppression keep the interviewer's TTS
+    // playback and room noise out of the candidate's answer track, which
+    // directly improves both live captions and server-side transcription.
+    const audioBase = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    };
+    const constraints = (exact: boolean): MediaStreamConstraints => ({
+      video: devices?.videoDeviceId && exact ? { deviceId: { exact: devices.videoDeviceId } } : true,
+      audio: devices?.audioDeviceId && exact
+        ? { ...audioBase, deviceId: { exact: devices.audioDeviceId } }
+        : audioBase,
+    });
+    let mediaStream: MediaStream;
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        // Echo cancellation + noise suppression keep the interviewer's TTS
-        // playback and room noise out of the candidate's answer track, which
-        // directly improves both live captions and server-side transcription.
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      // The component using this hook may have unmounted while permission
-      // was pending. Stop the tracks we just acquired instead of leaking
-      // an active camera/mic that nothing will ever release.
-      if (disposedRef.current) {
-        mediaStream.getTracks().forEach((track) => track.stop());
+      mediaStream = await navigator.mediaDevices.getUserMedia(constraints(true));
+    } catch (err) {
+      // A device chosen in the lobby may have been unplugged since — fall
+      // back to defaults instead of failing the join.
+      if (err instanceof OverconstrainedError || (err instanceof Error && err.name === "OverconstrainedError")) {
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia(constraints(false));
+        } catch (retryErr) {
+          setError(retryErr instanceof Error ? retryErr : new Error("Could not access the camera"));
+          dispatch({ type: "PERMISSION_DENIED" });
+          return null;
+        }
+      } else {
+        setError(err instanceof Error ? err : new Error("Could not access the camera"));
+        dispatch({ type: "PERMISSION_DENIED" });
         return null;
       }
+    }
+    // The component using this hook may have unmounted while permission
+    // was pending. Stop the tracks we just acquired instead of leaking
+    // an active camera/mic that nothing will ever release.
+    if (disposedRef.current) {
+      mediaStream.getTracks().forEach((track) => track.stop());
+      return null;
+    }
 
       currentStreamRef.current = mediaStream;
       mediaStream.getTracks().forEach((track) => {
@@ -103,11 +140,6 @@ export function useCameraRecorder(): UseCameraRecorder {
       setStream(mediaStream);
       dispatch({ type: "PERMISSION_GRANTED" });
       return mediaStream;
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error("Could not access the camera"));
-      dispatch({ type: "PERMISSION_DENIED" });
-      return null;
-    }
   }, [dispatch]);
 
   const record = useCallback(() => {

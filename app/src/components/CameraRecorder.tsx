@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
 import { useLiveCaptions } from "@/hooks/useLiveCaptions";
+import { SUBTITLE_SIZE_CLASS, useSubtitleSize } from "@/hooks/useSubtitleSize";
 import type { UseTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { InterviewMood } from "@/lib/interview-config";
 import { formatDuration } from "@/lib/recording/format-duration";
@@ -130,6 +131,7 @@ export function CameraRecorder({
 }: CameraRecorderProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captions = useLiveCaptions();
+  const { size: subtitleSize } = useSubtitleSize();
   const { record, reset, state: recorderState, stop, pause, resume } = recorder;
   const {
     finalText,
@@ -421,7 +423,7 @@ export function CameraRecorder({
                 <div
                   ref={transcriptPanelRef}
                   aria-live="polite"
-                  className="absolute bottom-12 left-3 right-3 max-h-28 overflow-y-auto overscroll-contain rounded-sm bg-black/70 px-3 py-2 text-sm leading-5 text-white shadow-sm [scrollbar-color:rgba(255,255,255,0.35)_transparent]"
+                  className={`absolute bottom-12 left-3 right-3 max-h-28 overflow-y-auto overscroll-contain rounded-sm bg-black/70 px-3 py-2 leading-5 text-white shadow-sm [scrollbar-color:rgba(255,255,255,0.35)_transparent] ${SUBTITLE_SIZE_CLASS[subtitleSize]}`}
                 >
                   <p>
                     {finalText} {interimText && <span className="text-zinc-300">{interimText}</span>}
