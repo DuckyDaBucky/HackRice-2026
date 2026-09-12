@@ -28,6 +28,7 @@ export function ViewSwitcher({ currentView }: { currentView: DashboardView }) {
       <div className="grid grid-cols-2 gap-1">
         {OPTIONS.map(({ view, label, icon: Icon }) => {
           const isActive = currentView === view;
+          const isHr = view === "hr";
           return (
             <button
               key={view}
@@ -36,11 +37,13 @@ export function ViewSwitcher({ currentView }: { currentView: DashboardView }) {
               aria-pressed={isActive}
               className={`flex flex-col items-center gap-1 rounded-md px-2 py-2 text-center transition-colors duration-150 ${
                 isActive
-                  ? "bg-dash-nav-active text-dash-text ring-1 ring-accent/30"
+                  ? isHr
+                    ? "bg-dash-nav-active-hr text-dash-text ring-1 ring-hr-accent/30"
+                    : "bg-dash-nav-active text-dash-text ring-1 ring-accent/30"
                   : "text-dash-text-muted hover:bg-dash-nav-hover hover:text-dash-text"
               }`}
             >
-              <Icon size={16} weight={isActive ? "fill" : "regular"} className={isActive ? "text-accent-deep" : ""} />
+              <Icon size={16} weight={isActive ? "fill" : "regular"} className={isActive ? (isHr ? "text-hr-accent-deep" : "text-accent-deep") : ""} />
               <span className="text-[11px] font-semibold leading-none">{label}</span>
             </button>
           );

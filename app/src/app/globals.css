@@ -24,6 +24,13 @@
   --dash-blue: #3b82f6;
   --dash-solid: #0b1120;
   --dash-solid-text: #ffffff;
+
+  /* HR workspace identity — burgundy/wine. Light-mode values. */
+  --hr-accent: #9d1c3f;
+  --hr-accent-hover: #b4234a;
+  --hr-accent-deep: #841434;
+  --hr-on-accent: #ffffff;
+  --dash-nav-active-hr: color-mix(in srgb, #ffffff 88%, var(--hr-accent) 12%);
 }
 
 /* Dashboard theme tokens — dark. Neutral navy/charcoal, teal reserved for
@@ -48,6 +55,13 @@
   --dash-blue: #3b82f6;
   --dash-solid: #f8fafc;
   --dash-solid-text: #0b1220;
+
+  /* HR workspace identity — burgundy/wine. Dark-mode values (brightened for contrast). */
+  --hr-accent: #d15474;
+  --hr-accent-hover: #e0607f;
+  --hr-accent-deep: #e78ba2;
+  --hr-on-accent: #2b0a12;
+  --dash-nav-active-hr: color-mix(in srgb, #182235 86%, var(--hr-accent) 14%);
 }
 
 @theme inline {
@@ -81,6 +95,11 @@
   --color-dash-blue: var(--dash-blue);
   --color-dash-solid: var(--dash-solid);
   --color-dash-solid-text: var(--dash-solid-text);
+  --color-hr-accent: var(--hr-accent);
+  --color-hr-accent-hover: var(--hr-accent-hover);
+  --color-hr-accent-deep: var(--hr-accent-deep);
+  --color-hr-on-accent: var(--hr-on-accent);
+  --color-dash-nav-active-hr: var(--dash-nav-active-hr);
 }
 
 body {

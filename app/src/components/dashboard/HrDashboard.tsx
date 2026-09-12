@@ -38,7 +38,7 @@ export function HrDashboard({
           <section className="rounded-xl border border-dash-border bg-dash-surface px-6 py-7">
             <h2 className="text-lg font-semibold text-dash-text">Hiring is disabled</h2>
             <p className="mt-2 text-sm text-dash-text-muted">
-              Set <code className="text-accent-deep">HIRING_ENABLED=true</code> after migrations and provider setup.
+              Set <code className="text-hr-accent-deep">HIRING_ENABLED=true</code> after migrations and provider setup.
             </p>
           </section>
         ) : !orgId ? (
@@ -55,7 +55,7 @@ export function HrDashboard({
               <div className="flex flex-wrap gap-2">
                 <Link
                   href="/hr/live"
-                  className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-semibold text-dash-on-accent transition-colors duration-150 hover:bg-accent-hover"
+                  className="inline-flex h-9 items-center rounded-md bg-hr-accent px-4 text-sm font-semibold text-hr-on-accent transition-colors duration-150 hover:bg-hr-accent-hover active:scale-[0.98]"
                 >
                   Live judge demo
                 </Link>
@@ -85,7 +85,7 @@ export function HrDashboard({
                       <td className="px-4 py-3 text-right">
                         <Link
                           href={`/hr/jobs/${job.id}?org=${orgId}`}
-                          className="inline-flex items-center gap-1 text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
+                          className="inline-flex items-center gap-1 text-sm font-medium text-hr-accent-deep transition-colors duration-150 hover:text-hr-accent"
                         >
                           Open
                           <ArrowRightIcon size={11} />

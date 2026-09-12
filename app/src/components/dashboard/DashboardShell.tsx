@@ -40,10 +40,16 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  // HR workspace gets the burgundy identity; candidate keeps teal.
+  const isHr = dashboardView === "hr";
+  const activeBorder = isHr ? "border-hr-accent" : "border-accent";
+  const activeBg = isHr ? "bg-dash-nav-active-hr" : "bg-dash-nav-active";
+  const activeIcon = isHr ? "text-hr-accent-deep" : "text-accent-deep";
 
   return (
-    <div className="flex min-h-screen bg-dash-bg [color-scheme:light] [html[data-theme=dark]_&]:[color-scheme:dark]">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-dash-border bg-dash-sidebar py-5 lg:flex">
+    <div className="flex min-h-screen bg-dash-bg">
+      {/* Fixed in the viewport with its own scroll — never stretches with page length. */}
+      <aside className="hidden w-56 shrink-0 flex-col overflow-y-auto border-r border-dash-border bg-dash-sidebar py-5 lg:sticky lg:top-0 lg:flex lg:h-screen">
         <Link href="/" className="px-5">
           <Logo size="sm" onLight />
         </Link>
@@ -58,11 +64,11 @@ export function DashboardShell({
                 href={item.href}
                 className={`flex items-center gap-2.5 rounded-r-md border-l-2 py-1.5 pl-3 pr-3 text-[13.5px] font-medium transition-colors duration-150 ${
                   isActive
-                    ? "border-accent bg-dash-nav-active text-dash-text"
+                    ? `${activeBorder} ${activeBg} text-dash-text`
                     : "border-transparent text-dash-text-muted hover:bg-dash-nav-hover hover:text-dash-text"
                 }`}
               >
-                <Icon size={17} weight="regular" className={isActive ? "text-accent-deep" : ""} />
+                <Icon size={17} weight="regular" className={isActive ? activeIcon : ""} />
                 {item.label}
               </Link>
             );
