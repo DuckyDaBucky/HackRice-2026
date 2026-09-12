@@ -1,5 +1,7 @@
 import "server-only";
-import { db } from "@/lib/db";
+import { and, eq, gt, inArray } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import { candidacies, hiringJobs, invitations, organizations } from "@/lib/db/schema";
 import { requireOrgAccess } from "./access";
 import { generateInvitationSecret, hashSecret, verifySecret } from "./crypto";
 import { enqueueSolanaAction } from "@/lib/solana/outbox";
@@ -52,26 +54,30 @@ export async function issueInvitation(params: {
   const secret = generateInvitationSecret();
   const secretHash = hashSecret(secret);
 
-  await db.query(
-    `UPDATE invitations SET status = 'superseded', revoked_at = now()
-     WHERE candidacy_id = $1 AND status = 'active'`,
-    [params.candidacyId],
-  );
+  await orm
+    .update(invitations)
+    .set({ status: "superseded", revokedAt: new Date() })
+    .where(and(eq(invitations.candidacyId, params.candidacyId), eq(invitations.status, "active")));
 
-  const result = await db.query<{ id: string; deadline_at: Date }>(
-    `INSERT INTO invitations
-       (candidacy_id, pack_revision, secret_hash, deadline_at, recruiter_contact, status)
-     VALUES ($1, $2, $3, now() + ($4 || ' days')::interval, $5, 'active')
-     RETURNING id, deadline_at`,
-    [params.candidacyId, params.packRevision, secretHash, String(days), params.recruiterContact ?? ""],
-  );
-  const invitation = result.rows[0];
+  const deadlineAt = new Date(Date.now() + days * 86400000);
+  const rows = await orm
+    .insert(invitations)
+    .values({
+      candidacyId: params.candidacyId,
+      packRevision: params.packRevision,
+      secretHash,
+      deadlineAt,
+      recruiterContact: params.recruiterContact ?? "",
+      status: "active",
+    })
+    .returning({ id: invitations.id, deadline_at: invitations.deadlineAt });
+  const invitation = rows[0];
   if (!invitation) throw new Error("Could not create invitation.");
 
-  await db.query(
-    `UPDATE candidacies SET status = 'invited', updated_at = now() WHERE id = $1`,
-    [params.candidacyId],
-  );
+  await orm
+    .update(candidacies)
+    .set({ status: "invited", updatedAt: new Date() })
+    .where(eq(candidacies.id, params.candidacyId));
 
   await enqueueSolanaAction({
     action: "issue_invitation",
@@ -88,17 +94,39 @@ export async function issueInvitation(params: {
 
 export async function exchangeInvitationSecret(secret: string) {
   const secretHash = hashSecret(secret);
-  const result = await db.query(
-    `SELECT i.*, c.confirmed_email, c.confirmed_name, c.organization_id, c.id AS candidacy_id,
-            j.title AS job_title, o.display_name AS org_name
-     FROM invitations i
-     JOIN candidacies c ON c.id = i.candidacy_id
-     JOIN hiring_jobs j ON j.id = c.job_id
-     JOIN organizations o ON o.id = c.organization_id
-     WHERE i.secret_hash = $1 AND i.status = 'active' AND i.deadline_at > now()`,
-    [secretHash],
-  );
-  const row = result.rows[0];
+  const rows = await orm
+    .select({
+      id: invitations.id,
+      candidacy_id: candidacies.id,
+      pack_revision: invitations.packRevision,
+      secret_hash: invitations.secretHash,
+      deadline_at: invitations.deadlineAt,
+      recruiter_contact: invitations.recruiterContact,
+      status: invitations.status,
+      revoked_at: invitations.revokedAt,
+      superseded_by: invitations.supersededBy,
+      solana_invitation_pda: invitations.solanaInvitationPda,
+      issued_at: invitations.issuedAt,
+      accepted_at: invitations.acceptedAt,
+      confirmed_email: candidacies.confirmedEmail,
+      confirmed_name: candidacies.confirmedName,
+      organization_id: candidacies.organizationId,
+      job_title: hiringJobs.title,
+      org_name: organizations.displayName,
+    })
+    .from(invitations)
+    .innerJoin(candidacies, eq(candidacies.id, invitations.candidacyId))
+    .innerJoin(hiringJobs, eq(hiringJobs.id, candidacies.jobId))
+    .innerJoin(organizations, eq(organizations.id, candidacies.organizationId))
+    .where(
+      and(
+        eq(invitations.secretHash, secretHash),
+        eq(invitations.status, "active"),
+        gt(invitations.deadlineAt, new Date()),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
   if (!row || !verifySecret(secret, row.secret_hash)) return null;
   return row;
 }
@@ -108,13 +136,22 @@ export async function revokeInvitation(params: {
   invitationId: string;
 }) {
   await requireOrgAccess(params.organizationId);
-  await db.query(
-    `UPDATE invitations SET status = 'revoked', revoked_at = now()
-     WHERE id = $1 AND candidacy_id IN (
-       SELECT id FROM candidacies WHERE organization_id = $2
-     ) AND status = 'active'`,
-    [params.invitationId, params.organizationId],
-  );
+  await orm
+    .update(invitations)
+    .set({ status: "revoked", revokedAt: new Date() })
+    .where(
+      and(
+        eq(invitations.id, params.invitationId),
+        eq(invitations.status, "active"),
+        inArray(
+          invitations.candidacyId,
+          orm
+            .select({ id: candidacies.id })
+            .from(candidacies)
+            .where(eq(candidacies.organizationId, params.organizationId)),
+        ),
+      ),
+    );
   await enqueueSolanaAction({
     action: "revoke_invitation",
     organizationId: params.organizationId,
@@ -128,21 +165,34 @@ export async function bindCandidateEmail(params: {
   clerkUserId: string;
   verifiedEmail: string;
 }) {
-  const invitation = await db.query(
-    `SELECT i.*, c.confirmed_email, c.id AS candidacy_id
-     FROM invitations i JOIN candidacies c ON c.id = i.candidacy_id
-     WHERE i.id = $1 AND i.status = 'active'`,
-    [params.invitationId],
-  );
-  const row = invitation.rows[0];
+  const rows = await orm
+    .select({
+      id: invitations.id,
+      candidacy_id: candidacies.id,
+      pack_revision: invitations.packRevision,
+      secret_hash: invitations.secretHash,
+      deadline_at: invitations.deadlineAt,
+      recruiter_contact: invitations.recruiterContact,
+      status: invitations.status,
+      revoked_at: invitations.revokedAt,
+      superseded_by: invitations.supersededBy,
+      solana_invitation_pda: invitations.solanaInvitationPda,
+      issued_at: invitations.issuedAt,
+      accepted_at: invitations.acceptedAt,
+      confirmed_email: candidacies.confirmedEmail,
+    })
+    .from(invitations)
+    .innerJoin(candidacies, eq(candidacies.id, invitations.candidacyId))
+    .where(and(eq(invitations.id, params.invitationId), eq(invitations.status, "active")))
+    .limit(1);
+  const row = rows[0];
   if (!row) throw new Error("Invitation not found.");
   if (row.confirmed_email.toLowerCase() !== params.verifiedEmail.toLowerCase()) {
     throw new Error("Sign in with the email address your recruiter confirmed.");
   }
-  await db.query(
-    `UPDATE candidacies SET clerk_user_id = $2, status = 'verification_pending', updated_at = now()
-     WHERE id = $1`,
-    [row.candidacy_id, params.clerkUserId],
-  );
+  await orm
+    .update(candidacies)
+    .set({ clerkUserId: params.clerkUserId, status: "verification_pending", updatedAt: new Date() })
+    .where(eq(candidacies.id, row.candidacy_id));
   return row;
 }

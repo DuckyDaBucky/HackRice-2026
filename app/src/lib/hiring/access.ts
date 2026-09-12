@@ -1,6 +1,8 @@
 import "server-only";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import { organizations } from "@/lib/db/schema";
 import { requireHiringEnabled } from "./config";
 import { isHiringSuperadmin } from "./superadmin";
 
@@ -30,17 +32,17 @@ export async function requireOrgMembership(clerkOrgId: string): Promise<{ userId
 }
 
 export async function getProvisionedOrganization(clerkOrgId: string) {
-  const result = await db.query<{
-    id: string;
-    clerk_org_id: string;
-    display_name: string;
-    provisioning_status: string;
-  }>(
-    `SELECT id, clerk_org_id, display_name, provisioning_status
-     FROM organizations WHERE clerk_org_id = $1 AND provisioning_status = 'active'`,
-    [clerkOrgId],
-  );
-  return result.rows[0] ?? null;
+  const rows = await orm
+    .select({
+      id: organizations.id,
+      clerk_org_id: organizations.clerkOrgId,
+      display_name: organizations.displayName,
+      provisioning_status: organizations.provisioningStatus,
+    })
+    .from(organizations)
+    .where(and(eq(organizations.clerkOrgId, clerkOrgId), eq(organizations.provisioningStatus, "active")))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function provisionOrganization(params: {
@@ -48,22 +50,28 @@ export async function provisionOrganization(params: {
   displayName: string;
 }) {
   requireHiringEnabled();
-  const result = await db.query<{ id: string }>(
-    `INSERT INTO organizations (clerk_org_id, display_name, provisioning_status)
-     VALUES ($1, $2, 'active')
-     ON CONFLICT (clerk_org_id) DO UPDATE SET display_name = EXCLUDED.display_name, updated_at = now()
-     RETURNING id`,
-    [params.clerkOrgId, params.displayName],
-  );
-  return result.rows[0]?.id;
+  const rows = await orm
+    .insert(organizations)
+    .values({
+      clerkOrgId: params.clerkOrgId,
+      displayName: params.displayName,
+      provisioningStatus: "active",
+    })
+    .onConflictDoUpdate({
+      target: organizations.clerkOrgId,
+      set: { displayName: params.displayName, updatedAt: new Date() },
+    })
+    .returning({ id: organizations.id });
+  return rows[0]?.id;
 }
 
 export async function requireOrgAccess(organizationId: string) {
-  const org = await db.query<{ clerk_org_id: string }>(
-    `SELECT clerk_org_id FROM organizations WHERE id = $1 AND provisioning_status = 'active'`,
-    [organizationId],
-  );
-  const row = org.rows[0];
+  const rows = await orm
+    .select({ clerk_org_id: organizations.clerkOrgId })
+    .from(organizations)
+    .where(and(eq(organizations.id, organizationId), eq(organizations.provisioningStatus, "active")))
+    .limit(1);
+  const row = rows[0];
   if (!row) throw new Error("Organization not found.");
   const membership = await requireOrgMembership(row.clerk_org_id);
   return { ...membership, organizationId, clerkOrgId: row.clerk_org_id };

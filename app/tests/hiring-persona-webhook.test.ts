@@ -2,13 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHmac } from "node:crypto";
 
 const mocks = vi.hoisted(() => ({
-  query: vi.fn(),
+  select: vi.fn(),
+  insert: vi.fn(),
+  update: vi.fn(),
   enqueueSolanaAction: vi.fn(),
 }));
 
-vi.mock("../src/lib/db", () => ({ db: { query: mocks.query } }));
+vi.mock("../src/lib/db", () => ({ orm: { select: mocks.select, insert: mocks.insert, update: mocks.update } }));
 vi.mock("../src/lib/solana/outbox", () => ({ enqueueSolanaAction: mocks.enqueueSolanaAction }));
 
+import { stubQuery } from "./helpers/drizzle-stub";
 import { handlePersonaWebhook } from "../src/lib/persona/webhook";
 
 function signBody(body: string, secret: string) {
@@ -28,7 +31,7 @@ describe("Persona webhook security", () => {
   it("rejects invalid signatures", async () => {
     const body = JSON.stringify({ data: { id: "evt-1", attributes: { status: "approved" } } });
     await expect(handlePersonaWebhook(body, "deadbeef")).rejects.toThrow("Invalid Persona webhook signature.");
-    expect(mocks.query).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
   });
 
   it("dedupes duplicate event_id deliveries", async () => {
@@ -49,11 +52,11 @@ describe("Persona webhook security", () => {
       },
     });
     const signature = signBody(body, "test-webhook-secret");
-    mocks.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+    mocks.insert.mockReturnValueOnce(stubQuery([]));
 
     const result = await handlePersonaWebhook(body, signature);
     expect(result).toMatchObject({ duplicate: true });
-    expect(mocks.query).toHaveBeenCalledTimes(1);
+    expect(mocks.insert).toHaveBeenCalledTimes(1);
   });
 
   it("marks verification verified only through webhook path", async () => {
@@ -80,24 +83,19 @@ describe("Persona webhook security", () => {
     });
     const signature = signBody(body, "test-webhook-secret");
 
-    mocks.query
-      .mockResolvedValueOnce({ rowCount: 1, rows: [{ id: "wh-1" }] })
-      .mockResolvedValueOnce({
-        rows: [{
-          id: "attempt-1",
-          candidacy_id: "cand-1",
-          invitation_id: "inv-1",
-          organization_id: "org-1",
-          confirmed_name: "Alex Candidate",
-        }],
-      })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] })
-      .mockResolvedValueOnce({ rows: [] });
+    mocks.insert.mockReturnValueOnce(stubQuery([{ id: "wh-1" }]));
+    mocks.select.mockReturnValueOnce(stubQuery([{
+      id: "attempt-1",
+      confirmedName: "Alex Candidate",
+      organizationId: "org-1",
+      candidacyId: "cand-1",
+      invitationId: "inv-1",
+    }]));
+    mocks.update.mockReturnValue(stubQuery([]));
 
     const result = await handlePersonaWebhook(body, signature);
     expect(result).toMatchObject({ verificationStatus: "verified", nameMatch: "match", eventName: "inquiry.approved" });
-    expect(mocks.query.mock.calls.some(([sql]) => String(sql).includes("UPDATE verification_attempts"))).toBe(true);
-    expect(mocks.query.mock.calls.some(([sql]) => String(sql).includes("UPDATE candidacies SET status = 'verified'"))).toBe(true);
+    expect(mocks.update).toHaveBeenCalledTimes(3);
+    expect(mocks.enqueueSolanaAction).toHaveBeenCalledWith(expect.objectContaining({ action: "attest_identity" }));
   });
 });

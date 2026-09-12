@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  query: vi.fn(),
+  select: vi.fn(),
 }));
 
-vi.mock("../src/lib/db", () => ({ db: { query: mocks.query } }));
+vi.mock("../src/lib/db", () => ({ orm: { select: mocks.select } }));
 
+import { stubQuery } from "./helpers/drizzle-stub";
 import { getCandidateVisibleReport } from "../src/lib/hiring/reports";
 
 describe("getCandidateVisibleReport filtering", () => {
@@ -14,47 +15,36 @@ describe("getCandidateVisibleReport filtering", () => {
   });
 
   it("returns null when candidate is not bound to the session", async () => {
-    mocks.query.mockResolvedValueOnce({ rows: [] });
+    mocks.select.mockReturnValueOnce(stubQuery([]));
     expect(await getCandidateVisibleReport("session-1", "user-1")).toBeNull();
   });
 
-  it("returns null when release was revoked", async () => {
-    mocks.query
-      .mockResolvedValueOnce({ rows: [{ candidacy_id: "cand-1" }] })
-      .mockResolvedValueOnce({
-        rows: [{
-          revoked_at: new Date(),
-          release_summary: true,
-          release_rubric: true,
-          release_per_question: true,
-          release_transcript: true,
-          release_recordings: true,
-          summary: { items: [{ rating: 4 }] },
-        }],
-      });
+  it("returns null when every release was revoked", async () => {
+    mocks.select
+      .mockReturnValueOnce(stubQuery([{ candidacy_id: "cand-1" }]))
+      .mockReturnValueOnce(stubQuery([{ id: "rev-1", summary: {} }]))
+      .mockReturnValueOnce(stubQuery([]))
+      .mockReturnValueOnce(stubQuery([{ id: "rel-1" }]));
 
     expect(await getCandidateVisibleReport("session-1", "user-1")).toBeNull();
   });
 
   it("omits unreleased sections and private notes from the response", async () => {
-    mocks.query
-      .mockResolvedValueOnce({ rows: [{ candidacy_id: "cand-1" }] })
-      .mockResolvedValueOnce({
-        rows: [{
-          revoked_at: null,
-          release_summary: true,
-          release_rubric: false,
-          release_per_question: true,
-          release_transcript: false,
-          release_recordings: false,
-          private_notes: "internal only",
-          summary: {
-            headline: "Strong communicator",
-            privateNotes: "should not leak",
-            items: [{ question: "Q1", rating: 5 }, { question: "Q2" }],
-          },
-        }],
-      });
+    mocks.select
+      .mockReturnValueOnce(stubQuery([{ candidacy_id: "cand-1" }]))
+      .mockReturnValueOnce(stubQuery([{ id: "rev-1", summary: {
+        headline: "Strong communicator",
+        privateNotes: "should not leak",
+        items: [{ question: "Q1", rating: 5 }, { question: "Q2" }],
+      } }]))
+      .mockReturnValueOnce(stubQuery([{
+        revokedAt: null,
+        releaseSummary: true,
+        releaseRubric: false,
+        releasePerQuestion: true,
+        releaseTranscript: false,
+        releaseRecordings: false,
+      }]));
 
     const report = await getCandidateVisibleReport("session-1", "user-1");
     expect(report).toEqual({
@@ -73,19 +63,17 @@ describe("getCandidateVisibleReport filtering", () => {
   });
 
   it("includes only explicitly released sections", async () => {
-    mocks.query
-      .mockResolvedValueOnce({ rows: [{ candidacy_id: "cand-1" }] })
-      .mockResolvedValueOnce({
-        rows: [{
-          revoked_at: null,
-          release_summary: false,
-          release_rubric: true,
-          release_per_question: false,
-          release_transcript: true,
-          release_recordings: true,
-          summary: { items: [{ rating: 3 }, { question: "Q2" }] },
-        }],
-      });
+    mocks.select
+      .mockReturnValueOnce(stubQuery([{ candidacy_id: "cand-1" }]))
+      .mockReturnValueOnce(stubQuery([{ id: "rev-1", summary: { items: [{ rating: 3 }, { question: "Q2" }] } }]))
+      .mockReturnValueOnce(stubQuery([{
+        revokedAt: null,
+        releaseSummary: false,
+        releaseRubric: true,
+        releasePerQuestion: false,
+        releaseTranscript: true,
+        releaseRecordings: true,
+      }]));
 
     const report = await getCandidateVisibleReport("session-1", "user-1");
     expect(report).toEqual({

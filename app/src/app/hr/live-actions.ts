@@ -1,7 +1,15 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { db } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import {
+  candidacies,
+  hiringJobs,
+  hiringResumes,
+  hiringSessionBindings,
+  organizations,
+} from "@/lib/db/schema";
 import { requireHiringEnabled } from "@/lib/hiring/config";
 import { provisionOrganization, requireOrgMembership } from "@/lib/hiring/access";
 import { resolveHiringClerkOrgId } from "@/lib/hiring/superadmin";
@@ -40,10 +48,10 @@ export async function hrLiveCreateSession(input: {
   });
   if (!organizationId) throw new Error("Could not provision organization.");
 
-  await db.query(`UPDATE organizations SET display_name = $2, updated_at = now() WHERE id = $1`, [
-    organizationId,
-    input.companyName.trim() || "Demo Company",
-  ]);
+  await orm
+    .update(organizations)
+    .set({ displayName: input.companyName.trim() || "Demo Company", updatedAt: new Date() })
+    .where(eq(organizations.id, organizationId));
 
   const jobId = await createJob({
     organizationId,
@@ -79,13 +87,13 @@ export async function hrLiveSaveResumeText(
 
 export async function hrLiveParseResume(organizationId: string, candidacyId: string) {
   requireHiringEnabled();
-  const row = await db.query<{ extracted_text: string }>(
-    `SELECT r.extracted_text FROM candidacies c
-     JOIN hiring_resumes r ON r.id = c.resume_id
-     WHERE c.id = $1 AND c.organization_id = $2`,
-    [candidacyId, organizationId],
-  );
-  const text = row.rows[0]?.extracted_text;
+  const rows = await orm
+    .select({ extractedText: hiringResumes.extractedText })
+    .from(candidacies)
+    .innerJoin(hiringResumes, eq(hiringResumes.id, candidacies.resumeId))
+    .where(and(eq(candidacies.id, candidacyId), eq(candidacies.organizationId, organizationId)))
+    .limit(1);
+  const text = rows[0]?.extractedText;
   if (!text) throw new Error("Paste or upload a resume first.");
 
   try {
@@ -161,34 +169,39 @@ export async function hrLiveApproveAndInvite(
     approvedByClerkUserId: userId,
   });
 
-  const org = await db.query<{ display_name: string }>(
-    `SELECT display_name FROM organizations WHERE id = $1`,
-    [organizationId],
-  );
-  const candidacy = await db.query<{ confirmed_name: string; job_title: string; confirmed_email: string }>(
-    `SELECT c.confirmed_name, c.confirmed_email, j.title AS job_title
-     FROM candidacies c JOIN hiring_jobs j ON j.id = c.job_id
-     WHERE c.id = $1`,
-    [candidacyId],
-  );
-  const row = candidacy.rows[0];
+  const orgRows = await orm
+    .select({ displayName: organizations.displayName })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  const candidacyRows = await orm
+    .select({
+      confirmedName: candidacies.confirmedName,
+      confirmedEmail: candidacies.confirmedEmail,
+      jobTitle: hiringJobs.title,
+    })
+    .from(candidacies)
+    .innerJoin(hiringJobs, eq(hiringJobs.id, candidacies.jobId))
+    .where(eq(candidacies.id, candidacyId))
+    .limit(1);
+  const row = candidacyRows[0];
 
   const issued = await issueInvitation({
     organizationId,
     candidacyId,
     packRevision: approved.revision,
     appOrigin,
-    recruiterContact: row?.confirmed_email ?? "",
+    recruiterContact: row?.confirmedEmail ?? "",
   });
 
   const message = buildInvitationMessage({
-    organizationName: org.rows[0]?.display_name ?? "Organization",
-    jobTitle: row?.job_title ?? "Role",
-    candidateName: row?.confirmed_name ?? "Candidate",
+    organizationName: orgRows[0]?.displayName ?? "Organization",
+    jobTitle: row?.jobTitle ?? "Role",
+    candidateName: row?.confirmedName ?? "Candidate",
     durationMinutes: 20,
     deadlineAt: issued.deadlineAt,
     invitationUrl: issued.invitationUrl,
-    recruiterContact: row?.confirmed_email ?? "",
+    recruiterContact: row?.confirmedEmail ?? "",
   });
 
   return { ...issued, message };
@@ -196,12 +209,21 @@ export async function hrLiveApproveAndInvite(
 
 export async function hrLiveFindSession(organizationId: string, candidacyId: string) {
   requireHiringEnabled();
-  const binding = await db.query<{ interview_session_id: string; status: string }>(
-    `SELECT b.interview_session_id, c.status
-     FROM hiring_session_bindings b
-     JOIN candidacies c ON c.id = b.candidacy_id
-     WHERE b.candidacy_id = $1 AND c.organization_id = $2`,
-    [candidacyId, organizationId],
-  );
-  return binding.rows[0] ?? null;
+  const rows = await orm
+    .select({
+      interviewSessionId: hiringSessionBindings.interviewSessionId,
+      status: candidacies.status,
+    })
+    .from(hiringSessionBindings)
+    .innerJoin(candidacies, eq(candidacies.id, hiringSessionBindings.candidacyId))
+    .where(
+      and(
+        eq(hiringSessionBindings.candidacyId, candidacyId),
+        eq(candidacies.organizationId, organizationId),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
+  // Callers (HrLiveDemo) consume snake_case keys; map camelCase selects back.
+  return row ? { interview_session_id: row.interviewSessionId, status: row.status } : null;
 }

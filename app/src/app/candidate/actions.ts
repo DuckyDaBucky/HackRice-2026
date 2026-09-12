@@ -1,11 +1,13 @@
 "use server";
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import { desc, eq } from "drizzle-orm";
 import { personaConfigured, personaSandboxBypassEnabled, requireHiringEnabled } from "@/lib/hiring/config";
 import { confirmSandboxIdentity } from "@/lib/persona/sandbox-bypass";
 import { exchangeInvitationSecret, bindCandidateEmail } from "@/lib/hiring/invitations";
 import { createPersonaInquiry, fetchPersonaInquiry, personaSandboxLabel } from "@/lib/persona/client";
-import { db } from "@/lib/db";
+import { orm } from "@/lib/db";
+import { candidacies, verificationAttempts } from "@/lib/db/schema";
 import { createHiringInterviewSession } from "@/lib/hiring/sessions";
 import { getCandidateVisibleReport } from "@/lib/hiring/reports";
 import { applyPersonaInquiryDecision } from "@/lib/persona/webhook";
@@ -42,11 +44,13 @@ export async function candidateStartPersona(invitationId: string, candidacyId: s
     invitationId,
     referenceId: `${candidacyId}:${invitationId}`,
   });
-  await db.query(
-    `INSERT INTO verification_attempts (candidacy_id, invitation_id, persona_inquiry_ref, environment, status)
-     VALUES ($1, $2, $3, $4, 'pending')`,
-    [candidacyId, invitationId, inquiry.inquiryId, process.env.PERSONA_ENV === "production" ? "production" : "sandbox"],
-  );
+  await orm.insert(verificationAttempts).values({
+    candidacyId,
+    invitationId,
+    personaInquiryRef: inquiry.inquiryId,
+    environment: process.env.PERSONA_ENV === "production" ? "production" : "sandbox",
+    status: "pending",
+  });
   return {
     inquiryId: inquiry.inquiryId,
     inquiryUrl: inquiry.inquiryUrl,
@@ -56,39 +60,50 @@ export async function candidateStartPersona(invitationId: string, candidacyId: s
 
 export async function candidateGetVerificationStatus(candidacyId: string) {
   requireHiringEnabled();
-  const result = await db.query<{
-    status: string;
-    name_match: string | null;
-    persona_inquiry_ref: string;
-  }>(
-    `SELECT status, name_match, persona_inquiry_ref FROM verification_attempts WHERE candidacy_id = $1 ORDER BY created_at DESC LIMIT 1`,
-    [candidacyId],
-  );
-  const attempt = result.rows[0];
+  const rows = await orm
+    .select({
+      status: verificationAttempts.status,
+      nameMatch: verificationAttempts.nameMatch,
+      personaInquiryRef: verificationAttempts.personaInquiryRef,
+    })
+    .from(verificationAttempts)
+    .where(eq(verificationAttempts.candidacyId, candidacyId))
+    .orderBy(desc(verificationAttempts.createdAt))
+    .limit(1);
+  const attempt = rows[0];
 
   if (
     personaConfigured() &&
-    attempt?.persona_inquiry_ref &&
-    !attempt.persona_inquiry_ref.startsWith("sandbox-bypass:") &&
+    attempt?.personaInquiryRef &&
+    !attempt.personaInquiryRef.startsWith("sandbox-bypass:") &&
     (attempt.status === "pending" || !attempt.status)
   ) {
     try {
-      const inquiry = await fetchPersonaInquiry(attempt.persona_inquiry_ref);
+      const inquiry = await fetchPersonaInquiry(attempt.personaInquiryRef);
       await applyPersonaInquiryDecision(inquiry);
     } catch {
       // Keep pending if Persona has not finished or the inquiry is not retrievable yet.
     }
   }
 
-  const refreshed = await db.query(
-    `SELECT status, name_match FROM verification_attempts WHERE candidacy_id = $1 ORDER BY created_at DESC LIMIT 1`,
-    [candidacyId],
-  );
-  const candidacy = await db.query(`SELECT status FROM candidacies WHERE id = $1`, [candidacyId]);
+  const refreshedRows = await orm
+    .select({
+      status: verificationAttempts.status,
+      nameMatch: verificationAttempts.nameMatch,
+    })
+    .from(verificationAttempts)
+    .where(eq(verificationAttempts.candidacyId, candidacyId))
+    .orderBy(desc(verificationAttempts.createdAt))
+    .limit(1);
+  const candidacyRows = await orm
+    .select({ status: candidacies.status })
+    .from(candidacies)
+    .where(eq(candidacies.id, candidacyId))
+    .limit(1);
   return {
-    verificationStatus: refreshed.rows[0]?.status ?? "pending",
-    nameMatch: refreshed.rows[0]?.name_match,
-    candidacyStatus: candidacy.rows[0]?.status,
+    verificationStatus: refreshedRows[0]?.status ?? "pending",
+    nameMatch: refreshedRows[0]?.nameMatch,
+    candidacyStatus: candidacyRows[0]?.status,
     sandboxBypass: personaSandboxBypassEnabled(),
     personaAvailable: personaConfigured(),
   };

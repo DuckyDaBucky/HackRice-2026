@@ -215,7 +215,7 @@ export const interviewSessionConfigs = pgTable(
     check("interview_session_configs_revision_check", sql`${table.revision} >= 1`),
     check(
       "interview_session_configs_duration_check",
-      sql`${table.timeBudgetSeconds} in (600, 1200, 1800)`,
+      sql`${table.timeBudgetSeconds} in (180, 600, 1200, 1800)`,
     ),
   ],
 );
@@ -618,6 +618,15 @@ export const solanaOutbox = pgTable("solana_outbox", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+});
+
+/** Persona webhook dedupe log. Mirrors migrations/0011_hiring_flow.sql. */
+export const personaWebhookEvents = pgTable("persona_webhook_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventId: text("event_id").notNull().unique(),
+  inquiryRef: text("inquiry_ref").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
 });
 
 /** Chess.com-style move review, applied to answers: a verdict per answered turn. */

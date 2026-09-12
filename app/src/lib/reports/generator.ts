@@ -1,9 +1,10 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { rawReportSchema, type ReportFindingInput, type ReportOverview, type ReportTranscriptTurn } from "./contracts";
-import { completeJsonText, llmTextModel, activeLlmProvider, type LlmProviderId } from "@/lib/llm/provider";
+import { heuristicFindings, heuristicOverview } from "./heuristic";
+import { activeLlmProvider, completeJsonText, llmTextModel, type LlmProviderId } from "@/lib/llm/provider";
 
-export const REPORT_PROMPT_VERSION = "report-v2-chess-style";
+export const REPORT_PROMPT_VERSION = "report-v3-chess-style-biometrics";
 
 /** Model for the report pass under the active LLM provider (Muse Spark by default). */
 export function reportModel() {
@@ -29,7 +30,7 @@ function answeredTurns(turns: ReportTranscriptTurn[]) {
   return turns.filter((turn) => turn.kind === "candidate_answer" && turn.text);
 }
 
-function buildEvaluatorPrompt(turns: ReportTranscriptTurn[]) {
+function buildEvaluatorPrompt(turns: ReportTranscriptTurn[], biometricContext?: string | null) {
   const answered = answeredTurns(turns);
   const transcript = answered
     .map((turn) => {
@@ -37,6 +38,10 @@ function buildEvaluatorPrompt(turns: ReportTranscriptTurn[]) {
       return `[turnId=${turn.turnId}] ${label}${turn.prompt ? ` (${turn.prompt})` : ""}: ${turn.text}`;
     })
     .join("\n");
+
+  const biometricBlock = biometricContext?.trim()
+    ? `\nBiometric context (from the candidate's recorded video, SmartSpectra SDK — use only as supporting delivery notes, never as the basis for a verdict):\n${biometricContext.trim().slice(0, 2000)}\n`
+    : "";
 
   return `You are reviewing a completed interview-practice transcript the way a chess engine reviews a finished game: go answer by answer, call out exactly where the candidate went wrong and why, and finish with an overview of the biggest problems to fix. You are evaluating a transcript after the fact, not conducting the interview.
 
@@ -50,8 +55,8 @@ Then return one "overview" object with:
 - "summary": a short paragraph on overall performance across the session.
 - "keyProblems": 1-5 short bullet strings naming the most impactful, recurring problems to fix, ordered by impact.
 
-Never infer or mention confidence, emotion, appearance, accent, personality or any biometric trait. Base every verdict only on what was said.
-
+Base every verdict primarily on what was said. You may add one short second sentence to "explanation" noting delivery (e.g. "Biometrics show elevated movement during this answer") when the biometric context above mentions that turn, but never change the verdict because of biometrics.
+${biometricBlock}
 Transcript:
 ${transcript || "(no answered turns)"}
 
@@ -59,18 +64,23 @@ Return strict JSON only:
 {"overview":{"summary":"...","keyProblems":["..."]},"findings":[{"turnId":"...","verdict":"blunder|mistake|inaccuracy|good|best|insufficient_evidence","explanation":"...","improvement":"...or null"}]}`;
 }
 
-/** Safe default when the model call fails or is rate-limited: never fabricate a verdict. */
+/** Safe default when the model call fails or is rate-limited: heuristic verdicts, never all-blank. */
 export function createFallbackReport(turns: ReportTranscriptTurn[]): GeneratedReport {
-  const findings: ReportFindingInput[] = answeredTurns(turns).map((turn) => ({
-    turnId: turn.turnId,
-    verdict: "insufficient_evidence" as const,
-    explanation: "The report generator was unavailable, so this answer was not evaluated.",
-    improvement: null,
-  }));
-  const overview: ReportOverview = {
-    summary: "The report generator was unavailable, so this session could not be reviewed yet.",
-    keyProblems: ["Retry generating this report once the evaluator is available again."],
-  };
+  const answered = answeredTurns(turns);
+  const findings: ReportFindingInput[] =
+    answered.length > 0
+      ? heuristicFindings(turns)
+      : [];
+  const overview: ReportOverview =
+    answered.length > 0
+      ? {
+          ...heuristicOverview(findings),
+          summary: `The full AI reviewer was unavailable, so these are instant local scores. ${heuristicOverview(findings).summary}`,
+        }
+      : {
+          summary: "No substantive answers were captured, so there is nothing to score yet.",
+          keyProblems: ["Answer out loud for at least 30 seconds per question so the reviewer has evidence."],
+        };
   return {
     overview,
     findings,
@@ -94,8 +104,8 @@ function parseModelText(raw: string, turns: ReportTranscriptTurn[]): { overview:
 }
 
 /** Calls the active LLM once for the report; persistence happens in the owning action. */
-export async function generateReport(turns: ReportTranscriptTurn[]): Promise<GeneratedReport> {
-  const { text, model, provider, usage } = await completeJsonText(buildEvaluatorPrompt(turns), {
+export async function generateReport(turns: ReportTranscriptTurn[], biometricContext?: string | null): Promise<GeneratedReport> {
+  const { text, model, provider, usage } = await completeJsonText(buildEvaluatorPrompt(turns, biometricContext), {
     timeoutMs: 25_000,
   });
   const { overview, findings } = parseModelText(text, turns);

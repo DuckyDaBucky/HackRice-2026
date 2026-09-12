@@ -1,5 +1,12 @@
 import "server-only";
-import { db } from "@/lib/db";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import {
+  biometricAnalyses,
+  interviewSessionConfigs,
+  interviewSessions,
+  mediaArtifacts,
+} from "@/lib/db/schema";
 import type { VideoAnalysis } from "./contracts";
 import { summarizeVideoAnalysis } from "./contracts";
 
@@ -7,24 +14,27 @@ import { summarizeVideoAnalysis } from "./contracts";
 const PRESAGE_RELAY_LOCK_KEY = 847_291_003;
 
 export async function isBiometricsEnabledForSession(sessionId: string): Promise<boolean> {
-  const result = await db.query<{ biometrics_enabled: boolean }>(
-    `SELECT c.biometrics_enabled
-     FROM interview_sessions s
-     JOIN interview_session_configs c ON c.session_id = s.id AND c.revision = s.active_config_revision
-     WHERE s.id = $1`,
-    [sessionId],
-  );
-  return result.rows[0]?.biometrics_enabled ?? false;
+  const rows = await orm
+    .select({ biometricsEnabled: interviewSessionConfigs.biometricsEnabled })
+    .from(interviewSessions)
+    .innerJoin(
+      interviewSessionConfigs,
+      and(
+        eq(interviewSessionConfigs.sessionId, interviewSessions.id),
+        eq(interviewSessionConfigs.revision, interviewSessions.activeConfigRevision),
+      ),
+    )
+    .where(eq(interviewSessions.id, sessionId))
+    .limit(1);
+  return rows[0]?.biometricsEnabled ?? false;
 }
 
 /** Idempotent: a second confirm of the same artifact never queues a duplicate analysis. */
 export async function queueBiometricAnalysis(params: { sessionId: string; artifactId: string }) {
-  await db.query(
-    `INSERT INTO biometric_analyses (session_id, artifact_id, status)
-     VALUES ($1, $2, 'queued')
-     ON CONFLICT (artifact_id, provider) DO NOTHING`,
-    [params.sessionId, params.artifactId],
-  );
+  await orm
+    .insert(biometricAnalyses)
+    .values({ sessionId: params.sessionId, artifactId: params.artifactId, status: "queued" })
+    .onConflictDoNothing({ target: [biometricAnalyses.artifactId, biometricAnalyses.provider] });
 }
 
 export interface QueuedBiometricAnalysis {
@@ -35,45 +45,61 @@ export interface QueuedBiometricAnalysis {
 
 /** Queued or retryable-failed rows for a session, joined to their clip's storage key. */
 async function getPendingAnalyses(sessionId: string): Promise<QueuedBiometricAnalysis[]> {
-  const result = await db.query<{ id: string; artifact_id: string; r2_key: string }>(
-    `SELECT b.id, b.artifact_id, ma.r2_key
-     FROM biometric_analyses b
-     JOIN media_artifacts ma ON ma.id = b.artifact_id
-     WHERE b.session_id = $1 AND b.status IN ('queued', 'retryable_failed')
-       AND ma.deleted_at IS NULL AND ma.upload_status = 'uploaded'
-     ORDER BY b.created_at ASC`,
-    [sessionId],
-  );
-  return result.rows.map((row) => ({ id: row.id, artifactId: row.artifact_id, r2Key: row.r2_key }));
+  const rows = await orm
+    .select({
+      id: biometricAnalyses.id,
+      artifactId: biometricAnalyses.artifactId,
+      r2Key: mediaArtifacts.r2Key,
+    })
+    .from(biometricAnalyses)
+    .innerJoin(mediaArtifacts, eq(mediaArtifacts.id, biometricAnalyses.artifactId))
+    .where(
+      and(
+        eq(biometricAnalyses.sessionId, sessionId),
+        inArray(biometricAnalyses.status, ["queued", "retryable_failed"]),
+        isNull(mediaArtifacts.deletedAt),
+        eq(mediaArtifacts.uploadStatus, "uploaded"),
+      ),
+    )
+    .orderBy(asc(biometricAnalyses.createdAt));
+  return rows.map((row) => ({ id: row.id, artifactId: row.artifactId ?? "", r2Key: row.r2Key }));
 }
 
 async function markProcessing(id: string) {
-  await db.query(
-    `UPDATE biometric_analyses SET status = 'processing', started_at = now() WHERE id = $1`,
-    [id],
-  );
+  await orm
+    .update(biometricAnalyses)
+    .set({ status: "processing", startedAt: new Date() })
+    .where(eq(biometricAnalyses.id, id));
 }
 
 async function markCompleted(id: string, analysis: VideoAnalysis) {
-  await db.query(
-    `UPDATE biometric_analyses
-     SET status = 'completed', analysis_id = $2, sdk_version = $3, metrics = $4::jsonb, completed_at = now()
-     WHERE id = $1`,
-    [id, analysis.analysisId, analysis.sdkVersion, JSON.stringify(summarizeVideoAnalysis(analysis))],
-  );
+  await orm
+    .update(biometricAnalyses)
+    .set({
+      status: "completed",
+      analysisId: analysis.analysisId,
+      sdkVersion: analysis.sdkVersion,
+      metrics: summarizeVideoAnalysis(analysis),
+      completedAt: new Date(),
+    })
+    .where(eq(biometricAnalyses.id, id));
 }
 
 async function markFailed(id: string, params: { errorCode: string; retryable: boolean }) {
-  await db.query(
-    `UPDATE biometric_analyses
-     SET status = $2, error_code = $3, completed_at = now()
-     WHERE id = $1`,
-    [id, params.retryable ? "retryable_failed" : "terminal_failed", params.errorCode],
-  );
+  await orm
+    .update(biometricAnalyses)
+    .set({
+      status: params.retryable ? "retryable_failed" : "terminal_failed",
+      errorCode: params.errorCode,
+      completedAt: new Date(),
+    })
+    .where(eq(biometricAnalyses.id, id));
 }
 
 export interface StoredBiometricAnalysis {
   id: string;
+  artifactId: string;
+  turnId: string | null;
   status: string;
   metrics: Record<string, unknown>;
   errorCode: string | null;
@@ -84,49 +110,56 @@ export async function getBiometricAnalysesForSession(
   sessionId: string,
   clerkUserId: string,
 ): Promise<StoredBiometricAnalysis[]> {
-  const result = await db.query<{
-    id: string;
-    status: string;
-    metrics: Record<string, unknown>;
-    error_code: string | null;
-    completed_at: Date | null;
-  }>(
-    `SELECT b.id, b.status, b.metrics, b.error_code, b.completed_at
-     FROM biometric_analyses b
-     JOIN interview_sessions s ON s.id = b.session_id
-     WHERE b.session_id = $1 AND s.clerk_user_id = $2
-     ORDER BY b.created_at ASC`,
-    [sessionId, clerkUserId],
-  );
-  return result.rows.map((row) => ({
+  const rows = await orm
+    .select({
+      id: biometricAnalyses.id,
+      artifactId: biometricAnalyses.artifactId,
+      turnId: mediaArtifacts.turnId,
+      status: biometricAnalyses.status,
+      metrics: biometricAnalyses.metrics,
+      errorCode: biometricAnalyses.errorCode,
+      completedAt: biometricAnalyses.completedAt,
+    })
+    .from(biometricAnalyses)
+    .innerJoin(interviewSessions, eq(interviewSessions.id, biometricAnalyses.sessionId))
+    .leftJoin(mediaArtifacts, eq(mediaArtifacts.id, biometricAnalyses.artifactId))
+    .where(and(eq(biometricAnalyses.sessionId, sessionId), eq(interviewSessions.clerkUserId, clerkUserId)))
+    .orderBy(asc(biometricAnalyses.createdAt));
+  return rows.map((row) => ({
     id: row.id,
+    artifactId: row.artifactId ?? "",
+    turnId: row.turnId,
     status: row.status,
-    metrics: row.metrics,
-    errorCode: row.error_code,
-    completedAt: row.completed_at?.toISOString() ?? null,
+    metrics: row.metrics as Record<string, unknown>,
+    errorCode: row.errorCode,
+    completedAt: row.completedAt?.toISOString() ?? null,
   }));
 }
+
+class PresageLockBusy extends Error {}
 
 /**
  * Runs every pending analysis for a session, one at a time, holding a Postgres advisory lock for
  * the whole batch. presage-api allows only one active native SDK session per process, so callers
- * must never run this concurrently with itself.
+ * must never run this concurrently with itself. Returns null without doing any work if another
+ * relay batch is already running elsewhere.
  */
 export async function withPresageRelayLock<T>(work: () => Promise<T>): Promise<T | null> {
-  const client = await db.connect();
   try {
-    const lock = await client.query<{ locked: boolean }>(
-      "SELECT pg_try_advisory_lock($1) AS locked",
-      [PRESAGE_RELAY_LOCK_KEY],
-    );
-    if (!lock.rows[0]?.locked) return null;
-    try {
-      return await work();
-    } finally {
-      await client.query("SELECT pg_advisory_unlock($1)", [PRESAGE_RELAY_LOCK_KEY]);
-    }
-  } finally {
-    client.release();
+    return await orm.transaction(async (tx) => {
+      const result = (await tx.execute(
+        sql`SELECT pg_try_advisory_lock(${PRESAGE_RELAY_LOCK_KEY}) AS locked`,
+      )) as unknown as { rows: Array<{ locked: boolean }> };
+      if (!result.rows[0]?.locked) throw new PresageLockBusy();
+      try {
+        return await work();
+      } finally {
+        await tx.execute(sql`SELECT pg_advisory_unlock(${PRESAGE_RELAY_LOCK_KEY})`);
+      }
+    });
+  } catch (error) {
+    if (error instanceof PresageLockBusy) return null;
+    throw error;
   }
 }
 

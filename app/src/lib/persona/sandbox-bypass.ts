@@ -1,5 +1,7 @@
 import "server-only";
-import { db } from "@/lib/db";
+import { and, eq } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import { candidacies, invitations, verificationAttempts } from "@/lib/db/schema";
 import { personaSandboxBypassEnabled } from "@/lib/hiring/config";
 import { enqueueSolanaAction } from "@/lib/solana/outbox";
 
@@ -12,35 +14,47 @@ export async function confirmSandboxIdentity(params: {
     throw new Error("Sandbox identity confirmation is disabled.");
   }
 
-  const candidacy = await db.query<{
-    id: string;
-    clerk_user_id: string | null;
-    organization_id: string;
-    confirmed_name: string;
-    status: string;
-  }>(
-    `SELECT c.id, c.clerk_user_id, c.organization_id, c.confirmed_name, c.status
-     FROM candidacies c
-     JOIN invitations i ON i.candidacy_id = c.id
-     WHERE c.id = $1 AND i.id = $2 AND i.status = 'active'`,
-    [params.candidacyId, params.invitationId],
-  );
-  const row = candidacy.rows[0];
+  const rows = await orm
+    .select({
+      id: candidacies.id,
+      clerkUserId: candidacies.clerkUserId,
+      organizationId: candidacies.organizationId,
+      confirmedName: candidacies.confirmedName,
+      status: candidacies.status,
+    })
+    .from(candidacies)
+    .innerJoin(invitations, eq(invitations.candidacyId, candidacies.id))
+    .where(
+      and(
+        eq(candidacies.id, params.candidacyId),
+        eq(invitations.id, params.invitationId),
+        eq(invitations.status, "active"),
+      ),
+    )
+    .limit(1);
+  const row = rows[0];
   if (!row) throw new Error("Invitation not found.");
-  if (row.clerk_user_id !== params.clerkUserId) {
+  if (row.clerkUserId !== params.clerkUserId) {
     throw new Error("Sign in with the email address your recruiter confirmed.");
   }
 
   const inquiryRef = `sandbox-bypass:${params.candidacyId}:${params.invitationId}`;
-  await db.query(
-    `INSERT INTO verification_attempts (candidacy_id, invitation_id, persona_inquiry_ref, environment, status, name_match, bound_at)
-     VALUES ($1, $2, $3, 'sandbox', 'verified', 'unknown', now())`,
-    [params.candidacyId, params.invitationId, inquiryRef],
-  );
-  await db.query(`UPDATE candidacies SET status = 'verified', updated_at = now() WHERE id = $1`, [params.candidacyId]);
+  await orm.insert(verificationAttempts).values({
+    candidacyId: params.candidacyId,
+    invitationId: params.invitationId,
+    personaInquiryRef: inquiryRef,
+    environment: "sandbox",
+    status: "verified",
+    nameMatch: "unknown",
+    boundAt: new Date(),
+  });
+  await orm
+    .update(candidacies)
+    .set({ status: "verified", updatedAt: new Date() })
+    .where(eq(candidacies.id, params.candidacyId));
   await enqueueSolanaAction({
     action: "attest_identity",
-    organizationId: row.organization_id,
+    organizationId: row.organizationId,
     candidacyId: params.candidacyId,
     invitationId: params.invitationId,
     payload: { verificationAttemptId: inquiryRef, sandboxBypass: true },

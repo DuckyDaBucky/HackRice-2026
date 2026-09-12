@@ -1,6 +1,17 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { db } from "@/lib/db";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import {
+  audioTranscripts,
+  candidacies,
+  hiringSessionBindings,
+  interviewPlanQuestions,
+  interviewTurns,
+  mediaArtifacts,
+  processingJobs,
+  reportRevisions,
+} from "@/lib/db/schema";
 import { transcribeWithScribe } from "@/lib/transcription/scribe";
 import { evaluateAnswer } from "@/lib/workbench/ai/service";
 import { createPlaybackUrl } from "@/lib/storage/r2";
@@ -15,110 +26,227 @@ export async function enqueueProcessingJob(params: {
   targetKind: string;
   payload?: Record<string, unknown>;
 }) {
-  await db.query(
-    `INSERT INTO processing_jobs (job_type, target_id, target_kind, payload)
-     VALUES ($1, $2, $3, $4::jsonb)`,
-    [params.jobType, params.targetId, params.targetKind, JSON.stringify(params.payload ?? {})],
-  );
+  await orm.insert(processingJobs).values({
+    jobType: params.jobType,
+    targetId: params.targetId,
+    targetKind: params.targetKind,
+    payload: params.payload ?? {},
+  });
 }
 
 export async function runProcessingWorker(limit = 5) {
   const owner = randomUUID();
-  const leased = await db.query(
-    `UPDATE processing_jobs
-     SET status = 'leased', lease_owner = $1, lease_expires_at = now() + ($2 || ' seconds')::interval, attempts = attempts + 1, updated_at = now()
-     WHERE id IN (
-       SELECT id FROM processing_jobs
-       WHERE status = 'queued' AND next_run_at <= now()
-       ORDER BY next_run_at ASC LIMIT $3
-       FOR UPDATE SKIP LOCKED
-     )
-     RETURNING *`,
-    [owner, String(LEASE_SECONDS), limit],
-  );
+  // Lease claim stays atomic: candidate selection (SKIP LOCKED) and the lease
+  // UPDATE run inside a single transaction while holding the row locks.
+  const leased = await orm.transaction(async (tx) => {
+    const candidates = await tx
+      .select({ id: processingJobs.id })
+      .from(processingJobs)
+      .where(and(eq(processingJobs.status, "queued"), lte(processingJobs.nextRunAt, new Date())))
+      .orderBy(asc(processingJobs.nextRunAt))
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    if (candidates.length === 0) return [];
+    return tx
+      .update(processingJobs)
+      .set({
+        status: "leased",
+        leaseOwner: owner,
+        leaseExpiresAt: new Date(Date.now() + LEASE_SECONDS * 1000),
+        attempts: sql`${processingJobs.attempts} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(
+        inArray(
+          processingJobs.id,
+          candidates.map((candidate) => candidate.id),
+        ),
+      )
+      .returning();
+  });
 
-  for (const job of leased.rows) {
+  for (const job of leased) {
     try {
-      if (job.job_type === "transcription") await processTranscription(job.target_id);
-      else if (job.job_type === "evaluation") await processEvaluation(job.target_id);
-      else if (job.job_type === "solana_reconcile") await processSolanaOutboxBatch(10);
-      else if (job.job_type === "retention") await processRetention(job.target_id);
-      await db.query(`UPDATE processing_jobs SET status = 'completed', updated_at = now() WHERE id = $1`, [job.id]);
+      if (job.jobType === "transcription") await processTranscription(job.targetId);
+      else if (job.jobType === "evaluation") await processEvaluation(job.targetId);
+      else if (job.jobType === "solana_reconcile") await processSolanaOutboxBatch(10);
+      else if (job.jobType === "retention") await processRetention(job.targetId);
+      await orm
+        .update(processingJobs)
+        .set({ status: "completed", updatedAt: new Date() })
+        .where(eq(processingJobs.id, job.id));
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       const terminal = job.attempts >= 5;
-      await db.query(
-        `UPDATE processing_jobs SET status = $2, last_error = $3, next_run_at = now() + interval '5 minutes', updated_at = now() WHERE id = $1`,
-        [job.id, terminal ? "terminal_failed" : "retryable_failed", message],
-      );
+      await orm
+        .update(processingJobs)
+        .set({
+          status: terminal ? "terminal_failed" : "retryable_failed",
+          lastError: message,
+          nextRunAt: new Date(Date.now() + 5 * 60 * 1000),
+          updatedAt: new Date(),
+        })
+        .where(eq(processingJobs.id, job.id));
     }
   }
-  return leased.rowCount;
+  return leased.length;
 }
 
 async function processTranscription(artifactId: string) {
-  const artifact = await db.query<{ r2_key: string; mime_type: string; session_id: string; turn_id: string | null }>(
-    `SELECT r2_key, mime_type, session_id, turn_id FROM media_artifacts WHERE id = $1 AND upload_status = 'uploaded'`,
-    [artifactId],
-  );
-  const row = artifact.rows[0];
+  const rows = await orm
+    .select({
+      r2Key: mediaArtifacts.r2Key,
+      mimeType: mediaArtifacts.mimeType,
+      turnId: mediaArtifacts.turnId,
+    })
+    .from(mediaArtifacts)
+    .where(and(eq(mediaArtifacts.id, artifactId), eq(mediaArtifacts.uploadStatus, "uploaded")))
+    .limit(1);
+  const row = rows[0];
   if (!row) throw new Error("Artifact not found.");
 
-  await db.query(
-    `INSERT INTO audio_transcripts (artifact_id, turn_id, provider, status)
-     VALUES ($1, $2, 'elevenlabs_scribe', 'processing')
-     ON CONFLICT (artifact_id, provider) DO UPDATE SET status = 'processing', started_at = now()`,
-    [artifactId, row.turn_id],
-  );
+  await orm
+    .insert(audioTranscripts)
+    .values({
+      artifactId,
+      turnId: row.turnId,
+      provider: "elevenlabs_scribe",
+      status: "processing",
+    })
+    .onConflictDoUpdate({
+      target: [audioTranscripts.artifactId, audioTranscripts.provider],
+      set: { status: "processing", startedAt: new Date() },
+    });
 
-  const url = await createPlaybackUrl(row.r2_key);
+  const url = await createPlaybackUrl(row.r2Key);
   const audioResponse = await fetch(url);
   if (!audioResponse.ok) throw new Error("Could not fetch recording for transcription.");
   const buffer = Buffer.from(await audioResponse.arrayBuffer());
-  const { fullText, segments } = await transcribeWithScribe({ audioBuffer: buffer, mimeType: row.mime_type });
+  const { fullText, segments } = await transcribeWithScribe({ audioBuffer: buffer, mimeType: row.mimeType });
 
-  await db.query(
-    `UPDATE audio_transcripts SET status = 'completed', full_text = $3, segments = $4::jsonb, completed_at = now()
-     WHERE artifact_id = $1 AND provider = 'elevenlabs_scribe'`,
-    [artifactId, row.turn_id, fullText, JSON.stringify(segments)],
-  );
+  await orm
+    .update(audioTranscripts)
+    .set({ status: "completed", fullText, segments, completedAt: new Date() })
+    .where(
+      and(
+        eq(audioTranscripts.artifactId, artifactId),
+        eq(audioTranscripts.provider, "elevenlabs_scribe"),
+      ),
+    );
 }
 
 async function processEvaluation(sessionId: string) {
-  const binding = await db.query<{ candidacy_id: string; clerk_user_id: string | null }>(
-    `SELECT b.candidacy_id, c.clerk_user_id
-     FROM hiring_session_bindings b JOIN candidacies c ON c.id = b.candidacy_id
-     WHERE b.interview_session_id = $1`,
-    [sessionId],
-  );
-  const hire = binding.rows[0];
-  const userId = hire?.clerk_user_id ?? "system";
+  const bindingRows = await orm
+    .select({
+      candidacyId: hiringSessionBindings.candidacyId,
+      clerkUserId: candidacies.clerkUserId,
+    })
+    .from(hiringSessionBindings)
+    .innerJoin(candidacies, eq(candidacies.id, hiringSessionBindings.candidacyId))
+    .where(eq(hiringSessionBindings.interviewSessionId, sessionId))
+    .limit(1);
+  const hire = bindingRows[0];
+  const userId = hire?.clerkUserId ?? "system";
 
-  const evidence = await db.query(
-    `SELECT q.id AS plan_question_id, q.prompt, q.content_type, t.id AS turn_id, a.id AS artifact_id, tr.full_text
-     FROM interview_plan_questions q
-     LEFT JOIN LATERAL (
-       SELECT t.id FROM interview_turns t WHERE t.plan_question_id = q.id AND t.kind = 'candidate_answer' AND t.deleted_at IS NULL ORDER BY t.sequence DESC LIMIT 1
-     ) t ON true
-     LEFT JOIN media_artifacts a ON a.turn_id = t.id AND a.upload_status = 'uploaded'
-     LEFT JOIN audio_transcripts tr ON tr.artifact_id = a.id AND tr.provider = 'elevenlabs_scribe' AND tr.status = 'completed'
-     WHERE q.session_id = $1 AND q.deleted_at IS NULL ORDER BY q.position`,
-    [sessionId],
-  );
+  // The original LATERAL query picked the latest candidate answer per plan
+  // question, its uploaded artifact, and the completed scribe transcript.
+  // Reassembled here in JS over small indexed reads (same pattern as
+  // ensureEvidenceLinkedReport), yielding one row per plan question.
+  const planRows = await orm
+    .select({
+      id: interviewPlanQuestions.id,
+      prompt: interviewPlanQuestions.prompt,
+      contentType: interviewPlanQuestions.contentType,
+    })
+    .from(interviewPlanQuestions)
+    .where(and(eq(interviewPlanQuestions.sessionId, sessionId), isNull(interviewPlanQuestions.deletedAt)))
+    .orderBy(asc(interviewPlanQuestions.position));
+  const answerRows = await orm
+    .select({
+      id: interviewTurns.id,
+      planQuestionId: interviewTurns.planQuestionId,
+      sequence: interviewTurns.sequence,
+    })
+    .from(interviewTurns)
+    .where(
+      and(
+        eq(interviewTurns.sessionId, sessionId),
+        eq(interviewTurns.kind, "candidate_answer"),
+        isNull(interviewTurns.deletedAt),
+      ),
+    )
+    .orderBy(desc(interviewTurns.sequence));
+  const latestAnswerByQuestion = new Map<string, string>();
+  for (const answer of answerRows) {
+    if (answer.planQuestionId && !latestAnswerByQuestion.has(answer.planQuestionId)) {
+      latestAnswerByQuestion.set(answer.planQuestionId, answer.id);
+    }
+  }
+  const turnIds = [...latestAnswerByQuestion.values()];
+  const artifactByTurn = new Map<string, string>();
+  if (turnIds.length > 0) {
+    const artifactRows = await orm
+      .select({
+        id: mediaArtifacts.id,
+        turnId: mediaArtifacts.turnId,
+      })
+      .from(mediaArtifacts)
+      .where(and(inArray(mediaArtifacts.turnId, turnIds), eq(mediaArtifacts.uploadStatus, "uploaded")))
+      .orderBy(sql`${mediaArtifacts.uploadedAt} DESC NULLS LAST`);
+    for (const artifact of artifactRows) {
+      if (artifact.turnId && !artifactByTurn.has(artifact.turnId)) {
+        artifactByTurn.set(artifact.turnId, artifact.id);
+      }
+    }
+  }
+  const artifactIds = [...artifactByTurn.values()];
+  const transcriptByArtifact = new Map<string, string>();
+  if (artifactIds.length > 0) {
+    const transcriptRows = await orm
+      .select({
+        artifactId: audioTranscripts.artifactId,
+        fullText: audioTranscripts.fullText,
+      })
+      .from(audioTranscripts)
+      .where(
+        and(
+          inArray(audioTranscripts.artifactId, artifactIds),
+          eq(audioTranscripts.provider, "elevenlabs_scribe"),
+          eq(audioTranscripts.status, "completed"),
+        ),
+      );
+    for (const transcript of transcriptRows) {
+      if (transcript.fullText && !transcriptByArtifact.has(transcript.artifactId)) {
+        transcriptByArtifact.set(transcript.artifactId, transcript.fullText);
+      }
+    }
+  }
+  const evidence = planRows.map((question) => {
+    const turnId = latestAnswerByQuestion.get(question.id) ?? null;
+    const artifactId = turnId ? (artifactByTurn.get(turnId) ?? null) : null;
+    return {
+      planQuestionId: question.id,
+      prompt: question.prompt,
+      contentType: question.contentType,
+      turnId,
+      artifactId,
+      fullText: artifactId ? (transcriptByArtifact.get(artifactId) ?? null) : null,
+    };
+  });
 
-  const revisionResult = await db.query<{ next: number }>(
-    `SELECT coalesce(max(revision), 0) + 1 AS next FROM report_revisions WHERE session_id = $1`,
-    [sessionId],
-  );
-  const revision = revisionResult.rows[0]?.next ?? 1;
+  const revisionRows = await orm
+    .select({ next: sql<number>`coalesce(max(${reportRevisions.revision}), 0) + 1` })
+    .from(reportRevisions)
+    .where(eq(reportRevisions.sessionId, sessionId));
+  const revision = revisionRows[0]?.next ?? 1;
   const items: Array<Record<string, unknown>> = [];
 
-  for (const row of evidence.rows) {
-    const answer = row.full_text?.trim() ?? "";
+  for (const row of evidence) {
+    const answer = row.fullText?.trim() ?? "";
     if (answer.length < 10) {
       items.push({
-        planQuestionId: row.plan_question_id,
-        competency: row.content_type,
+        planQuestionId: row.planQuestionId,
+        competency: row.contentType,
         coverage: "insufficient",
         finding: "Insufficient transcript evidence for scoring.",
         rating: null,
@@ -128,9 +256,9 @@ async function processEvaluation(sessionId: string) {
     try {
       const evaluation = await evaluateAnswer(userId, {
         question: {
-          id: row.plan_question_id,
+          id: row.planQuestionId,
           prompt: row.prompt,
-          competency: row.content_type,
+          competency: row.contentType,
           category: "behavioral",
           intent: row.prompt,
           profileEvidence: [],
@@ -149,9 +277,9 @@ async function processEvaluation(sessionId: string) {
       });
       for (const dim of evaluation.evaluation.dimensions) {
         items.push({
-          planQuestionId: row.plan_question_id,
-          turnId: row.turn_id,
-          artifactId: row.artifact_id,
+          planQuestionId: row.planQuestionId,
+          turnId: row.turnId,
+          artifactId: row.artifactId,
           competency: dim.dimension,
           coverage: dim.rating === null ? "insufficient" : "observed",
           finding: dim.rationale,
@@ -161,8 +289,8 @@ async function processEvaluation(sessionId: string) {
       }
     } catch {
       items.push({
-        planQuestionId: row.plan_question_id,
-        competency: row.content_type,
+        planQuestionId: row.planQuestionId,
+        competency: row.contentType,
         coverage: "insufficient",
         finding: "Evaluation failed for this answer; retry processing.",
         rating: null,
@@ -170,30 +298,50 @@ async function processEvaluation(sessionId: string) {
     }
   }
 
-  const summary = { items, answeredCount: evidence.rows.filter((r) => r.full_text).length };
+  const summary = { items, answeredCount: evidence.filter((r) => r.fullText).length };
   const commitment = opaqueCommitment(summary);
-  const reportResult = await db.query<{ id: string }>(
-    `INSERT INTO report_revisions (session_id, candidacy_id, revision, revision_commitment, status, summary, generated_at)
-     VALUES ($1, $2, $3, $4, 'completed', $5::jsonb, now()) RETURNING id`,
-    [sessionId, hire?.candidacy_id, revision, commitment, JSON.stringify(summary)],
-  );
+  const candidacyId = hire?.candidacyId;
+  if (!candidacyId) throw new Error("Hiring binding not found for session.");
+  const reportRows = await orm
+    .insert(reportRevisions)
+    .values({
+      sessionId,
+      candidacyId,
+      revision,
+      revisionCommitment: commitment,
+      status: "completed",
+      summary,
+      generatedAt: new Date(),
+    })
+    .returning({ id: reportRevisions.id });
 
-  if (hire?.candidacy_id) {
-    await db.query(`UPDATE candidacies SET status = 'report_ready', updated_at = now() WHERE id = $1`, [hire.candidacy_id]);
-    await enqueueSolanaAction({
-      action: "register_report_revision",
-      candidacyId: hire.candidacy_id,
-      expectedRevision: revision,
-      payload: { sessionId, revision, commitment },
-    });
-  }
-  return reportResult.rows[0]?.id;
+  await orm
+    .update(candidacies)
+    .set({ status: "report_ready", updatedAt: new Date() })
+    .where(eq(candidacies.id, candidacyId));
+  await enqueueSolanaAction({
+    action: "register_report_revision",
+    candidacyId,
+    expectedRevision: revision,
+    payload: { sessionId, revision, commitment },
+  });
+  return reportRows[0]?.id;
 }
 
 async function processRetention(candidacyId: string) {
-  await db.query(
-    `UPDATE candidacies SET status = 'deleted', confirmed_name = '[deleted]', confirmed_email = '[deleted]', updated_at = now()
-     WHERE id = $1 AND delete_after IS NOT NULL AND delete_after <= now()`,
-    [candidacyId],
-  );
+  await orm
+    .update(candidacies)
+    .set({
+      status: "deleted",
+      confirmedName: "[deleted]",
+      confirmedEmail: "[deleted]",
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(candidacies.id, candidacyId),
+        isNotNull(candidacies.deleteAfter),
+        lte(candidacies.deleteAfter, new Date()),
+      ),
+    );
 }

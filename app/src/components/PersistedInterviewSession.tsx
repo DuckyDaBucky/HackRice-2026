@@ -19,6 +19,7 @@ import {
   skipPersistedInterviewQuestion,
 } from "@/app/interview/v2-actions";
 import { DEFAULT_VOICE_ID } from "@/lib/voice/presets";
+import { buildExitLine, buildIntroLine } from "@/lib/interview-dialog";
 import type { V2ResumeState } from "@/lib/interviews/persistence";
 import type { InterviewMode, Question } from "@/lib/questions/types";
 
@@ -58,6 +59,28 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
   const mode = legacyModeFor(initialState);
   const voiceId = initialState.config.voiceId ?? DEFAULT_VOICE_ID;
   const done = index >= questions.length;
+  const introLine = buildIntroLine({
+    targetRole: initialState.config.targetRole,
+    seniority: initialState.config.seniority,
+    timeBudgetSeconds: initialState.config.timeBudgetSeconds,
+    questionCount: questions.length,
+  });
+
+  // Spoken outro on the completion screen, once per session.
+  const exitSpokenRef = useRef(false);
+  useEffect(() => {
+    if (!done || exitSpokenRef.current) return;
+    exitSpokenRef.current = true;
+    void tts.speak(
+      buildExitLine({
+        answeredCount: uploadCount,
+        totalQuestions: questions.length,
+        timeBudgetSeconds: initialState.config.timeBudgetSeconds,
+      }),
+      voiceId,
+      initialState.config.mood,
+    );
+  }, [done, initialState.config.mood, initialState.config.timeBudgetSeconds, questions.length, tts, uploadCount, voiceId]);
 
   useEffect(() => {
     if (!recorder.stream || joined) return;
@@ -109,10 +132,17 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
         </p>
         <button
           type="button"
-          onClick={() => router.push(`/reports/${initialState.session.id}`)}
+          onClick={() => router.push(`/interview/session/${initialState.session.id}/report`)}
           className="rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]"
         >
           Review report
+        </button>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="rounded-full border border-zinc-700 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
+        >
+          Back to dashboard
         </button>
       </div>
     );
@@ -151,6 +181,7 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
       questionPrompt={currentPrompt}
       questionNumber={index + 1}
       totalQuestions={questions.length}
+      introLine={introLine}
       onLeave={leave}
       onPauseChange={async (paused) => {
         const changed = paused
