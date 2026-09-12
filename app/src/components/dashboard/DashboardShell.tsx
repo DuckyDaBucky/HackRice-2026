@@ -42,7 +42,7 @@ export function DashboardShell({
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen bg-dash-bg">
+    <div className="flex min-h-screen bg-dash-bg [color-scheme:light] [html[data-theme=dark]_&]:[color-scheme:dark]">
       <aside className="hidden w-56 shrink-0 flex-col border-r border-dash-border bg-dash-sidebar py-5 lg:flex">
         <Link href="/" className="px-5">
           <Logo size="sm" onLight />

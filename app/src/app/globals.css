@@ -3,6 +3,7 @@
 :root {
   --background: #09090b;
   --foreground: #fafafa;
+  color-scheme: light only;
 
   /* Dashboard theme tokens — light (default) */
   --dash-bg: #fafbfc;
@@ -28,6 +29,7 @@
 /* Dashboard theme tokens — dark. Neutral navy/charcoal, teal reserved for
    small emphasis (active states, primary actions), never a background wash. */
 [data-theme="dark"] {
+  color-scheme: dark only;
   --dash-bg: #0b1220;
   --dash-sidebar: #111b2e;
   --dash-surface: #131d2d;
@@ -82,9 +84,30 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--dash-bg);
+  color: var(--dash-text);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Native inputs/selects follow OS color-scheme unless overridden — keep
+   dashboard forms visually aligned with dash-* tokens in light mode. */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background-color: var(--dash-surface);
+  color: var(--dash-text);
+  color-scheme: light only;
+}
+
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  color-scheme: dark only;
+}
+
+select option {
+  background-color: var(--dash-surface);
+  color: var(--dash-text);
 }
 
 .marketing {
@@ -92,6 +115,7 @@ body {
   --foreground: #f4f7fa;
   background: var(--background);
   color: var(--foreground);
+  color-scheme: dark only;
 }
 @media (prefers-reduced-motion: reduce) {
   .marketing *, .marketing *::before, .marketing *::after {

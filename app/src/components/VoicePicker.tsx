@@ -31,7 +31,7 @@ export function VoicePicker({
             onChange(event.target.value);
           }
         }}
-        className="h-10 rounded-lg border border-dash-border-strong bg-dash-surface px-3 text-sm text-dash-text outline-none focus:border-accent"
+        className="h-10 w-full cursor-pointer rounded-lg border border-dash-border-strong bg-dash-surface px-3 text-sm text-dash-text outline-none focus:border-accent"
       >
         {VOICE_PRESETS.map((preset) => (
           <option key={preset.id} value={preset.id}>
