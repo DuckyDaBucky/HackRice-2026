@@ -19,3 +19,7 @@ export const VOICE_PRESETS: VoicePreset[] = [
 ];
 
 export const DEFAULT_VOICE_ID = VOICE_PRESETS[0].id;
+
+export function getVoiceLabel(voiceId: string): string {
+  return VOICE_PRESETS.find((preset) => preset.id === voiceId)?.label ?? "Custom voice";
+}

@@ -1,0 +1,172 @@
+openapi: 3.1.0
+info:
+  title: Presage SmartSpectra Wrapper API
+  version: 0.1.0
+  description: >-
+    Language-neutral HTTP contract for the SmartSpectra wrapper. The live
+    WebSocket protocol is described on GET /v1/live and in README.md.
+servers:
+  - url: http://localhost:8080
+paths:
+  /health:
+    get:
+      summary: Service health
+      operationId: getHealth
+      responses:
+        "200":
+          description: The process is responsive.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, sdkVersion, activeSessionId]
+                properties:
+                  status: { const: ok }
+                  sdkVersion: { type: string }
+                  activeSessionId: { type: [string, "null"], format: uuid }
+  /v1/capabilities:
+    get:
+      summary: Discover SDK bundles, enums, output events, and transport paths
+      operationId: getCapabilities
+      responses:
+        "200":
+          description: Capabilities of the loaded SmartSpectra runtime.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /v1/videos/analyze:
+    post:
+      summary: Analyze an uploaded whole video
+      description: >-
+        Holds the request until analysis completes. Set stream=true for an
+        incremental NDJSON response, which is recommended for long videos.
+      operationId: analyzeVideo
+      parameters:
+        - $ref: "#/components/parameters/Stream"
+        - $ref: "#/components/parameters/IncludeRawProtobuf"
+        - $ref: "#/components/parameters/IncludeVideoOutput"
+        - name: interframeDelayMs
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: startOffsetMs
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: maxDurationMs
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: frameTransform
+          in: query
+          schema:
+            oneOf:
+              - { type: integer, minimum: 0, maximum: 5 }
+              - { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [video]
+              properties:
+                video:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Completed aggregate JSON or an incremental NDJSON event stream.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoAnalysis"
+            application/x-ndjson:
+              schema:
+                type: string
+        "409":
+          description: Another native SDK session is active in this process.
+          headers:
+            Retry-After:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413":
+          description: Upload exceeds MAX_VIDEO_BYTES.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The file or SDK configuration could not be processed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "504":
+          description: Analysis exceeded VIDEO_ANALYSIS_TIMEOUT_MS.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /v1/live:
+    get:
+      summary: Upgrade to a live-analysis WebSocket
+      description: >-
+        Upgrade this request to WebSocket. Send a JSON start message, followed
+        by binary frames whose first eight bytes are an unsigned big-endian
+        microsecond timestamp. See README.md for the complete duplex protocol.
+      operationId: openLiveAnalysis
+      parameters:
+        - $ref: "#/components/parameters/IncludeRawProtobuf"
+        - $ref: "#/components/parameters/IncludeVideoOutput"
+      responses:
+        "101":
+          description: Switching Protocols.
+components:
+  parameters:
+    Stream:
+      name: stream
+      in: query
+      schema: { type: boolean, default: false }
+    IncludeRawProtobuf:
+      name: includeRawProtobuf
+      in: query
+      schema: { type: boolean, default: true }
+    IncludeVideoOutput:
+      name: includeVideoOutput
+      in: query
+      schema: { type: boolean, default: false }
+  schemas:
+    ApiEvent:
+      type: object
+      required: [type, emittedAt]
+      properties:
+        type: { type: string }
+        emittedAt: { type: string, format: date-time }
+      additionalProperties: true
+    VideoAnalysis:
+      type: object
+      required: [analysisId, sdkVersion, requestedMetrics, status, eventCounts, events]
+      properties:
+        analysisId: { type: string, format: uuid }
+        sdkVersion: { type: string }
+        requestedMetrics:
+          type: array
+          items: { type: integer }
+        status: { const: completed }
+        eventCounts:
+          type: object
+          additionalProperties: { type: integer }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/ApiEvent" }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, retryable]
+          properties:
+            code: { type: string }
+            message: { type: string }
+            retryable: { type: boolean }
+            requestId: { type: string }

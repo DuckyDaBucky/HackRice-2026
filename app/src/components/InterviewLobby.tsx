@@ -1,7 +1,8 @@
 "use client";
 
 import { VideoCameraIcon, WarningCircleIcon } from "@phosphor-icons/react";
-import { VoicePicker } from "@/components/VoicePicker";
+import { getVoiceLabel } from "@/lib/voice/presets";
+import { MOOD_OPTIONS, type InterviewMood } from "@/lib/interview-config";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
 import type { InterviewMode } from "@/lib/questions/types";
 
@@ -14,17 +15,23 @@ export function InterviewLobby({
   mode,
   recorder,
   voiceId,
-  onVoiceIdChange,
+  mood,
+  resumeProgress,
 }: {
   mode: InterviewMode;
   recorder: UseCameraRecorder;
   voiceId: string;
-  onVoiceIdChange: (id: string) => void;
+  mood: InterviewMood;
+  /** Present only when re-entering a session that already has uploaded answers. */
+  resumeProgress?: { answered: number; total: number };
 }) {
   const isRequesting = recorder.state === "requesting-permission";
   const isError = recorder.state === "error";
+  const moodLabel = MOOD_OPTIONS.find((option) => option.id === mood)?.label ?? "Neutral";
 
   const handleJoin = async () => {
+    // The meeting view owns the first prompt after a successful camera join,
+    // which prevents duplicate speech and immediately begins the live turn.
     await recorder.start();
   };
 
@@ -40,8 +47,14 @@ export function InterviewLobby({
             {MODE_LABEL[mode]} practice interview
           </span>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Ready to join your interview?
+            {resumeProgress ? "Resume your interview" : "Ready to join your interview?"}
           </h1>
+          {resumeProgress && (
+            <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-400">
+              {resumeProgress.answered} of {resumeProgress.total} answered — continuing from
+              question {resumeProgress.answered + 1}
+            </span>
+          )}
         </div>
 
         <p className="text-sm leading-relaxed text-zinc-400">
@@ -54,13 +67,18 @@ export function InterviewLobby({
         {isError && (
           <div className="flex items-start gap-2 rounded-xl bg-red-950/60 px-4 py-3 text-left text-sm text-red-300 ring-1 ring-inset ring-red-900">
             <WarningCircleIcon size={18} className="mt-0.5 shrink-0" />
-            <span>
-              {recorder.error?.message ?? "Could not access your camera or microphone."}
-            </span>
+            <span>{recorder.error?.message ?? "Could not access your camera or microphone."}</span>
           </div>
         )}
 
-        <VoicePicker voiceId={voiceId} onChange={onVoiceIdChange} />
+        <div className="flex items-center gap-2 text-xs text-zinc-500">
+          <span className="rounded-full bg-zinc-900 px-3 py-1 ring-1 ring-inset ring-zinc-800">
+            Voice: {getVoiceLabel(voiceId)}
+          </span>
+          <span className="rounded-full bg-zinc-900 px-3 py-1 ring-1 ring-inset ring-zinc-800">
+            Mood: {moodLabel}
+          </span>
+        </div>
 
         <button
           type="button"

@@ -21,9 +21,12 @@
     "import:research": "node --conditions=react-server --env-file=.env.local --import tsx scripts/research-db.ts",
     "verify:research-db": "node --conditions=react-server --env-file=.env.local --import tsx scripts/research-db.ts --verify",
     "check:ai": "node --conditions=react-server --env-file=.env.local --import tsx scripts/check-ai.ts",
-    "check:memory": "node --conditions=react-server --env-file=.env.local --import tsx scripts/check-memory.ts"
+    "check:memory": "node --conditions=react-server --env-file=.env.local --import tsx scripts/check-memory.ts",
+    "setup:r2-cors": "node --conditions=react-server --env-file=.env.local --import tsx scripts/configure-r2-cors.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1130.0",
+    "@aws-sdk/s3-request-presigner": "^3.1130.0",
     "@clerk/nextjs": "^7.9.2",
     "@langchain/core": "^1.2.10",
     "@langchain/google": "^0.2.5",
