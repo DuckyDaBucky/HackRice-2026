@@ -19,6 +19,7 @@ export interface SessionRecord extends SessionConfig {
   createdAt: string;
   completedAt: string | null;
   isDurable: boolean;
+  reportStatus: "processing" | "completed" | "retryable_failed" | "terminal_failed" | null;
 }
 
 interface SessionRow {
@@ -33,6 +34,7 @@ interface SessionRow {
   custom_prompt: string | null;
   voice_id: string | null;
   active_config_revision: number | null;
+  report_status: SessionRecord["reportStatus"];
 }
 
 function toRecord(row: SessionRow): SessionRecord {
@@ -43,6 +45,7 @@ function toRecord(row: SessionRow): SessionRecord {
     createdAt: row.created_at,
     completedAt: row.completed_at,
     isDurable: row.active_config_revision !== null,
+    reportStatus: row.report_status,
     questionCount: row.question_count,
     mood: row.mood,
     customPrompt: row.custom_prompt,
@@ -55,7 +58,10 @@ const SESSION_COLUMNS =
    coalesce(nullif((SELECT count(*)::int FROM interview_plan_questions plan
                     WHERE plan.session_id = interview_sessions.id
                       AND plan.deleted_at IS NULL AND plan.superseded_at IS NULL), 0), question_count) AS question_count,
-   mood, custom_prompt, voice_id, active_config_revision`;
+   mood, custom_prompt, voice_id, active_config_revision,
+   (SELECT report.status FROM evaluation_reports report
+    WHERE report.session_id = interview_sessions.id AND report.deleted_at IS NULL
+    ORDER BY report.version DESC LIMIT 1) AS report_status`;
 
 /** Called once a candidate actually joins (camera granted) — not on page load, so bouncing off the lobby never leaves a ghost row. */
 export async function createSession(

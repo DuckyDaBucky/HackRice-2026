@@ -38,6 +38,12 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "abandoned") {
     return { label: "Try again", href: "/interview/setup" };
   }
+  if (session.isDurable && session.reportStatus === "completed") {
+    return { label: "Review report", href: `/reports/${session.id}` };
+  }
+  if (session.isDurable && session.reportStatus === "processing") {
+    return { label: "Report preparing", href: `/reports/${session.id}` };
+  }
   return { label: "Practice again", href: "/interview/setup" };
 }
 
@@ -106,11 +112,12 @@ export function Dashboard({
           <section className="flex flex-col gap-4">
             <h2 className="text-sm font-medium text-zinc-400">Recent sessions</h2>
             {sessions.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-zinc-800 px-6 py-14 text-center">
+              <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-zinc-800 px-6 py-12 text-center">
                 <ClockCounterClockwiseIcon size={28} weight="light" className="text-zinc-600" />
-                <p className="text-sm text-zinc-500">
-                  No sessions yet — set one up above and it will show up here.
-                </p>
+                <div className="max-w-md text-sm leading-relaxed text-zinc-500">
+                  <p>No sessions yet. Choose a role and interview tracks, allow camera and microphone access, then finish answers when you are ready.</p>
+                  <p className="mt-2">Saved recordings and captions stay private to your account and can be resumed later.</p>
+                </div>
               </div>
             ) : (
               <ul className="flex flex-col divide-y divide-zinc-900 rounded-2xl border border-zinc-800 bg-zinc-900/30">
