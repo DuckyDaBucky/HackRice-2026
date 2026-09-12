@@ -30,6 +30,9 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 | [Camera recorder build slice](16-camera-recorder-build-slice.md) | Reconciles this plan with the interview-practice foundation currently being implemented |
 | [Camera recorder component](17-camera-recorder-component.md) | Spec for the capture component: states, interfaces, testability boundary |
 | [Data model slice](18-data-model-slice.md) | Minimal interview-practice schema (sessions/questions/answer attempts), verified against the real DEV database |
+| [Presage feasibility spike](19-presage-feasibility-spike.md) | SmartSpectra has no browser support; scope and options for whoever builds the biometric piece |
+| [Recording storage and playback](20-recording-storage-and-playback.md) | Object storage upload flow (buildable now) and a timestamped feedback-marker timeline (depends on evaluation existing) |
+| [Live interview voice](21-live-interview-voice.md) | ElevenLabs TTS + live captions + live follow-ups, built and verified except an ElevenLabs API key |
 | [Change log](CHANGELOG.md) | Documentation changes and future implementation reconciliation |
 
 ## Status conventions

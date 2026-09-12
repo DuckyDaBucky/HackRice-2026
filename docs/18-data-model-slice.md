@@ -49,7 +49,9 @@ follow-up `INSERT` script; this migration only creates the empty table.
 | `is_active` | `boolean` | default `true`; lets a question be retired without deleting history that references it |
 | `created_at` | `timestamptz` | default `now()` |
 
-Indexed on `(mode, sequence)` for pack assembly.
+`(mode, sequence)` is a **unique constraint** (`questions_mode_sequence_key`,
+added in 0002 — see below), not just an index: two questions sharing a
+position would leave a pack with no defined order.
 
 ### `answer_attempts`
 
@@ -64,15 +66,16 @@ becomes a real requirement.
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | `uuid` PK | `gen_random_uuid()` |
-| `session_id` | `uuid` FK | → `interview_sessions(id)`, `ON DELETE CASCADE` |
-| `question_id` | `uuid` FK | → `questions(id)` |
+| `session_id` | `uuid` | composite FK → `interview_sessions(id, mode)`, `ON DELETE CASCADE` |
+| `question_id` | `uuid` | composite FK → `questions(id, mode)` |
+| `mode` | `text` | added in 0002; denormalized from the session, `CHECK` in `('technical', 'behavioral')` — see "mode consistency" below |
 | `media_ref` | `text` | pointer to wherever the blob eventually lands (e.g. object storage key/URL); nullable — storage is out of scope for this slice, so there's nowhere for it to point yet |
 | `mime_type` | `text` | nullable |
 | `duration_ms` | `integer` | nullable, `CHECK (>= 0)` |
 | `recorded_at` | `timestamptz` | nullable — when the clip finished recording client-side |
 | `upload_status` | `text` | `CHECK` in `('pending', 'uploading', 'uploaded', 'failed')`, default `'pending'` |
 | `analysis_status` | `text` | `CHECK` in `('not_started', 'queued', 'processing', 'completed', 'failed')`, default `'not_started'` |
-| `created_at`, `updated_at` | `timestamptz` | default `now()` |
+| `created_at`, `updated_at` | `timestamptz` | default `now()`; `updated_at` advances on every `UPDATE` via a trigger (0002) |
 
 `upload_status` and `analysis_status` are separate columns, not one status
 field, because docs/16 makes analysis "per-answer, not real-time, not
@@ -82,9 +85,22 @@ stub's absence look like a broken upload. A `CHECK` enforces
 `upload_status <> 'uploaded' OR media_ref IS NOT NULL` so a row can't claim
 to be uploaded without something to point at.
 
-Indexed on `(session_id, question_id)` for the review-page query pattern
-(list a session's attempts against its questions, in order) and separately
-on `question_id` for the reverse lookup.
+`(session_id, question_id)` is a **unique constraint**
+(`answer_attempts_session_question_key`, 0002), not just an index — this
+slice models exactly one attempt per question per session, and a plain
+index let duplicate or concurrent inserts silently violate that.
+`question_id` is separately indexed (`idx_answer_attempts_question_id`)
+for the reverse lookup.
+
+**Mode consistency (0002):** nothing before 0002 stopped an
+`answer_attempts` row from pairing a session and question with *different*
+`mode` values (a technical session referencing a behavioral question),
+since the two foreign keys were checked independently. Fixed by giving
+`answer_attempts` its own `mode` column and switching both foreign keys to
+composite `(id, mode)` references — `interview_sessions` and `questions`
+each got a `UNIQUE (id, mode)` constraint to make that referenceable.
+Postgres has no native cross-table `CHECK`, so this is the standard way to
+enforce it declaratively instead of trusting application code.
 
 ## Design choices
 
@@ -177,16 +193,43 @@ need to fetch the current password again (`tiger service get t75o4scmb8
 --with-password`, or the Tiger Cloud console) before their existing
 connection string will work.
 
-## Applying this migration in a fresh environment
+## 0002: fixes from automated PR review
 
-No migration runner is installed. Apply the file directly:
+[`app/migrations/0002_data_integrity_fixes.sql`](../app/migrations/0002_data_integrity_fixes.sql)
+addresses four gaps `qodo-code-review` found in PR #2 against 0001, all
+verified against the real DEV service (applied, then each constraint
+exercised to confirm it actually rejects the bad case, not just that the
+migration ran):
+
+- Duplicate `(session_id, question_id)` rows were possible → unique
+  constraint (see "Mode consistency" above for the FK-related fix, and the
+  `answer_attempts` table section above for the uniqueness one).
+- Duplicate `(mode, sequence)` questions were possible → unique constraint.
+- A session and question with different `mode` values could be paired on
+  one `answer_attempts` row → composite FKs, described above.
+- `updated_at` had a default but nothing advanced it on `UPDATE` → a
+  `BEFORE UPDATE` trigger on `interview_sessions` and `answer_attempts`.
+
+All four were confirmed live: a duplicate insert, a mode-mismatched
+insert, and a duplicate-sequence insert were each rejected with the
+expected constraint-violation error, and an `UPDATE` was confirmed to
+advance `updated_at` past its original value.
+
+0001's own tables were empty in the DEV environment this was applied
+against, so no backfill/dedup step was needed for the new `mode` column or
+the new unique constraints. A database with existing rows would need
+duplicates resolved (per an explicit policy) before 0002 can apply.
+
+## Applying these migrations in a fresh environment
+
+No migration runner is installed. Apply both files in order:
 
 ```sh
 psql "$DATABASE_URL" -f app/migrations/0001_interview_practice_slice.sql
+psql "$DATABASE_URL" -f app/migrations/0002_data_integrity_fixes.sql
 ```
 
-The file wraps its statements in a single transaction and is safe to run
-once against an empty schema. It is not idempotent (no `IF NOT EXISTS` on
-the `CREATE TABLE` statements) and will error if run twice against the
-same database; a future migration runner should track what's already
-applied rather than this file guessing.
+Each file wraps its statements in a single transaction. Neither is
+idempotent (no `IF NOT EXISTS` guards) and each will error if run twice
+against the same database; a future migration runner should track what's
+already applied rather than this file guessing.
