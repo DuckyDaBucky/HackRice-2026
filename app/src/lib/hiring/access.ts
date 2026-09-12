@@ -3,6 +3,7 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { requireHiringEnabled } from "./config";
 import { isHiringSuperadmin } from "./superadmin";
+import { userHasHrAccess } from "@/lib/user-roles";
 
 export type OrgRole = "admin" | "recruiter";
 
@@ -15,7 +16,7 @@ export async function requireSignedInUser() {
 export async function requireOrgMembership(clerkOrgId: string): Promise<{ userId: string; role: OrgRole }> {
   requireHiringEnabled();
   const userId = await requireSignedInUser();
-  if (await isHiringSuperadmin(userId)) {
+  if (await isHiringSuperadmin(userId) || (await userHasHrAccess(userId))) {
     return { userId, role: "admin" };
   }
   const client = await clerkClient();

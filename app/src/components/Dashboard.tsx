@@ -23,6 +23,8 @@ import {
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord, SessionStats } from "@/lib/sessions";
 import type { InterviewMode } from "@/lib/questions/types";
+import type { AppUserRole } from "@/lib/user-roles.shared";
+import type { DashboardView } from "@/lib/dashboard/view-mode";
 
 const MODE_LABEL: Record<InterviewMode, string> = {
   technical: "Technical",
@@ -95,12 +97,16 @@ export function Dashboard({
   sessions,
   answeredCounts,
   hasResume,
+  role = "candidate",
+  dashboardView = "practice",
 }: {
   firstName: string | null;
   stats: SessionStats;
   sessions: SessionRecord[];
   answeredCounts: Record<string, number>;
   hasResume: boolean;
+  role?: AppUserRole;
+  dashboardView?: DashboardView;
 }) {
   const hasCompleted = stats.completedSessions > 0;
   const completed = sessions.filter((s) => s.status === "completed");
@@ -112,7 +118,7 @@ export function Dashboard({
   const focus = currentScores ? weakestCategory(currentScores) : null;
 
   return (
-    <DashboardShell active="Home" firstName={firstName}>
+    <DashboardShell active="Home" firstName={firstName} role={role} dashboardView={dashboardView}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">

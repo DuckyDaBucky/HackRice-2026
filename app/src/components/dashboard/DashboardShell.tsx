@@ -12,7 +12,11 @@ import {
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/marketing/Logo";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
+import { ViewSwitcher } from "@/components/dashboard/ViewSwitcher";
 import { clerkEnabled } from "@/lib/clerk";
+import { roleLabel, type AppUserRole } from "@/lib/user-roles.shared";
+import type { DashboardView } from "@/lib/dashboard/view-mode";
+import { canSwitchDashboardView } from "@/lib/dashboard/view-mode";
 
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: HouseIcon },
@@ -25,10 +29,14 @@ const NAV_ITEMS = [
 export function DashboardShell({
   active,
   firstName,
+  role = "candidate",
+  dashboardView = "practice",
   children,
 }: {
   active: (typeof NAV_ITEMS)[number]["label"];
   firstName: string | null;
+  role?: AppUserRole;
+  dashboardView?: DashboardView;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -71,8 +79,9 @@ export function DashboardShell({
             <span className="truncate text-[13px] font-medium text-dash-text">
               {firstName ?? "Your account"}
             </span>
-            <span className="text-[11px] text-dash-text-faint">Candidate</span>
+            <span className="text-[11px] text-dash-text-faint">{roleLabel(role)}</span>
           </div>
+          {canSwitchDashboardView(role) && <ViewSwitcher currentView={dashboardView} />}
           <ThemeToggle />
         </div>
       </aside>

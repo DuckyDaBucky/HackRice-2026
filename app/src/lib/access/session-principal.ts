@@ -6,6 +6,7 @@ import type { HiringInterviewPolicy, SessionPrincipal } from "@/lib/hiring/contr
 import { DEFAULT_HIRING_POLICY } from "@/lib/hiring/contracts";
 import { requireOrgMembership, getProvisionedOrganization } from "@/lib/hiring/access";
 import { isHiringSuperadmin } from "@/lib/hiring/superadmin";
+import { userHasHrAccess } from "@/lib/user-roles";
 
 export async function resolveSessionPrincipal(sessionId: string): Promise<SessionPrincipal | null> {
   const { userId } = await auth();
@@ -39,7 +40,7 @@ export async function resolveSessionPrincipal(sessionId: string): Promise<Sessio
       try {
         const membership = await requireOrgMembership(clerkOrgId);
         const provisioned = await getProvisionedOrganization(clerkOrgId);
-        if (provisioned || (await isHiringSuperadmin(userId))) {
+        if (provisioned || (await isHiringSuperadmin(userId)) || (await userHasHrAccess(userId))) {
           return {
             kind: "org_recruiter",
             clerkUserId: userId,
@@ -49,7 +50,7 @@ export async function resolveSessionPrincipal(sessionId: string): Promise<Sessio
           };
         }
       } catch {
-        if (await isHiringSuperadmin(userId)) {
+        if ((await isHiringSuperadmin(userId)) || (await userHasHrAccess(userId))) {
           return {
             kind: "org_recruiter",
             clerkUserId: userId,

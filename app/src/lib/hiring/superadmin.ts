@@ -1,5 +1,7 @@
 import "server-only";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
+import { verifiedEmailsForUser } from "@/lib/clerk-user";
+import { userHasHrAccess } from "@/lib/user-roles";
 
 export function hiringSuperadminEmails() {
   return (process.env.HIRING_SUPERADMIN_EMAILS ?? "")
@@ -10,14 +12,6 @@ export function hiringSuperadminEmails() {
 
 export function personalClerkOrgId(userId: string) {
   return `personal_${userId}`;
-}
-
-export async function verifiedEmailsForUser(userId: string) {
-  const client = await clerkClient();
-  const user = await client.users.getUser(userId);
-  return user.emailAddresses
-    .filter((entry) => entry.verification?.status === "verified")
-    .map((entry) => entry.emailAddress.toLowerCase());
 }
 
 export async function isHiringSuperadmin(userId: string) {
@@ -33,5 +27,6 @@ export async function resolveHiringClerkOrgId() {
   if (!userId) return null;
   if (orgId) return orgId;
   if (await isHiringSuperadmin(userId)) return personalClerkOrgId(userId);
+  if (await userHasHrAccess(userId)) return personalClerkOrgId(userId);
   return null;
 }

@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   getV2ResumeState: vi.fn(),
   requireOrgMembership: vi.fn(),
   getProvisionedOrganization: vi.fn(),
+  isHiringSuperadmin: vi.fn(),
+  userHasHrAccess: vi.fn(),
 }));
 
 vi.mock("@clerk/nextjs/server", () => ({ auth: mocks.auth }));
@@ -17,6 +19,12 @@ vi.mock("../src/lib/hiring/access", () => ({
   requireOrgMembership: mocks.requireOrgMembership,
   getProvisionedOrganization: mocks.getProvisionedOrganization,
 }));
+vi.mock("../src/lib/hiring/superadmin", () => ({
+  isHiringSuperadmin: mocks.isHiringSuperadmin,
+}));
+vi.mock("../src/lib/user-roles", () => ({
+  userHasHrAccess: mocks.userHasHrAccess,
+}));
 
 import { resolveSessionPrincipal } from "../src/lib/access/session-principal";
 
@@ -27,6 +35,8 @@ describe("resolveSessionPrincipal access control", () => {
     mocks.getV2ResumeState.mockResolvedValue(null);
     mocks.requireOrgMembership.mockResolvedValue({ role: "admin" });
     mocks.getProvisionedOrganization.mockResolvedValue({ id: "org-db-1" });
+    mocks.isHiringSuperadmin.mockResolvedValue(false);
+    mocks.userHasHrAccess.mockResolvedValue(false);
   });
 
   it("grants assigned candidate access to their hiring session", async () => {
