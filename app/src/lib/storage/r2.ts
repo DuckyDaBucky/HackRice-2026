@@ -1,5 +1,5 @@
 import "server-only";
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { HeadObjectCommand, S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const UPLOAD_URL_TTL_SECONDS = 10 * 60;
@@ -31,6 +31,15 @@ export function answerClipKey(sessionId: string, questionId: string, mimeType: s
   return `interviews/${sessionId}/${questionId}.${ext}`;
 }
 
+/**
+ * V2 keeps each physical recording addressable. Retries reuse an artifact id;
+ * a revisit gets a new id and can never overwrite an earlier answer.
+ */
+export function artifactClipKey(sessionId: string, artifactId: string, mimeType: string) {
+  const ext = mimeType.includes("webm") ? "webm" : "mp4";
+  return `interviews/${sessionId}/artifacts/${artifactId}.${ext}`;
+}
+
 export async function createUploadUrl(key: string, contentType: string): Promise<string> {
   return getSignedUrl(
     client(),
@@ -43,4 +52,16 @@ export async function createPlaybackUrl(key: string): Promise<string> {
   return getSignedUrl(client(), new GetObjectCommand({ Bucket: bucket(), Key: key }), {
     expiresIn: PLAYBACK_URL_TTL_SECONDS,
   });
+}
+
+/** Verify the object exists after a direct browser PUT before recording it as uploaded. */
+export async function getUploadedObjectMetadata(key: string): Promise<{
+  byteSize: number | null;
+  checksumSha256: string | null;
+}> {
+  const result = await client().send(new HeadObjectCommand({ Bucket: bucket(), Key: key }));
+  return {
+    byteSize: typeof result.ContentLength === "number" ? result.ContentLength : null,
+    checksumSha256: result.ChecksumSHA256 ?? null,
+  };
 }
