@@ -1,4 +1,5 @@
 import { ProductPreview } from "./ProductPreview";
+import { TiltCard } from "./TiltCard";
 
 export function Hero() {
   return (
@@ -36,7 +37,9 @@ export function Hero() {
             </div>
           </div>
 
-          <ProductPreview />
+          <TiltCard>
+            <ProductPreview />
+          </TiltCard>
         </div>
       </div>
     </section>
