@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRightIcon, CheckIcon } from "@phosphor-icons/react";
+import { RoleCombobox } from "@/components/RoleCombobox";
 import { VoicePicker } from "@/components/VoicePicker";
 import { useVoicePreference } from "@/hooks/useVoicePreference";
 import {
@@ -142,11 +143,14 @@ export default function InterviewSetupPage() {
         </div>
       </section>
 
-      <section className="flex flex-col gap-4" aria-labelledby="interview-context">
-        <h2 id="interview-context" className="text-sm font-medium text-zinc-300">Interview context</h2>
+      <section className="flex flex-col gap-4 rounded-2xl border border-sky-900/60 bg-sky-500/[0.04] p-5" aria-labelledby="interview-context">
+        <div className="flex flex-col gap-1">
+          <h2 id="interview-context" className="text-base font-semibold text-zinc-100">What role are you practicing for?</h2>
+          <p className="text-sm text-zinc-400">Click the field for popular roles, or start typing to narrow them down — or write your own.</p>
+        </div>
         <div className="flex flex-col gap-2">
-          <label htmlFor="target-role" className="text-sm text-zinc-400">Target role</label>
-          <input id="target-role" value={targetRole} onChange={(event) => setTargetRole(event.target.value)} placeholder="e.g. Backend engineer" maxLength={160} className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-zinc-100 outline-none placeholder:text-zinc-600 focus:border-sky-600" />
+          <label htmlFor="target-role" className="text-sm font-medium text-zinc-300">Target role</label>
+          <RoleCombobox value={targetRole} onChange={setTargetRole} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {SENIORITY_OPTIONS.map((option) => {
