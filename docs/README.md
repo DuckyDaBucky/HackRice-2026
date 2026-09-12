@@ -1,8 +1,11 @@
 # Get Me Hired — project documentation
 
+- [Account profiles and invitation roadmap](17-profiles-and-invitations.md): Clerk-linked persistence, automatic experience criteria, UTC date handling and proposed blockchain invitations.
+- [ElevenLabs handoff](18-elevenlabs-handoff.md): prepared question text and the boundary with the audio/video implementation.
+
 **HackRice 2026 · CS interview preparation and employer interviews**
 
-Initial planning baseline: September 12, 2026. Updated after static inspection of main at `17f33a59747a1e251334b28e6019602593f35f83`. The repository now has a Next.js/Clerk/PostgreSQL scaffold. Interview features remain planned. Source presence is distinguished from runtime verification; no app build, provider call or deployment was tested in this documentation update.
+Initial planning baseline: September 12, 2026. The combined implementation now includes the authenticated development workbench, resume processing, account profiles and question planning alongside the camera recorder and interview voice slice from main. The documents below distinguish implemented behavior from proposed features; the workbench question pack and the interview session's static question source remain separate integration boundaries. Reports provide feedback after answers; live captions and spoken prompts are not live candidate evaluation.
 
 Get Me Hired is an exclusively video interview platform for behavioral and technical-behavioral interviews. Its structured practice experience is inspired by HackerRank, but coding exercises, coding contests, and a code execution judge are outside the current scope.
 
@@ -13,7 +16,7 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 | Document | Purpose |
 | --- | --- |
 | [Product brief](01-product-brief.md) | Vision, audience, scope, terminology and confirmed requirements |
-| [Practice experience](02-practice-experience.md) | Resume parsing, personalized questions, recorded and live practice |
+| [Practice experience](02-practice-experience.md) | Resume parsing, personalized questions, recorded practice and post-interview reports |
 | [Corporate experience](03-corporate-experience.md) | HR setup, screening invitations, interviewer assistance and review |
 | [Evaluation and reports](04-evaluation-and-reports.md) | Evidence-based rubrics, report contents and scoring boundaries |
 | [Architecture](05-architecture.md) | Proposed components, processing flow, session states and failure handling |
@@ -43,3 +46,5 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 - **Deferred:** intentionally outside the recommended HackRice build slice.
 
 The founder's requested product scope is wider than the proposed HackRice MVP. The delivery plan recommends sequencing; it does not cancel later requirements. Use the decision register when changing scope. Keep this folder in the existing repository when implementation lands; do not replace the application's future README or scaffold to match assumptions here.
+
+- [Workbench and post-interview processing](16-workbench-and-processing.md): current scope, integration ownership, database import and verification boundaries.

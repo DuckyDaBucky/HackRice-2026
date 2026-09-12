@@ -1,5 +1,18 @@
 # Documentation change log
 
+## September 12, 2026 — combine workbench and interview slices
+
+- Preserved main's recording, voice, captions, migrations and documentation alongside the development workbench and account profiles.
+- Combined dependency requirements and both test directories; 64 tests pass.
+- Kept both Gemini configuration names explicit: `GOOGLE_API_KEY` for the workbench and `GEMINI_API_KEY` for interview follow-ups.
+- The workbench question pack still needs to be connected to the interview session; merging the slices does not imply that handoff or recording storage is complete.
+
+## September 12, 2026 — processing scope and research storage
+
+- Replaced live analysis assumptions with post-interview reports and recording playback.
+- Retained a private HR answer-guidance overlay as a proposed feature.
+- Documented the development workbench, paused Gemini ownership and research import safeguards.
+- Distinguished corpus storage from future Backboard user memory and documented future subtitle sizes.
 ## 2026-09-12 — PR review fixes (camera hook, DB constraints, Node version)
 
 - Fixed four real bugs in `useCameraRecorder.ts` found by automated PR

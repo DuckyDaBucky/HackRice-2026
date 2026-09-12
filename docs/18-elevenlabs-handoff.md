@@ -1,0 +1,9 @@
+# ElevenLabs preparation and audio/video handoff
+
+`POST /api/dev/ai/speech-plan` accepts `{pack, voiceId?, subtitleSize?}` under the existing development-only authenticated, same-origin guard. It returns a versioned speech plan with the pack ID and ordered items containing stable item/question IDs, plain question text, separate subtitle text and playback options. The playground exposes this preparation under the generated question pack. Status is explicitly `prepared-not-synthesized`; audio is null. No voice-provider request is made.
+
+Only the public question prompt is passed to the speech layer. Answer indicators, rubrics, resume excerpts and saved memory are not included. `voiceId` is an optional configuration slot; a future adapter must validate account access to that voice before synthesizing. Subtitle sizes are small, medium, large and extra-large. Preserve text availability independently of audio, with accessible contrast in the eventual player.
+
+`QuestionVoiceProvider.synthesize` defines the future server-side adapter boundary: text, voice ID, stable request ID and abort signal in; audio bytes, MIME type and optional provider request ID out. Keep ElevenLabs credentials server-side. Provider timeout, quota, cancellation, retry policy and validated audio format will be implemented with the actual adapter. Do not interpret a prepared plan as successful speech synthesis or playback.
+
+The friend's audio/video implementation owns capture, playback and transcription. Correlate media and final submitted answers using pack and question IDs. It can emit started, paused, completed, cancelled or failed playback events. Final answer text can enter the existing evaluate endpoint after explicit submission. Recording transport, microphone turn detection, transcription providers and video playback are intentionally untouched by this change. Interview analysis remains post-submission, not live coaching.

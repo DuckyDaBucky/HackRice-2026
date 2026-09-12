@@ -1,5 +1,7 @@
 # UX and screen inventory
 
+> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+
 ## Current screen inventory
 
 Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
@@ -35,14 +37,14 @@ Candidate pages should prioritize the question, camera preview and answer contro
 2. **Role/template editor:** competencies, questions, rubric, answer guides and policies.
 3. **Invitation manager:** create/revoke/resend, expiry and completion status.
 4. **Candidate landing/device check:** employer, purpose, format and recording terms.
-5. **Candidate interview:** reusable recorded/live components with published corporate policies.
+5. **Candidate interview:** reusable recording and submission components with published corporate policies.
 6. **Interviewer panel:** question pack, private guidance, follow-ups and notes.
 7. **Candidate review:** report, media evidence, transcript correction and human rating.
 8. **Workspace settings:** memberships, retention and allowed integrations.
 
 ## Voice and art packs
 
-ElevenLabs voice is intended for practice and automated corporate interviews. Text must remain available when audio fails. Provide an accessible stop/replay control for question speech. Voice selection, licensing and live interruption behavior remain implementation decisions.
+ElevenLabs voice is intended for practice and automated corporate interviews. Text must remain available when audio fails. Provide an accessible stop/replay control for question speech. Voice selection and licensing remain implementation decisions. Interview analysis is not streamed to candidates.
 
 The founder may upload avatar art packs. Define accepted formats, rights confirmation and animation/lip-sync behavior later. Start with no avatar or a static visual; do not make a complex avatar renderer a prerequisite for interview functionality.
 
