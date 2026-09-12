@@ -2,6 +2,7 @@
 
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 import { useState } from "react";
+import { clerkEnabled } from "@/lib/clerk";
 import { Logo } from "./Logo";
 
 const LINKS = [
@@ -32,23 +33,25 @@ export function Nav() {
           ))}
         </nav>
 
-        <div className="hidden items-center gap-4 lg:flex">
-          <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button className="text-sm text-muted transition-colors hover:text-foreground">
-                Sign in
-              </button>
-            </SignInButton>
-            <SignUpButton mode="modal">
-              <button className="rounded-full border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/10">
-                Sign up
-              </button>
-            </SignUpButton>
-          </Show>
-          <Show when="signed-in">
-            <UserButton />
-          </Show>
-        </div>
+        {clerkEnabled && (
+          <div className="hidden items-center gap-4 lg:flex">
+            <Show when="signed-out">
+              <SignInButton mode="modal">
+                <button className="text-sm text-muted transition-colors hover:text-foreground">
+                  Sign in
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal">
+                <button className="rounded-full border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/10">
+                  Sign up
+                </button>
+              </SignUpButton>
+            </Show>
+            <Show when="signed-in">
+              <UserButton />
+            </Show>
+          </div>
+        )}
 
         <button
           type="button"
@@ -75,23 +78,25 @@ export function Nav() {
               </a>
             ))}
           </nav>
-          <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
-            <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button className="text-sm text-muted hover:text-foreground">
-                  Sign in
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="rounded-full border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent hover:border-accent">
-                  Sign up
-                </button>
-              </SignUpButton>
-            </Show>
-            <Show when="signed-in">
-              <UserButton />
-            </Show>
-          </div>
+          {clerkEnabled && (
+            <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
+              <Show when="signed-out">
+                <SignInButton mode="modal">
+                  <button className="text-sm text-muted hover:text-foreground">
+                    Sign in
+                  </button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <button className="rounded-full border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent hover:border-accent">
+                    Sign up
+                  </button>
+                </SignUpButton>
+              </Show>
+              <Show when="signed-in">
+                <UserButton />
+              </Show>
+            </div>
+          )}
         </div>
       )}
     </header>
