@@ -1,0 +1,19 @@
+[package]
+name = "get_me_hired"
+version = "0.1.0"
+description = "Get Me Hired opaque invitation and report-release state"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "get_me_hired"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+
+[dependencies]
+anchor-lang = "0.30.1"
