@@ -15,7 +15,9 @@ export const chatSchema = z.object({
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(16000) }).strict()).min(1).max(30),
   context: contextSchema,
 }).strict().refine(v => v.messages.at(-1)?.role === "user", "End with a user message");
-export const generationSchema = z.object({context:contextSchema, count:z.number().int().min(1).max(10).default(5)}).strict();
+export const generationSchema = z.object({context:contextSchema, count:z.number().int().min(1).max(10).default(5),
+  selectionSeed:z.string().min(1).max(100).optional(), excludedQuestionIds:z.array(z.string().max(150)).max(200).optional(),
+}).strict();
 export const generatedQuestionSchema = z.object({
   prompt: short, category:z.enum(["behavioral","technical-behavioral"]), competency:short,
   intent:short, profileEvidence:z.array(short).max(5), projectId:z.string().max(100).nullable(),
