@@ -11,7 +11,6 @@ import { currentUser } from "@clerk/nextjs/server";
 import { Dashboard } from "@/components/Dashboard";
 import { getSessionStats, listRecentSessions } from "@/lib/sessions";
 import { getProfile } from "@/lib/profiles";
-import { USE_MOCK_DASHBOARD_DATA, MOCK_STATS, MOCK_SESSIONS, MOCK_HAS_RESUME } from "@/lib/dashboard/mock-data";
 
 export default async function Home() {
   const user = clerkEnabled ? await currentUser() : null;
@@ -31,16 +30,18 @@ export default async function Home() {
     );
   }
 
-  const [stats, sessions, profile] = USE_MOCK_DASHBOARD_DATA
-    ? [MOCK_STATS, MOCK_SESSIONS, null]
-    : await Promise.all([getSessionStats(user.id), listRecentSessions(user.id), getProfile(user.id)]);
+  const [stats, sessions, profile] = await Promise.all([
+    getSessionStats(user.id),
+    listRecentSessions(user.id),
+    getProfile(user.id),
+  ]);
 
   return (
     <Dashboard
       firstName={user.firstName}
       stats={stats}
       sessions={sessions}
-      hasResume={USE_MOCK_DASHBOARD_DATA ? MOCK_HAS_RESUME : profile !== null}
+      hasResume={profile !== null}
     />
   );
 }

@@ -7,7 +7,6 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { listRecentSessions } from "@/lib/sessions";
 import { sessionDurationMinutes, sessionScore, shortDate } from "@/lib/dashboard/performance";
-import { USE_MOCK_DASHBOARD_DATA, MOCK_SESSIONS } from "@/lib/dashboard/mock-data";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord } from "@/lib/sessions";
 
@@ -44,7 +43,7 @@ export default async function InterviewsPage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in?redirect_url=%2Finterviews");
 
-  const sessions = USE_MOCK_DASHBOARD_DATA ? MOCK_SESSIONS : await listRecentSessions(user.id, 50);
+  const sessions = await listRecentSessions(user.id, 50);
 
   return (
     <DashboardShell active="Interviews" firstName={user.firstName}>
