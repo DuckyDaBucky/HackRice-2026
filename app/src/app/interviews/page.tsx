@@ -21,19 +21,38 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
 
 const STATUS_LABEL: Record<SessionRecord["status"], string> = {
   completed: "Completed",
-  in_progress: "Incomplete",
+  in_progress: "In progress",
+  paused: "Paused",
+  planned: "Ready to start",
   abandoned: "Abandoned",
 };
 
 const STATUS_STYLE: Record<SessionRecord["status"], string> = {
   completed: "text-[#0f9d78]",
   in_progress: "text-amber-600",
+  paused: "text-amber-600",
+  planned: "text-accent-deep",
   abandoned: "text-[#93a1b5]",
 };
 
+/** Mirrors the durable-session/report lifecycle from components/Dashboard.tsx. */
 function actionFor(session: SessionRecord): { label: string; href: string } {
-  if (session.status === "in_progress") {
-    return { label: "Resume", href: `/interview/${session.mode}?session=${session.id}` };
+  if (session.status === "in_progress" || session.status === "paused" || session.status === "planned") {
+    return {
+      label: session.status === "planned" ? "Start" : "Resume",
+      href: session.isDurable
+        ? `/interview/session/${session.id}`
+        : `/interview/${session.mode}?session=${session.id}`,
+    };
+  }
+  if (session.status === "abandoned") {
+    return { label: "Try again", href: "/interview/setup" };
+  }
+  if (session.isDurable && session.reportStatus === "completed") {
+    return { label: "Review report", href: `/reports/${session.id}` };
+  }
+  if (session.isDurable && session.reportStatus === "processing") {
+    return { label: "Report preparing", href: `/reports/${session.id}` };
   }
   return { label: "Practice again", href: "/interview/setup" };
 }
