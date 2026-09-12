@@ -16,13 +16,14 @@ import {
   skillBreakdown,
   type SkillScores,
 } from "@/lib/dashboard/performance";
+import { USE_MOCK_DASHBOARD_DATA, MOCK_SESSIONS } from "@/lib/dashboard/mock-data";
 
 export default async function AnalyticsPage() {
   if (!clerkEnabled) redirect("/");
   const user = await currentUser();
   if (!user) redirect("/sign-in?redirect_url=%2Fanalytics");
 
-  const sessions = await listRecentSessions(user.id, 50);
+  const sessions = USE_MOCK_DASHBOARD_DATA ? MOCK_SESSIONS : await listRecentSessions(user.id, 50);
   const completed = sessions.filter((s) => s.status === "completed");
 
   if (completed.length === 0) {

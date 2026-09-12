@@ -5,6 +5,7 @@ import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ResumeUploadButton } from "@/components/dashboard/ResumeUploadButton";
 import { getProfile } from "@/lib/profiles";
+import { USE_MOCK_DASHBOARD_DATA, MOCK_PROFILE_ACCOUNT } from "@/lib/dashboard/mock-data";
 
 const LEVEL_LABEL: Record<string, string> = {
   intern: "Intern",
@@ -21,7 +22,7 @@ export default async function ResumePage() {
   const user = await currentUser();
   if (!user) redirect("/sign-in?redirect_url=%2Fresume");
 
-  const account = await getProfile(user.id);
+  const account = USE_MOCK_DASHBOARD_DATA ? MOCK_PROFILE_ACCOUNT : await getProfile(user.id);
 
   return (
     <DashboardShell active="Resume" firstName={user.firstName}>
