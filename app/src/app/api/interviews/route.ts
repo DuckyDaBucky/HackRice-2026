@@ -10,6 +10,7 @@ import {
   completeSessionPlan,
   failSessionPlanning,
 } from "@/lib/interviews/persistence";
+import { llmTextModel } from "@/lib/llm/provider";
 
 const PLAN_PROMPT_VERSION = "interview-plan-v1";
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const parsed = interviewSetupSchema.safeParse(body);
   if (!parsed.success) return Response.json({ error: "Invalid interview setup." }, { status: 400 });
 
-  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  const model = llmTextModel("plan");
   const inputHash = planInputHash(parsed.data);
   let draft: Awaited<ReturnType<typeof beginSessionPlanning>>;
   try {

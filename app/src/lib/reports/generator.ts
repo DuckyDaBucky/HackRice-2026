@@ -1,12 +1,14 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { rawReportSchema, type ReportFindingInput, type ReportOverview, type ReportTranscriptTurn } from "./contracts";
+import { heuristicFindings, heuristicOverview } from "./heuristic";
+import { activeLlmProvider, completeJsonText, llmTextModel, type LlmProviderId } from "@/lib/llm/provider";
 
-export const REPORT_PROMPT_VERSION = "report-v2-chess-style";
+export const REPORT_PROMPT_VERSION = "report-v3-chess-style-biometrics";
 
-/** A separate model keeps interview-time calls from exhausting the free-tier quota reports need. */
+/** Model for the report pass under the active LLM provider (Muse Spark by default). */
 export function reportModel() {
-  return process.env.GEMINI_REPORT_MODEL || process.env.GEMINI_MODEL || "gemini-3.6-flash";
+  return llmTextModel("report");
 }
 
 export interface GeneratedReport {
@@ -16,7 +18,8 @@ export interface GeneratedReport {
   result: Record<string, unknown>;
   usage: Record<string, number>;
   model: string;
-  source: "gemini" | "fallback";
+  provider: LlmProviderId;
+  source: LlmProviderId | "fallback";
 }
 
 export function reportInputHash(turns: ReportTranscriptTurn[]) {
@@ -27,7 +30,7 @@ function answeredTurns(turns: ReportTranscriptTurn[]) {
   return turns.filter((turn) => turn.kind === "candidate_answer" && turn.text);
 }
 
-function buildEvaluatorPrompt(turns: ReportTranscriptTurn[]) {
+function buildEvaluatorPrompt(turns: ReportTranscriptTurn[], biometricContext?: string | null) {
   const answered = answeredTurns(turns);
   const transcript = answered
     .map((turn) => {
@@ -35,6 +38,10 @@ function buildEvaluatorPrompt(turns: ReportTranscriptTurn[]) {
       return `[turnId=${turn.turnId}] ${label}${turn.prompt ? ` (${turn.prompt})` : ""}: ${turn.text}`;
     })
     .join("\n");
+
+  const biometricBlock = biometricContext?.trim()
+    ? `\nBiometric context (from the candidate's recorded video, SmartSpectra SDK — use only as supporting delivery notes, never as the basis for a verdict):\n${biometricContext.trim().slice(0, 2000)}\n`
+    : "";
 
   return `You are reviewing a completed interview-practice transcript the way a chess engine reviews a finished game: go answer by answer, call out exactly where the candidate went wrong and why, and finish with an overview of the biggest problems to fix. You are evaluating a transcript after the fact, not conducting the interview.
 
@@ -48,8 +55,8 @@ Then return one "overview" object with:
 - "summary": a short paragraph on overall performance across the session.
 - "keyProblems": 1-5 short bullet strings naming the most impactful, recurring problems to fix, ordered by impact.
 
-Never infer or mention confidence, emotion, appearance, accent, personality or any biometric trait. Base every verdict only on what was said.
-
+Base every verdict primarily on what was said. You may add one short second sentence to "explanation" noting delivery (e.g. "Biometrics show elevated movement during this answer") when the biometric context above mentions that turn, but never change the verdict because of biometrics.
+${biometricBlock}
 Transcript:
 ${transcript || "(no answered turns)"}
 
@@ -57,18 +64,23 @@ Return strict JSON only:
 {"overview":{"summary":"...","keyProblems":["..."]},"findings":[{"turnId":"...","verdict":"blunder|mistake|inaccuracy|good|best|insufficient_evidence","explanation":"...","improvement":"...or null"}]}`;
 }
 
-/** Safe default when the model call fails or is rate-limited: never fabricate a verdict. */
+/** Safe default when the model call fails or is rate-limited: heuristic verdicts, never all-blank. */
 export function createFallbackReport(turns: ReportTranscriptTurn[]): GeneratedReport {
-  const findings: ReportFindingInput[] = answeredTurns(turns).map((turn) => ({
-    turnId: turn.turnId,
-    verdict: "insufficient_evidence" as const,
-    explanation: "The report generator was unavailable, so this answer was not evaluated.",
-    improvement: null,
-  }));
-  const overview: ReportOverview = {
-    summary: "The report generator was unavailable, so this session could not be reviewed yet.",
-    keyProblems: ["Retry generating this report once the evaluator is available again."],
-  };
+  const answered = answeredTurns(turns);
+  const findings: ReportFindingInput[] =
+    answered.length > 0
+      ? heuristicFindings(turns)
+      : [];
+  const overview: ReportOverview =
+    answered.length > 0
+      ? {
+          ...heuristicOverview(findings),
+          summary: `The full AI reviewer was unavailable, so these are instant local scores. ${heuristicOverview(findings).summary}`,
+        }
+      : {
+          summary: "No substantive answers were captured, so there is nothing to score yet.",
+          keyProblems: ["Answer out loud for at least 30 seconds per question so the reviewer has evidence."],
+        };
   return {
     overview,
     findings,
@@ -76,6 +88,7 @@ export function createFallbackReport(turns: ReportTranscriptTurn[]): GeneratedRe
     result: { overview, findings, source: "fallback", reason: "report_generator_unavailable" },
     usage: {},
     model: "fallback-static-v1",
+    provider: activeLlmProvider(),
     source: "fallback",
   };
 }
@@ -90,58 +103,20 @@ function parseModelText(raw: string, turns: ReportTranscriptTurn[]): { overview:
   };
 }
 
-function usageFrom(data: unknown): Record<string, number> {
-  const usage = (data as { usageMetadata?: Record<string, unknown> })?.usageMetadata;
-  if (!usage) return {};
-  const fields: Record<string, unknown> = {
-    promptTokens: usage.promptTokenCount,
-    candidateTokens: usage.candidatesTokenCount,
-    totalTokens: usage.totalTokenCount,
+/** Calls the active LLM once for the report; persistence happens in the owning action. */
+export async function generateReport(turns: ReportTranscriptTurn[], biometricContext?: string | null): Promise<GeneratedReport> {
+  const { text, model, provider, usage } = await completeJsonText(buildEvaluatorPrompt(turns, biometricContext), {
+    timeoutMs: 25_000,
+  });
+  const { overview, findings } = parseModelText(text, turns);
+  return {
+    overview,
+    findings,
+    inputHash: reportInputHash(turns),
+    result: { overview, findings },
+    usage,
+    model,
+    provider,
+    source: provider,
   };
-  return Object.fromEntries(
-    Object.entries(fields).filter((entry): entry is [string, number] => typeof entry[1] === "number"),
-  );
-}
-
-/** Calls Gemini once for the report; persistence happens in the owning action. */
-export async function generateReport(turns: ReportTranscriptTurn[]): Promise<GeneratedReport> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Report generation is unavailable because Gemini is not configured.");
-  const model = reportModel();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildEvaluatorPrompt(turns) }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            thinkingConfig: { thinkingBudget: 128 },
-          },
-        }),
-      },
-    );
-    if (!response.ok) throw new Error(`Gemini report evaluator failed with status ${response.status}.`);
-    const data: unknown = await response.json();
-    const text = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })
-      ?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Gemini report evaluator returned no text.");
-    const { overview, findings } = parseModelText(text, turns);
-    return {
-      overview,
-      findings,
-      inputHash: reportInputHash(turns),
-      result: { overview, findings },
-      usage: usageFrom(data),
-      model,
-      source: "gemini",
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
 }

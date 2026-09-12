@@ -10,6 +10,7 @@ export interface ReviewClip {
 
 export interface ReviewAnswer {
   turnId: string;
+  artifactId: string | null;
   number: number;
   question: string | null;
   isFollowUp: boolean;
@@ -45,14 +46,16 @@ export function buildReviewAnswers(params: {
 
     const asked = turn.planQuestionId ? lastAskedByPlanQuestionId.get(turn.planQuestionId) : undefined;
     const planPrompt = turn.planQuestionId ? promptByPlanQuestionId.get(turn.planQuestionId) ?? null : null;
+    const clip = params.clipsByTurnId.get(turn.id) ?? null;
     answers.push({
       turnId: turn.id,
+      artifactId: null,
       number: answers.length + 1,
       question: asked?.text ?? planPrompt,
       isFollowUp: asked?.kind === "follow_up",
       transcript: turn.text,
       finding: findingByTurnId.get(turn.id) ?? null,
-      clip: params.clipsByTurnId.get(turn.id) ?? null,
+      clip,
     });
   }
   return answers;
@@ -71,12 +74,14 @@ export async function buildSessionReview(params: {
   const uploaded = context.artifacts.filter((artifact) => artifact.turnId && artifact.uploadStatus === "uploaded");
   const urls = await Promise.all(uploaded.map((artifact) => createPlaybackUrl(artifact.r2Key).catch(() => null)));
   const clipsByTurnId = new Map<string, ReviewClip>();
+  const artifactByTurnId = new Map<string, string>();
   uploaded.forEach((artifact, index) => {
     const url = urls[index];
     if (url && artifact.turnId) clipsByTurnId.set(artifact.turnId, { url, durationMs: artifact.durationMs });
+    if (artifact.turnId) artifactByTurnId.set(artifact.turnId, artifact.id);
   });
 
-  return {
+  const review = {
     answers: buildReviewAnswers({ context, findings: params.findings, clipsByTurnId }),
     processMistakes: deriveProcessMistakes({
       elapsedActiveMs: context.session.elapsedActiveMs,
@@ -86,4 +91,8 @@ export async function buildSessionReview(params: {
       artifacts: context.artifacts,
     }),
   };
+  for (const answer of review.answers) {
+    answer.artifactId = artifactByTurnId.get(answer.turnId) ?? null;
+  }
+  return review;
 }

@@ -1,6 +1,7 @@
 import { buildFollowUpPrompt } from "@/lib/follow-up/build-prompt";
 import { parseFollowUpResponse } from "@/lib/follow-up/parse-response";
 import { isInterviewMood, MAX_CUSTOM_PROMPT_LENGTH } from "@/lib/interview-config";
+import { completeJsonText, isLlmConfigured } from "@/lib/llm/provider";
 import type { InterviewMode } from "@/lib/questions/types";
 
 interface FollowUpRequestBody {
@@ -24,9 +25,7 @@ function isValidBody(body: unknown): body is FollowUpRequestBody {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    console.error("GEMINI_API_KEY is not configured");
+  if (!isLlmConfigured()) {
     return Response.json({ followUp: FALLBACK_FOLLOW_UP });
   }
 
@@ -51,36 +50,11 @@ export async function POST(request: Request) {
   });
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            // Live in-call feature: full thinking-mode latency (multiple
-            // seconds) is unacceptable here. thinkingBudget: 0 is rejected
-            // by this model (INVALID_ARGUMENT) — 128 is the smallest
-            // budget verified to work, cutting thinking tokens ~3-4x.
-            thinkingConfig: { thinkingBudget: 128 },
-          },
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      console.error("Gemini follow-up request failed", response.status, await response.text());
-      return Response.json({ followUp: FALLBACK_FOLLOW_UP });
-    }
-
-    const data = await response.json();
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const { text } = await completeJsonText(prompt, { timeoutMs: 10_000 });
     const followUp = text ? parseFollowUpResponse(text) : null;
     return Response.json({ followUp });
   } catch (error) {
-    console.error("Gemini follow-up request errored", error);
+    console.error("Follow-up request errored", error);
     return Response.json({ followUp: FALLBACK_FOLLOW_UP });
   }
 }

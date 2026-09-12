@@ -2,6 +2,7 @@ import { requireDevUser, checkOrigin } from "@/lib/workbench/access";
 import { loadCorpus, researchDirectory } from "@/lib/workbench/corpus";
 import { extractResume, MAX_UPLOAD } from "@/lib/workbench/extraction";
 import { parseResume } from "@/lib/workbench/parser";
+import { describeLlm } from "@/lib/llm/provider";
 import { resumeSchema } from "@/lib/workbench/schemas";
 import { WorkbenchError } from "@/lib/workbench/errors";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -27,7 +28,7 @@ async function body(request:Request,limit:number) {
 export async function GET(request:Request,context:Context) {
   try {await requireDevUser();const {operation}=await context.params;
     if(operation==="corpus") return json(await loadCorpus());
-    if(operation==="status") return json({geminiConfigured:Boolean(process.env.GOOGLE_API_KEY),model:process.env.GEMINI_MODEL||"gemini-3.6-flash",memory:process.env.BACKBOARD_API_KEY?"configured; test in AI playground":"not configured",spectra:"not connected"});
+    if(operation==="status") return json({llm:describeLlm(),memory:process.env.BACKBOARD_API_KEY?"configured; test in AI playground":"not configured",spectra:"not connected"});
     return json({error:{code:"NOT_FOUND",message:"Not found"}},404);
   }catch(e){return failure(e);}
 }

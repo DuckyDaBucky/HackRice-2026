@@ -7,7 +7,7 @@ export const CONTENT_TYPES = [
   "code_explanation",
 ] as const;
 export const SENIORITY_LEVELS = ["junior", "mid_level", "senior"] as const;
-export const TIME_BUDGET_SECONDS = [600, 1200, 1800] as const;
+export const TIME_BUDGET_SECONDS = [180, 600, 1200, 1800] as const;
 export const INTERVIEW_MOODS = ["supportive", "neutral", "challenging"] as const;
 
 export const interviewContentTypeSchema = z.enum(CONTENT_TYPES);
@@ -16,6 +16,7 @@ export const timeBudgetSchema = z.union([
   z.literal(TIME_BUDGET_SECONDS[0]),
   z.literal(TIME_BUDGET_SECONDS[1]),
   z.literal(TIME_BUDGET_SECONDS[2]),
+  z.literal(TIME_BUDGET_SECONDS[3]),
 ]);
 export const interviewMoodSchema = z.enum(INTERVIEW_MOODS);
 
@@ -54,6 +55,7 @@ export const PLAN_LENGTH_BY_TIME: Record<(typeof TIME_BUDGET_SECONDS)[number], {
   target: number;
   maximum: number;
 }> = {
+  180: { minimum: 1, target: 1, maximum: 1 },
   600: { minimum: 3, target: 4, maximum: 5 },
   1200: { minimum: 5, target: 6, maximum: 7 },
   1800: { minimum: 7, target: 8, maximum: 10 },
@@ -61,4 +63,11 @@ export const PLAN_LENGTH_BY_TIME: Record<(typeof TIME_BUDGET_SECONDS)[number], {
 
 export function planLengthFor(timeBudgetSeconds: number) {
   return PLAN_LENGTH_BY_TIME[timeBudgetSchema.parse(timeBudgetSeconds)];
+}
+
+/** Blitz demo mode: one question plus at most one follow-up, ~3 minutes. */
+export const BLITZ_TIME_BUDGET_SECONDS = 180 as const;
+
+export function isBlitzBudget(timeBudgetSeconds: number): boolean {
+  return timeBudgetSeconds === BLITZ_TIME_BUDGET_SECONDS;
 }

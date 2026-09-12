@@ -30,6 +30,7 @@
     "@clerk/nextjs": "^7.9.2",
     "@langchain/core": "^1.2.10",
     "@langchain/google": "^0.2.5",
+    "@langchain/openai": "^1.5.12",
     "@phosphor-icons/react": "^2.1.10",
     "drizzle-orm": "^0.45.2",
     "mammoth": "^1.12.2",

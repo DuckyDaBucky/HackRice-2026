@@ -209,7 +209,7 @@ export const interviewSessionConfigs = pgTable(
     check("interview_session_configs_revision_check", sql`${table.revision} >= 1`),
     check(
       "interview_session_configs_duration_check",
-      sql`${table.timeBudgetSeconds} in (600, 1200, 1800)`,
+      sql`${table.timeBudgetSeconds} in (180, 600, 1200, 1800)`,
     ),
   ],
 );

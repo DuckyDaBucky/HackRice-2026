@@ -3,7 +3,8 @@ import {checkOrigin,requireDevUser} from "@/lib/workbench/access";
 import {WorkbenchError} from "@/lib/workbench/errors";
 import {chatSchema,generationSchema,evaluationRequestSchema,memoryMutationSchema} from "@/lib/workbench/ai/contracts";
 import {generateQuestions,evaluateAnswer,startChat} from "@/lib/workbench/ai/service";
-import {gemini,geminiModel,providerError} from "@/lib/workbench/ai/gemini";
+import {chatModel,chatModelId,providerError} from "@/lib/workbench/ai/gemini";
+import {describeLlm} from "@/lib/llm/provider";
 import {practiceMemory} from "@/lib/workbench/ai/backboard";
 import {prepareSpeech,speechRequestSchema} from "@/lib/workbench/ai/speech";
 export const runtime="nodejs";
@@ -25,7 +26,7 @@ async function readBody(request:Request){
 export async function GET(request:Request,context:Context){
   try{
     const user=await requireDevUser(),{action}=await context.params;
-    if(action==="status")return json({gemini:{configured:Boolean(process.env.GOOGLE_API_KEY),model:geminiModel()},backboard:{configured:Boolean(process.env.BACKBOARD_API_KEY)},database:process.env.GET_ME_HIRED_RESEARCH_SOURCE==="database"?"Research database configured":"Local research files configured",persistence:"Approved notes in Backboard only; chats, profiles and reports are temporary."});
+    if(action==="status")return json({llm:describeLlm(),backboard:{configured:Boolean(process.env.BACKBOARD_API_KEY)},database:process.env.GET_ME_HIRED_RESEARCH_SOURCE==="database"?"Research database configured":"Local research files configured",persistence:"Approved notes in Backboard only; chats, profiles and reports are temporary."});
     if(action==="memory")return json({memories:await practiceMemory.list(user)});
     throw new WorkbenchError("NOT_FOUND","Not found",404);
   }catch(e){return failure(e);}
@@ -42,11 +43,11 @@ export async function POST(request:Request,context:Context){
       return json({memories:await practiceMemory.list(user),message:"Backboard accepted the change. The list below reflects its current stored notes; refresh if processing is pending."});
     }
     if(action==="check"){
-      const {provider}=z.object({provider:z.enum(["gemini","backboard"])}).strict().parse(input);
+      const {provider}=z.object({provider:z.enum(["llm","backboard"])}).strict().parse(input);
       if(provider==="backboard")return json(await practiceMemory.check());
       try{
-        await gemini().withStructuredOutput(z.object({ready:z.literal(true)}),{name:"connection_check"}).invoke("Return ready: true.",{signal:AbortSignal.any([request.signal,AbortSignal.timeout(30000)])});
-        return json({verifiedAt:new Date().toISOString(),model:geminiModel()});
+        await chatModel().withStructuredOutput(z.object({ready:z.literal(true)}),{name:"connection_check"}).invoke("Return ready: true.",{signal:AbortSignal.any([request.signal,AbortSignal.timeout(30000)])});
+        return json({verifiedAt:new Date().toISOString(),model:chatModelId()});
       }catch(e){throw providerError(e);}
     }
     if(action==="chat"){
