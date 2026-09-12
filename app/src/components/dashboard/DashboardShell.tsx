@@ -35,7 +35,7 @@ export function DashboardShell({
 
   return (
     <div className="flex min-h-screen bg-dash-bg">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-dash-border bg-dash-surface py-5 lg:flex">
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-dash-border bg-dash-sidebar py-5 lg:flex">
         <Link href="/" className="px-5">
           <Logo size="sm" onLight />
         </Link>
@@ -50,7 +50,7 @@ export function DashboardShell({
                 href={item.href}
                 className={`flex items-center gap-2.5 rounded-r-md border-l-2 py-1.5 pl-3 pr-3 text-[13.5px] font-medium transition-colors duration-150 ${
                   isActive
-                    ? "border-accent bg-dash-tint text-dash-text"
+                    ? "border-accent bg-dash-nav-active text-dash-text"
                     : "border-transparent text-dash-text-muted hover:bg-dash-nav-hover hover:text-dash-text"
                 }`}
               >

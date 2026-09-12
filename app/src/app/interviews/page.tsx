@@ -31,7 +31,7 @@ const STATUS_STYLE: Record<SessionRecord["status"], string> = {
   completed: "text-dash-success",
   in_progress: "text-amber-600",
   paused: "text-amber-600",
-  planned: "text-accent-deep",
+  planned: "text-dash-blue",
   abandoned: "text-dash-text-faint",
 };
 

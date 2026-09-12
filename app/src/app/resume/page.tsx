@@ -34,7 +34,7 @@ export default async function ResumePage() {
                 Personalize your interviews using your experience.
               </p>
             </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-dash-border-strong bg-dash-surface-hover px-8 py-12 text-center transition-colors duration-150 hover:border-accent/50 hover:bg-dash-tint">
+            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-dash-border-strong bg-dash-surface-hover px-8 py-12 text-center transition-colors duration-150 hover:border-accent/50 hover:bg-dash-nav-active">
               <FileArrowUpIcon size={26} weight="light" className="text-dash-text-faint" />
               <h2 className="mt-1.5 text-base font-semibold text-dash-text">Add your resume</h2>
               <p className="max-w-sm text-sm text-dash-text-muted">

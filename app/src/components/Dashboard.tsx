@@ -73,7 +73,7 @@ const STATUS_STYLE: Record<SessionRecord["status"], string> = {
   completed: "text-dash-success",
   in_progress: "text-amber-600",
   paused: "text-amber-600",
-  planned: "text-accent-deep",
+  planned: "text-dash-blue",
   abandoned: "text-dash-text-faint",
 };
 
@@ -116,8 +116,12 @@ export function Dashboard({
           <p className="mt-1 text-sm text-dash-text-muted">Practice today. Perform tomorrow.</p>
         </div>
 
-        <section className="relative overflow-hidden rounded-xl border border-dash-tint-border bg-dash-tint px-6 py-7 sm:px-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <section className="relative overflow-hidden rounded-xl border border-dash-border bg-dash-surface px-6 py-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-8">
+          <div
+            className="pointer-events-none absolute inset-0 [background:radial-gradient(120%_100%_at_100%_0%,color-mix(in_srgb,var(--color-accent)_10%,transparent),transparent_60%)]"
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-md">
               <h2 className="text-xl font-semibold tracking-tight text-dash-text">
                 Ready for your next interview?

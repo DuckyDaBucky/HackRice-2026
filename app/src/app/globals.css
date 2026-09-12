@@ -6,12 +6,12 @@
 
   /* Dashboard theme tokens — light (default) */
   --dash-bg: #fafbfc;
+  --dash-sidebar: #ffffff;
   --dash-surface: #ffffff;
   --dash-surface-muted: #f6f7f9;
   --dash-surface-hover: #f9fafb;
   --dash-nav-hover: #f4f5f7;
-  --dash-tint: #f0fbf8;
-  --dash-tint-border: #d7eee8;
+  --dash-nav-active: color-mix(in srgb, #ffffff 90%, var(--color-accent) 10%);
   --dash-border: #eef1f6;
   --dash-border-strong: #e3e7ee;
   --dash-text: #0b1120;
@@ -20,29 +20,32 @@
   --dash-icon-faint: #b7c0cc;
   --dash-on-accent: #03231e;
   --dash-success: #0f9d78;
+  --dash-blue: #3b82f6;
   --dash-solid: #0b1120;
   --dash-solid-text: #ffffff;
 }
 
-/* Dashboard theme tokens — dark, reusing the existing brand navy palette */
+/* Dashboard theme tokens — dark. Neutral navy/charcoal, teal reserved for
+   small emphasis (active states, primary actions), never a background wash. */
 [data-theme="dark"] {
-  --dash-bg: #0b1120;
-  --dash-surface: #131b2c;
-  --dash-surface-muted: #172036;
-  --dash-surface-hover: #172036;
-  --dash-nav-hover: #182238;
-  --dash-tint: #0d2620;
-  --dash-tint-border: #1c3d34;
-  --dash-border: #232e42;
-  --dash-border-strong: #2b3852;
-  --dash-text: #f4f7fa;
-  --dash-text-muted: #93a1b5;
-  --dash-text-faint: #6b7891;
-  --dash-icon-faint: #4b5563;
+  --dash-bg: #0b1220;
+  --dash-sidebar: #111b2e;
+  --dash-surface: #131d2d;
+  --dash-surface-muted: #111827;
+  --dash-surface-hover: #182235;
+  --dash-nav-hover: #182235;
+  --dash-nav-active: color-mix(in srgb, #182235 88%, var(--color-accent) 12%);
+  --dash-border: #263247;
+  --dash-border-strong: #324158;
+  --dash-text: #f8fafc;
+  --dash-text-muted: #94a3b8;
+  --dash-text-faint: #64748b;
+  --dash-icon-faint: #475569;
   --dash-on-accent: #03231e;
   --dash-success: #34d399;
-  --dash-solid: #f4f7fa;
-  --dash-solid-text: #0b1120;
+  --dash-blue: #3b82f6;
+  --dash-solid: #f8fafc;
+  --dash-solid-text: #0b1220;
 }
 
 @theme inline {
@@ -59,12 +62,12 @@
   --font-mono: var(--font-geist-mono);
 
   --color-dash-bg: var(--dash-bg);
+  --color-dash-sidebar: var(--dash-sidebar);
   --color-dash-surface: var(--dash-surface);
   --color-dash-surface-muted: var(--dash-surface-muted);
   --color-dash-surface-hover: var(--dash-surface-hover);
   --color-dash-nav-hover: var(--dash-nav-hover);
-  --color-dash-tint: var(--dash-tint);
-  --color-dash-tint-border: var(--dash-tint-border);
+  --color-dash-nav-active: var(--dash-nav-active);
   --color-dash-border: var(--dash-border);
   --color-dash-border-strong: var(--dash-border-strong);
   --color-dash-text: var(--dash-text);
@@ -73,6 +76,7 @@
   --color-dash-icon-faint: var(--dash-icon-faint);
   --color-dash-on-accent: var(--dash-on-accent);
   --color-dash-success: var(--dash-success);
+  --color-dash-blue: var(--dash-blue);
   --color-dash-solid: var(--dash-solid);
   --color-dash-solid-text: var(--dash-solid-text);
 }

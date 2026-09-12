@@ -14,7 +14,7 @@ export function JoinInterview() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center rounded-md border border-dash-tint-border bg-dash-surface px-4 text-sm font-medium text-dash-text transition-colors duration-150 hover:bg-dash-nav-hover active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="inline-flex h-9 items-center rounded-md border border-dash-border bg-dash-surface px-4 text-sm font-medium text-dash-text transition-colors duration-150 hover:bg-dash-nav-hover active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         Join an interview
       </button>
