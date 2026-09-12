@@ -42,7 +42,7 @@ A judge should be able to say "use my name and my project" and you can do it wit
 
 | Area | Status | Evidence |
 | --- | --- | --- |
-| Hiring DB schema | Applied locally (`0008`) | Tables present on `:5434/hackrice` |
+| Hiring DB schema | Applied locally (`0011`, formerly `0008`) | Tables present on `:5434/hackrice` |
 | Persona sandbox | Live | Inquiry API 201, webhook HMAC, events enabled |
 | Persona candidate UI | Live | Hosted verify URL + status polling |
 | Solana outbox | Real devnet memo txs | `verify:solana` pass, Solscan signature |
@@ -143,7 +143,7 @@ Keep `/dev/hiring-links` as engineering fallback, but the judge narrative starts
 | A1 | Runbook: cloudflared + `setup:persona-webhook` | Friend | Webhook delivers on inquiry complete |
 | A2 | One live E2E script/checklist (use `/demo/start`, not `/dev/hiring-links`) | Friend | HR invite → Persona → 1 recorded answer → report row exists |
 | A3 | Keep `/dev/hiring-links` as engineering fallback only; judges start at `/demo/start` | Done / you | `/demo/start` is the demo entry; dev-links never shown on stage |
-| A4 | Apply `0008` to TigerData when network allows | Friend | Remote `DATABASE_URL` works |
+| A4 | Apply `0008_stats_analytics.sql` through `0011_hiring_flow.sql` to TigerData when network allows | Friend | Remote `DATABASE_URL` works |
 | A5 | R2 CORS if uploads fail | Friend | Recording reaches `uploaded` |
 | A6 | Fund Solana wallet before demo | Done | ≥0.1 SOL on service keypair |
 
@@ -170,7 +170,7 @@ Store on `hiring_jobs` or `candidacies`:
 
 ```sql
 -- migration 0009 (fixed — hiring_jobs already has question_count,
--- shared_question_count, personalized_question_count from 0008)
+-- shared_question_count, personalized_question_count from 0011)
 ALTER TABLE hiring_jobs ADD COLUMN interview_template text NOT NULL DEFAULT 'balanced'
   CHECK (interview_template IN ('personality_behavioral','technical_behavioral','balanced','custom'));
 -- Generator must read the job row's counts instead of hardcoding count: 6.
@@ -299,7 +299,7 @@ Actions already enqueued: `issue_invitation`, `attest_identity`, `activate_acces
 | Step | Action |
 | --- | --- |
 | F1 | Vercel/host app with production env |
-| F2 | TigerData + migrate through `0008` |
+| F2 | TigerData + migrate `0008`→`0011` in order |
 | F3 | Stable webhook URL (not ephemeral cloudflared) |
 | F4 | Clerk org provisioning for demo company |
 | F5 | R2 bucket + CORS + retention cron |

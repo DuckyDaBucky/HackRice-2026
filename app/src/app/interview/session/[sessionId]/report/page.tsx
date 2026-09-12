@@ -13,7 +13,9 @@ const FALLBACK_REASON: Record<string, string> = {
 
 export default async function InterviewReportPage({
   params,
-}: PageProps<"/interview/session/[sessionId]/report">) {
+}: {
+  params: Promise<{ sessionId: string }>;
+}) {
   const { sessionId } = await params;
   const data = await getReportPageData(sessionId);
   if (!data) notFound();

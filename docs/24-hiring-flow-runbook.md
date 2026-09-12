@@ -4,7 +4,7 @@ This branch implements the employer-directed recorded interview flow. It does **
 
 ## Prerequisites
 
-1. Apply migration `app/migrations/0008_hiring_flow.sql` to your Postgres database.
+1. Apply migrations in order: `app/migrations/0008_stats_analytics.sql` through `app/migrations/0011_hiring_flow.sql` to your Postgres database. (All statements are idempotent; re-running is safe. The hiring file is `0011`, not `0008` — main already has a different `0008`.)
 2. Configure Clerk organizations with admin/recruiter roles.
 3. Server-provision organizations via `/hr` (arbitrary Clerk orgs grant nothing until provisioned).
 

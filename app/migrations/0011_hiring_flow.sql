@@ -1,3 +1,5 @@
+-- 0011_hiring_flow.sql (renamed from 0008_hiring_flow.sql to avoid colliding
+-- with main's 0008_stats_analytics.sql; all statements are idempotent).
 -- Hiring flow: organizations, jobs, candidacies, invitations, verification, sessions, reports, workers.
 
 ALTER TABLE interview_sessions
@@ -77,9 +79,16 @@ CREATE TABLE IF NOT EXISTS candidacies (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE hiring_resumes
-  ADD CONSTRAINT hiring_resumes_candidacy_fkey
-  FOREIGN KEY (candidacy_id) REFERENCES candidacies(id) ON DELETE SET NULL;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'hiring_resumes_candidacy_fkey'
+  ) THEN
+    ALTER TABLE hiring_resumes
+      ADD CONSTRAINT hiring_resumes_candidacy_fkey
+      FOREIGN KEY (candidacy_id) REFERENCES candidacies(id) ON DELETE SET NULL;
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_candidacies_org ON candidacies(organization_id);
 CREATE INDEX IF NOT EXISTS idx_candidacies_job ON candidacies(job_id);
