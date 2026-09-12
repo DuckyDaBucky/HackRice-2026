@@ -190,6 +190,7 @@ export const interviewSessionConfigs = pgTable(
     mood: text("mood", { enum: ["supportive", "neutral", "challenging"] as const })
       .notNull()
       .default("neutral"),
+    biometricsEnabled: boolean("biometrics_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -380,6 +381,81 @@ export const reportShareLinks = pgTable(
     check("report_share_links_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
   ],
 );
+
+export const reportFindingKinds = ["strength", "gap", "insufficient_evidence"] as const;
+export const reportFindingConfidence = ["low", "medium", "high"] as const;
+
+export const reportFindings = pgTable(
+  "report_findings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => interviewSessions.id, { onDelete: "cascade" }),
+    generationId: uuid("generation_id")
+      .notNull()
+      .references(() => aiGenerations.id, { onDelete: "cascade" }),
+    competencyId: text("competency_id").notNull(),
+    kind: text("kind", { enum: reportFindingKinds }).notNull(),
+    finding: text("finding").notNull(),
+    improvement: text("improvement"),
+    evidenceTurnIds: uuid("evidence_turn_ids").array().notNull().default([]),
+    evidenceStartMs: integer("evidence_start_ms"),
+    evidenceEndMs: integer("evidence_end_ms"),
+    confidence: text("confidence", { enum: reportFindingConfidence }).notNull().default("low"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("report_findings_session_idx").on(table.sessionId, table.createdAt),
+    index("report_findings_generation_idx").on(table.generationId),
+    check(
+      "report_findings_evidence_start_check",
+      sql`${table.evidenceStartMs} is null or ${table.evidenceStartMs} >= 0`,
+    ),
+    check(
+      "report_findings_evidence_end_check",
+      sql`${table.evidenceEndMs} is null or ${table.evidenceEndMs} >= 0`,
+    ),
+  ],
+);
+
+export const biometricStatuses = [
+  "not_started",
+  "queued",
+  "processing",
+  "completed",
+  "retryable_failed",
+  "terminal_failed",
+] as const;
+
+export const biometricAnalyses = pgTable(
+  "biometric_analyses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => interviewSessions.id, { onDelete: "cascade" }),
+    artifactId: uuid("artifact_id").references(() => mediaArtifacts.id, { onDelete: "set null" }),
+    provider: text("provider").notNull().default("presage_smartspectra"),
+    status: text("status", { enum: biometricStatuses }).notNull().default("not_started"),
+    analysisId: text("analysis_id"),
+    sdkVersion: text("sdk_version"),
+    metrics: jsonb("metrics").notNull().default({}),
+    errorCode: text("error_code"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("biometric_analyses_session_idx").on(table.sessionId, table.createdAt),
+    index("biometric_analyses_artifact_idx").on(table.artifactId),
+  ],
+);
+
+export type ReportFinding = typeof reportFindings.$inferSelect;
+export type NewReportFinding = typeof reportFindings.$inferInsert;
+export type BiometricAnalysis = typeof biometricAnalyses.$inferSelect;
+export type NewBiometricAnalysis = typeof biometricAnalyses.$inferInsert;
 
 export type InterviewSession = typeof interviewSessions.$inferSelect;
 export type NewInterviewSession = typeof interviewSessions.$inferInsert;
