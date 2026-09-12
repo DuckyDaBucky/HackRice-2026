@@ -83,16 +83,16 @@ export function RoleCombobox({
         placeholder="e.g. Backend engineer — pick a popular role or type your own"
         maxLength={160}
         autoComplete="off"
-        className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-base text-zinc-100 shadow-[0_0_0_1px_rgba(56,189,248,0.15)] outline-none placeholder:text-zinc-600 focus:border-sky-500"
+        className="h-12 w-full rounded-lg border border-dash-border-strong bg-dash-surface px-4 text-[15px] text-dash-text shadow-sm outline-none placeholder:text-dash-text-faint focus:border-accent"
       />
       {open && options.length > 0 && (
         <ul
           id={listId}
           role="listbox"
           aria-label={typing ? "Matching roles" : "Popular roles"}
-          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-zinc-700 bg-zinc-950 p-1.5 shadow-2xl shadow-black/60"
+          className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-dash-border bg-dash-surface p-1.5 shadow-xl"
         >
-          <li aria-hidden="true" className="px-3 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-zinc-500 uppercase">
+          <li aria-hidden="true" className="px-3 pt-1.5 pb-1 text-[11px] font-medium tracking-wide text-dash-text-faint uppercase">
             {typing ? "Matching roles" : "Popular roles"}
           </li>
           {options.map((option, index) => (
@@ -105,10 +105,10 @@ export function RoleCombobox({
                   choose(option);
                 }}
                 onMouseEnter={() => setHighlight(index)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition ${index === highlight ? "bg-sky-500/15 text-zinc-50" : "text-zinc-300"}`}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors duration-150 ${index === highlight ? "bg-dash-nav-active text-dash-text" : "text-dash-text-muted"}`}
               >
                 <span>{option.label}</span>
-                {option.custom && <span className="text-xs text-sky-400">Custom</span>}
+                {option.custom && <span className="text-xs font-medium text-accent-deep">Custom</span>}
               </button>
             </li>
           ))}

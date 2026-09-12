@@ -17,7 +17,7 @@ export function VoicePicker({
 
   return (
     <div className="flex w-full flex-col gap-2 text-left">
-      <label htmlFor="voice-select" className="text-xs font-medium text-zinc-500">
+      <label htmlFor="voice-select" className="text-sm font-medium text-dash-text">
         Interviewer voice
       </label>
       <select
@@ -31,7 +31,7 @@ export function VoicePicker({
             onChange(event.target.value);
           }
         }}
-        className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100"
+        className="h-10 rounded-lg border border-dash-border-strong bg-dash-surface px-3 text-sm text-dash-text outline-none focus:border-accent"
       >
         {VOICE_PRESETS.map((preset) => (
           <option key={preset.id} value={preset.id}>
@@ -47,7 +47,7 @@ export function VoicePicker({
           value={matchesPreset ? "" : voiceId}
           onChange={(event) => onChange(event.target.value.trim())}
           placeholder="Paste an ElevenLabs voice ID"
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+          className="h-10 rounded-lg border border-dash-border-strong bg-dash-surface px-3 text-sm text-dash-text outline-none placeholder:text-dash-text-faint focus:border-accent"
         />
       )}
     </div>
