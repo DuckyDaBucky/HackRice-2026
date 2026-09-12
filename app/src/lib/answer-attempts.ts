@@ -1,5 +1,7 @@
 import "server-only";
-import { db } from "./db";
+import { and, count, eq, inArray } from "drizzle-orm";
+import { orm } from "./db";
+import { answerAttempts } from "./db/schema";
 import type { InterviewMode } from "./questions/types";
 
 export async function recordAttemptUploaded(params: {
@@ -11,17 +13,23 @@ export async function recordAttemptUploaded(params: {
   durationMs: number;
 }) {
   const { sessionId, questionId, mode, mediaRef, mimeType, durationMs } = params;
-  await db.query(
-    `INSERT INTO answer_attempts (session_id, question_id, mode, media_ref, mime_type, duration_ms, recorded_at, upload_status)
-     VALUES ($1, $2, $3, $4, $5, $6, now(), 'uploaded')
-     ON CONFLICT (session_id, question_id) DO UPDATE
-       SET media_ref = EXCLUDED.media_ref,
-           mime_type = EXCLUDED.mime_type,
-           duration_ms = EXCLUDED.duration_ms,
-           recorded_at = now(),
-           upload_status = 'uploaded'`,
-    [sessionId, questionId, mode, mediaRef, mimeType, durationMs],
-  );
+  const recordedAt = new Date();
+  await orm
+    .insert(answerAttempts)
+    .values({
+      sessionId,
+      questionId,
+      mode,
+      mediaRef,
+      mimeType,
+      durationMs,
+      recordedAt,
+      uploadStatus: "uploaded",
+    })
+    .onConflictDoUpdate({
+      target: [answerAttempts.sessionId, answerAttempts.questionId],
+      set: { mediaRef, mimeType, durationMs, recordedAt, uploadStatus: "uploaded" },
+    });
 }
 
 export async function recordAttemptFailed(params: {
@@ -30,21 +38,27 @@ export async function recordAttemptFailed(params: {
   mode: InterviewMode;
 }) {
   const { sessionId, questionId, mode } = params;
-  await db.query(
-    `INSERT INTO answer_attempts (session_id, question_id, mode, upload_status)
-     VALUES ($1, $2, $3, 'failed')
-     ON CONFLICT (session_id, question_id) DO UPDATE SET upload_status = 'failed'`,
-    [sessionId, questionId, mode],
-  );
+  await orm
+    .insert(answerAttempts)
+    .values({ sessionId, questionId, mode, uploadStatus: "failed" })
+    .onConflictDoUpdate({
+      target: [answerAttempts.sessionId, answerAttempts.questionId],
+      set: { uploadStatus: "failed" },
+    });
 }
 
 /** Question ids already successfully uploaded for a session — used to resume past them. */
 export async function listUploadedQuestionIds(sessionId: string): Promise<string[]> {
-  const result = await db.query<{ question_id: string }>(
-    `SELECT question_id FROM answer_attempts WHERE session_id = $1 AND upload_status = 'uploaded'`,
-    [sessionId],
-  );
-  return result.rows.map((row) => row.question_id);
+  const rows = await orm
+    .select({ questionId: answerAttempts.questionId })
+    .from(answerAttempts)
+    .where(
+      and(
+        eq(answerAttempts.sessionId, sessionId),
+        eq(answerAttempts.uploadStatus, "uploaded"),
+      ),
+    );
+  return rows.map((row) => row.questionId);
 }
 
 /** Answered-question counts per session, for the dashboard's "2 of 3 answered" progress. */
@@ -52,12 +66,15 @@ export async function countUploadedAttemptsBySession(
   sessionIds: string[],
 ): Promise<Record<string, number>> {
   if (sessionIds.length === 0) return {};
-  const result = await db.query<{ session_id: string; count: number }>(
-    `SELECT session_id, count(*)::int AS count
-     FROM answer_attempts
-     WHERE session_id = ANY($1::uuid[]) AND upload_status = 'uploaded'
-     GROUP BY session_id`,
-    [sessionIds],
-  );
-  return Object.fromEntries(result.rows.map((row) => [row.session_id, row.count]));
+  const rows = await orm
+    .select({ sessionId: answerAttempts.sessionId, count: count() })
+    .from(answerAttempts)
+    .where(
+      and(
+        inArray(answerAttempts.sessionId, sessionIds),
+        eq(answerAttempts.uploadStatus, "uploaded"),
+      ),
+    )
+    .groupBy(answerAttempts.sessionId);
+  return Object.fromEntries(rows.map((row) => [row.sessionId, row.count]));
 }

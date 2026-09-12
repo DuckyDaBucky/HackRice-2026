@@ -1,5 +1,7 @@
 import "server-only";
-import { db } from "./db";
+import { and, count, desc, eq, isNull, ne, sql } from "drizzle-orm";
+import { orm } from "./db";
+import { interviewSessions, type InterviewSession as InterviewSessionRow } from "./db/schema";
 import type { InterviewMode } from "./questions/types";
 import type { InterviewMood } from "./interview-config";
 
@@ -22,46 +24,71 @@ export interface SessionRecord extends SessionConfig {
   reportStatus: "processing" | "completed" | "retryable_failed" | "terminal_failed" | null;
 }
 
-interface SessionRow {
-  id: string;
-  clerk_user_id: string;
-  mode: InterviewMode;
+type SessionSelectRow = Pick<
+  InterviewSessionRow,
+  | "id"
+  | "clerkUserId"
+  | "mode"
+  | "createdAt"
+  | "completedAt"
+  | "mood"
+  | "customPrompt"
+  | "voiceId"
+  | "activeConfigRevision"
+> & {
   status: SessionStatus;
-  created_at: string;
-  completed_at: string | null;
-  question_count: number;
-  mood: InterviewMood;
-  custom_prompt: string | null;
-  voice_id: string | null;
-  active_config_revision: number | null;
-  report_status: SessionRecord["reportStatus"];
-}
+  questionCount: number;
+  reportStatus: SessionRecord["reportStatus"];
+};
 
-function toRecord(row: SessionRow): SessionRecord {
+function toRecord(row: SessionSelectRow): SessionRecord {
   return {
     id: row.id,
     mode: row.mode,
     status: row.status,
-    createdAt: row.created_at,
-    completedAt: row.completed_at,
-    isDurable: row.active_config_revision !== null,
-    reportStatus: row.report_status,
-    questionCount: row.question_count,
+    createdAt: row.createdAt.toISOString(),
+    completedAt: row.completedAt?.toISOString() ?? null,
+    isDurable: row.activeConfigRevision !== null,
+    reportStatus: row.reportStatus,
+    questionCount: row.questionCount,
     mood: row.mood,
-    customPrompt: row.custom_prompt,
-    voiceId: row.voice_id,
+    customPrompt: row.customPrompt,
+    voiceId: row.voiceId,
   };
 }
 
-const SESSION_COLUMNS =
-  `id, clerk_user_id, mode, status, created_at, completed_at,
-   coalesce(nullif((SELECT count(*)::int FROM interview_plan_questions plan
-                    WHERE plan.session_id = interview_sessions.id
-                      AND plan.deleted_at IS NULL AND plan.superseded_at IS NULL), 0), question_count) AS question_count,
-   mood, custom_prompt, voice_id, active_config_revision,
-   (SELECT report.status FROM evaluation_reports report
-    WHERE report.session_id = interview_sessions.id AND report.deleted_at IS NULL
-    ORDER BY report.version DESC LIMIT 1) AS report_status`;
+// Derived columns mirroring the former SESSION_COLUMNS raw SQL: the question
+// count prefers the live plan over the session default, and the report status
+// is the latest non-deleted evaluation report. Kept as SQL fragments because
+// they are correlated subqueries over other tables.
+function sessionSelection() {
+  return {
+    id: interviewSessions.id,
+    clerkUserId: interviewSessions.clerkUserId,
+    mode: interviewSessions.mode,
+    // The status column can hold 'deleted' in the database even though the
+    // application type excludes it; every read filters deleted rows out, so
+    // the cast below never observes that value.
+    status: sql<SessionStatus>`${interviewSessions.status}`.as("status"),
+    createdAt: interviewSessions.createdAt,
+    completedAt: interviewSessions.completedAt,
+    activeConfigRevision: interviewSessions.activeConfigRevision,
+    mood: interviewSessions.mood,
+    customPrompt: interviewSessions.customPrompt,
+    voiceId: interviewSessions.voiceId,
+    questionCount:
+      sql<number>`coalesce(nullif((select count(*)::int from interview_plan_questions where session_id = ${interviewSessions.id} and deleted_at is null and superseded_at is null), 0), ${interviewSessions.questionCount})`,
+    reportStatus:
+      sql<SessionRecord["reportStatus"]>`(select status from evaluation_reports where session_id = ${interviewSessions.id} and deleted_at is null order by version desc limit 1)`,
+  };
+}
+
+function liveSessionFilter() {
+  return and(
+    isNull(interviewSessions.deletedAt),
+    ne(interviewSessions.status, "deleted"),
+  );
+}
 
 /** Called once a candidate actually joins (camera granted) — not on page load, so bouncing off the lobby never leaves a ghost row. */
 export async function createSession(
@@ -70,13 +97,18 @@ export async function createSession(
   mode: InterviewMode,
   config: SessionConfig,
 ) {
-  await db.query(
-    `INSERT INTO interview_sessions
-       (id, clerk_user_id, mode, question_count, mood, custom_prompt, voice_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (id) DO NOTHING`,
-    [id, clerkUserId, mode, config.questionCount, config.mood, config.customPrompt, config.voiceId],
-  );
+  await orm
+    .insert(interviewSessions)
+    .values({
+      id,
+      clerkUserId,
+      mode,
+      questionCount: config.questionCount,
+      mood: config.mood,
+      customPrompt: config.customPrompt,
+      voiceId: config.voiceId,
+    })
+    .onConflictDoNothing({ target: interviewSessions.id });
 }
 
 export async function setSessionStatus(
@@ -84,39 +116,46 @@ export async function setSessionStatus(
   clerkUserId: string,
   status: Extract<SessionStatus, "completed" | "abandoned">,
 ) {
-  await db.query(
-    `UPDATE interview_sessions
-     SET status = $3, completed_at = CASE WHEN $3 = 'completed' THEN now() ELSE completed_at END
-     WHERE id = $1 AND clerk_user_id = $2 AND status = 'in_progress'`,
-    [id, clerkUserId, status],
-  );
+  await orm
+    .update(interviewSessions)
+    .set({
+      status,
+      // Mirror the old CASE: stamp completion only when completing.
+      ...(status === "completed" ? { completedAt: new Date() } : {}),
+    })
+    .where(
+      and(
+        eq(interviewSessions.id, id),
+        eq(interviewSessions.clerkUserId, clerkUserId),
+        eq(interviewSessions.status, "in_progress"),
+      ),
+    );
 }
 
 /** Ownership + full config for actions that act on an existing session id from the client. */
 export async function getSessionOwner(
   id: string,
 ): Promise<(SessionRecord & { clerkUserId: string }) | null> {
-  const result = await db.query<SessionRow>(
-    `SELECT ${SESSION_COLUMNS} FROM interview_sessions WHERE id = $1`,
-    [id],
-  );
-  const row = result.rows[0];
-  return row ? { ...toRecord(row), clerkUserId: row.clerk_user_id } : null;
+  const rows = await orm
+    .select(sessionSelection())
+    .from(interviewSessions)
+    .where(eq(interviewSessions.id, id))
+    .limit(1);
+  const row = rows[0];
+  return row ? { ...toRecord(row), clerkUserId: row.clerkUserId } : null;
 }
 
 export async function listRecentSessions(
   clerkUserId: string,
   limit = 5,
 ): Promise<SessionRecord[]> {
-  const result = await db.query<SessionRow>(
-    `SELECT ${SESSION_COLUMNS}
-     FROM interview_sessions
-     WHERE clerk_user_id = $1 AND deleted_at IS NULL AND status <> 'deleted'
-     ORDER BY created_at DESC
-     LIMIT $2`,
-    [clerkUserId, limit],
-  );
-  return result.rows.map(toRecord);
+  const rows = await orm
+    .select(sessionSelection())
+    .from(interviewSessions)
+    .where(and(eq(interviewSessions.clerkUserId, clerkUserId), liveSessionFilter()))
+    .orderBy(desc(interviewSessions.createdAt))
+    .limit(limit);
+  return rows.map(toRecord);
 }
 
 export interface SessionStats {
@@ -126,16 +165,17 @@ export interface SessionStats {
 }
 
 export async function getSessionStats(clerkUserId: string): Promise<SessionStats> {
-  const result = await db.query<{ total: number; completed: number; recent: number }>(
-    `SELECT
-       count(*)::int AS total,
-       count(*) FILTER (WHERE status = 'completed')::int AS completed,
-       count(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS recent
-     FROM interview_sessions
-     WHERE clerk_user_id = $1 AND deleted_at IS NULL AND status <> 'deleted'`,
-    [clerkUserId],
-  );
-  const row = result.rows[0];
+  const rows = await orm
+    .select({
+      total: count(),
+      completed:
+        sql<number>`(count(*) filter (where ${interviewSessions.status} = 'completed'))::int`,
+      recent:
+        sql<number>`(count(*) filter (where ${interviewSessions.createdAt} >= now() - interval '7 days'))::int`,
+    })
+    .from(interviewSessions)
+    .where(and(eq(interviewSessions.clerkUserId, clerkUserId), liveSessionFilter()));
+  const row = rows[0];
   return {
     totalSessions: row?.total ?? 0,
     completedSessions: row?.completed ?? 0,
