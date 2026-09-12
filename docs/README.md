@@ -13,7 +13,7 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 | Document | Purpose |
 | --- | --- |
 | [Product brief](01-product-brief.md) | Vision, audience, scope, terminology and confirmed requirements |
-| [Practice experience](02-practice-experience.md) | Resume parsing, personalized questions, recorded and live practice |
+| [Practice experience](02-practice-experience.md) | Resume parsing, personalized questions, recorded practice and post-interview reports |
 | [Corporate experience](03-corporate-experience.md) | HR setup, screening invitations, interviewer assistance and review |
 | [Evaluation and reports](04-evaluation-and-reports.md) | Evidence-based rubrics, report contents and scoring boundaries |
 | [Architecture](05-architecture.md) | Proposed components, processing flow, session states and failure handling |
@@ -37,3 +37,5 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 - **Deferred:** intentionally outside the recommended HackRice build slice.
 
 The founder's requested product scope is wider than the proposed HackRice MVP. The delivery plan recommends sequencing; it does not cancel later requirements. Use the decision register when changing scope. Keep this folder in the existing repository when implementation lands; do not replace the application's future README or scaffold to match assumptions here.
+
+- [Workbench and post-interview processing](16-workbench-and-processing.md): current scope, integration ownership, database import and verification boundaries.

@@ -1,5 +1,12 @@
 # Documentation change log
 
+## September 12, 2026 — processing scope and research storage
+
+- Replaced live analysis assumptions with post-interview reports and recording playback.
+- Retained a private HR answer-guidance overlay as a proposed feature.
+- Documented the development workbench, paused Gemini ownership and research import safeguards.
+- Distinguished corpus storage from future Backboard user memory and documented future subtitle sizes.
+
 ## 2026-09-12 — First implementation reconciliation
 
 - Inspected immutable main snapshot `17f33a59747a1e251334b28e6019602593f35f83` through the authenticated GitHub connection.

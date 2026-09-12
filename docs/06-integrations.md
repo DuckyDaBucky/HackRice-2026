@@ -1,5 +1,7 @@
 # Integration plan and validation register
 
+> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+
 ## Integrations observed in code
 
 Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
@@ -19,7 +21,7 @@ The founder named Backboard, Vultr, Presage SmartSpectra SDK, LangChain, Gemini,
 | Backboard | AI/context layer | Confirmed selection; exact responsibility unresolved | Context isolation, supported models, retention, deletion, streaming and SDK/API contract |
 | Gemini | Question generation, follow-ups and evaluation candidate | Confirmed intended model family | Exact model, structured output, latency, cost, regional/data settings |
 | LangChain | Possible orchestration around generation/context/tools | Confirmed intended library | Necessary responsibilities versus direct Backboard calls; supported versions |
-| ElevenLabs | Spoken questions in practice and corporate screens; live voice if feasible | Confirmed | TTS versus conversational API, streaming, interruption, available voices, pricing and consent terms |
+| ElevenLabs | Spoken question playback in practice and corporate screens | Confirmed | TTS versus conversational API, streaming, interruption, available voices, pricing and consent terms |
 | Vultr | Hosting/infrastructure | Confirmed | Region, compute, storage, database, networking, secrets and budget |
 | Presage SmartSpectra SDK | Camera-related service being ideated | Confirmed exploratory integration | SDK runtime/platform support, input requirements, supported outputs, limitations and permission to use |
 | Persona | Unspecified optional feature | Exploratory | Which product/vendor is meant, intended purpose, consent, cost and necessity |
