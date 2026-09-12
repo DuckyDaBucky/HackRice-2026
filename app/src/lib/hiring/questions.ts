@@ -6,10 +6,19 @@ import { approvedQuestionSchema, type ApprovedQuestion } from "./contracts";
 import { packCommitment } from "./crypto";
 import { z } from "zod";
 
+export type InterviewTemplate = "balanced" | "personality_behavioral" | "technical_behavioral";
+
+function templateToCategoryFocus(template: InterviewTemplate | undefined) {
+  if (template === "personality_behavioral") return "behavioral" as const;
+  if (template === "technical_behavioral") return "technical-behavioral" as const;
+  return "balanced" as const;
+}
+
 export async function generateCandidateQuestions(params: {
   organizationId: string;
   candidacyId: string;
   clerkUserId: string;
+  interviewTemplate?: InterviewTemplate;
 }) {
   await requireOrgAccess(params.organizationId);
   const candidacy = await db.query(
@@ -34,6 +43,7 @@ export async function generateCandidateQuestions(params: {
 
   const { pack } = await generateQuestions(params.clerkUserId, {
     count: 6,
+    categoryFocus: templateToCategoryFocus(params.interviewTemplate),
     context: {
       useMemory: false,
       profile,

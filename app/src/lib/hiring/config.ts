@@ -5,15 +5,16 @@ export function hiringEnabled() {
 }
 
 export function personaConfigured() {
-  return Boolean(
-    process.env.PERSONA_API_KEY &&
-    process.env.PERSONA_TEMPLATE_ID &&
-    process.env.PERSONA_WEBHOOK_SECRET,
-  );
+  return Boolean(process.env.PERSONA_API_KEY && process.env.PERSONA_TEMPLATE_ID);
 }
 
 export function personaEnvironment() {
   return process.env.PERSONA_ENV === "production" ? "production" : "sandbox";
+}
+
+/** Local/demo only. Never allowed when PERSONA_ENV=production. */
+export function personaSandboxBypassEnabled() {
+  return personaEnvironment() === "sandbox" && process.env.PERSONA_SANDBOX_BYPASS === "true";
 }
 
 export function solanaConfigured() {

@@ -42,13 +42,18 @@ export default async function HrHomePage() {
         <p className="mt-1 text-sm text-zinc-500">{org?.display_name ?? "Organization"} — jobs and interview activity</p>
       </header>
 
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-medium text-zinc-400">Jobs</h2>
-        {org && (
-          <Link href={`/hr/jobs/new?org=${org.id}`} className="rounded border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-900">
-            New job
+        <div className="flex gap-2">
+          <Link href="/hr/live" className="rounded-full bg-sky-500 px-4 py-1.5 text-sm font-medium text-zinc-950">
+            Live judge demo
           </Link>
-        )}
+          {org && (
+            <Link href={`/hr/jobs/new?org=${org.id}`} className="rounded border border-zinc-700 px-3 py-1.5 text-sm hover:bg-zinc-900">
+              New job
+            </Link>
+          )}
+        </div>
       </div>
 
       <table className="w-full text-left text-sm">

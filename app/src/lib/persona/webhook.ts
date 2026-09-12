@@ -4,59 +4,89 @@ import { db } from "@/lib/db";
 import { personaEnvironment } from "@/lib/hiring/config";
 import { enqueueSolanaAction } from "@/lib/solana/outbox";
 
-function verifyPersonaSignature(rawBody: string, signature: string | null) {
+type InquiryAttributes = {
+  status?: string;
+  "reference-id"?: string;
+  "name-first"?: string;
+  "name-last"?: string;
+};
+
+type InquiryRecord = {
+  id: string;
+  attributes?: InquiryAttributes;
+};
+
+export function verifyPersonaSignature(rawBody: string, signatureHeader: string | null) {
   const secret = process.env.PERSONA_WEBHOOK_SECRET;
-  if (!secret || !signature) return false;
-  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
-  const a = Buffer.from(expected, "hex");
-  const b = Buffer.from(signature.replace(/^sha256=/, ""), "hex");
-  return a.length === b.length && timingSafeEqual(a, b);
+  if (!secret || !signatureHeader) return false;
+
+  const pairs = signatureHeader.trim().split(/\s+/);
+  return pairs.some((pair) => {
+    const parts = pair.split(",");
+    const t = parts.find((p) => p.startsWith("t="))?.slice(2);
+    const v1 = parts.find((p) => p.startsWith("v1="))?.slice(3);
+    if (!t || !v1) return false;
+    const expected = createHmac("sha256", secret).update(`${t}.${rawBody}`).digest("hex");
+    const a = Buffer.from(v1, "hex");
+    const b = Buffer.from(expected, "hex");
+    return a.length === b.length && timingSafeEqual(a, b);
+  });
 }
 
-export async function handlePersonaWebhook(rawBody: string, signature: string | null) {
-  if (!verifyPersonaSignature(rawBody, signature)) {
-    throw new Error("Invalid Persona webhook signature.");
-  }
-  const payload = JSON.parse(rawBody) as {
-    data: {
-      id: string;
-      attributes: {
-        status?: string;
-        "reference-id"?: string;
-        "name-first"?: string;
-        "name-last"?: string;
-        fields?: Record<string, unknown>;
-      };
+export function extractInquiryFromWebhookPayload(payload: {
+  data?: {
+    id?: string;
+    type?: string;
+    attributes?: InquiryAttributes & {
+      name?: string;
+      payload?: { data?: InquiryRecord };
     };
   };
-  const eventId = payload.data.id;
-  const inquiryRef = payload.data.attributes["reference-id"] ?? eventId;
+}): { eventId: string; eventName: string; inquiry: InquiryRecord } | null {
+  const root = payload.data;
+  if (!root?.id) return null;
+  const eventName = root.attributes?.name ?? "";
+  const nested = root.attributes?.payload?.data;
+  if (nested?.id) {
+    return { eventId: root.id, eventName, inquiry: nested };
+  }
+  if (root.type === "inquiry" || root.id.startsWith("inq_")) {
+    return { eventId: root.id, eventName, inquiry: root as InquiryRecord };
+  }
+  if (root.attributes?.status) {
+    return {
+      eventId: root.id,
+      eventName,
+      inquiry: { id: root.attributes["reference-id"] ?? root.id, attributes: root.attributes },
+    };
+  }
+  return null;
+}
 
-  const dedupe = await db.query(
-    `INSERT INTO persona_webhook_events (event_id, inquiry_ref)
-     VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING RETURNING id`,
-    [eventId, inquiryRef],
-  );
-  if (dedupe.rowCount === 0) return { duplicate: true };
+export async function applyPersonaInquiryDecision(inquiry: InquiryRecord) {
+  const attrs = inquiry.attributes ?? {};
+  const inquiryId = inquiry.id;
+  const referenceId = attrs["reference-id"];
 
   const attempt = await db.query(
     `SELECT v.*, c.confirmed_name, c.organization_id, c.id AS candidacy_id, i.id AS invitation_id
      FROM verification_attempts v
      JOIN candidacies c ON c.id = v.candidacy_id
      JOIN invitations i ON i.id = v.invitation_id
-     WHERE v.persona_inquiry_ref = $1 AND v.environment = $2
+     WHERE v.environment = $3
+       AND (v.persona_inquiry_ref = $1 OR v.persona_inquiry_ref = $2 OR v.persona_inquiry_ref = $4)
      ORDER BY v.created_at DESC LIMIT 1`,
-    [inquiryRef, personaEnvironment()],
+    [inquiryId, referenceId ?? inquiryId, personaEnvironment(), referenceId ?? ""],
   );
   const row = attempt.rows[0];
   if (!row) throw new Error("Verification attempt not found for inquiry.");
 
-  const status = payload.data.attributes.status;
+  const status = attrs.status;
   let verificationStatus: "verified" | "review" | "failed" = "failed";
   let nameMatch: "match" | "mismatch" | "unknown" = "unknown";
 
   if (status === "approved" || status === "completed") {
-    const idName = `${payload.data.attributes["name-first"] ?? ""} ${payload.data.attributes["name-last"] ?? ""}`.trim().toLowerCase();
+    const idName = `${attrs["name-first"] ?? ""} ${attrs["name-last"] ?? ""}`.trim().toLowerCase();
     const expected = String(row.confirmed_name).trim().toLowerCase();
     if (idName && expected && (idName.includes(expected.split(" ")[0]!) || expected.includes(idName.split(" ")[0]!))) {
       verificationStatus = "verified";
@@ -69,8 +99,10 @@ export async function handlePersonaWebhook(rawBody: string, signature: string | 
     }
   } else if (status === "declined" || status === "failed") {
     verificationStatus = "failed";
+  } else if (status === "needs review" || status === "marked-for-review") {
+    verificationStatus = "review";
   } else {
-    return { pending: true };
+    return { pending: true as const, verificationStatus: status ?? "pending" };
   }
 
   await db.query(
@@ -94,6 +126,31 @@ export async function handlePersonaWebhook(rawBody: string, signature: string | 
     await db.query(`UPDATE candidacies SET status = 'verification_pending', updated_at = now() WHERE id = $1`, [row.candidacy_id]);
   }
 
-  await db.query(`UPDATE persona_webhook_events SET processed_at = now() WHERE event_id = $1`, [eventId]);
   return { verificationStatus, nameMatch };
+}
+
+export async function handlePersonaWebhook(rawBody: string, signature: string | null) {
+  if (!process.env.PERSONA_WEBHOOK_SECRET) {
+    throw new Error("Persona webhook secret is not configured.");
+  }
+  if (!verifyPersonaSignature(rawBody, signature)) {
+    throw new Error("Invalid Persona webhook signature.");
+  }
+  const payload = JSON.parse(rawBody) as Parameters<typeof extractInquiryFromWebhookPayload>[0];
+  const extracted = extractInquiryFromWebhookPayload(payload);
+  if (!extracted) throw new Error("Persona webhook payload missing inquiry.");
+
+  const eventId = extracted.eventId;
+  const inquiryRef = extracted.inquiry.attributes?.["reference-id"] ?? extracted.inquiry.id;
+
+  const dedupe = await db.query(
+    `INSERT INTO persona_webhook_events (event_id, inquiry_ref)
+     VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING RETURNING id`,
+    [eventId, inquiryRef],
+  );
+  if (dedupe.rowCount === 0) return { duplicate: true, eventName: extracted.eventName };
+
+  const result = await applyPersonaInquiryDecision(extracted.inquiry);
+  await db.query(`UPDATE persona_webhook_events SET processed_at = now() WHERE event_id = $1`, [eventId]);
+  return { ...result, eventName: extracted.eventName };
 }

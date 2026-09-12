@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-declare_id!("GMHired1111111111111111111111111111111111");
+declare_id!("eZqUe8be2q8R6akfzAx9BZuQ4DnXezGbfTRPJZPpxk2");
 
 #[program]
 pub mod get_me_hired {

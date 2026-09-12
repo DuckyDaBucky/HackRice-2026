@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import { candidateExchangeInvitation, candidateBindEmail } from "../actions";
 
 export default function CandidateInvitePage() {
   const router = useRouter();
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const { isSignedIn } = useAuth();
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "redirecting">("loading");
   const [details, setDetails] = useState<{ invitationId: string; candidacyId: string; jobTitle: string; orgName: string; sandboxLabel: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,19 +21,30 @@ export default function CandidateInvitePage() {
     }
     history.replaceState(null, "", window.location.pathname);
     void candidateExchangeInvitation(hash)
-      .then((d) => {
+      .then(async (d) => {
         setDetails(d);
-        setStatus("ready");
         sessionStorage.setItem("hiring_invitation_id", d.invitationId);
         sessionStorage.setItem("hiring_candidacy_id", d.candidacyId);
+        if (isSignedIn) {
+          setStatus("redirecting");
+          try {
+            await candidateBindEmail(d.invitationId);
+            router.replace(`/candidate/verify?candidacy=${d.candidacyId}&invitation=${d.invitationId}`);
+            return;
+          } catch {
+            setStatus("ready");
+            return;
+          }
+        }
+        setStatus("ready");
       })
       .catch((e) => {
         setStatus("error");
         setError(e instanceof Error ? e.message : "Invalid invitation");
       });
-  }, []);
+  }, [isSignedIn, router]);
 
-  if (status === "loading") {
+  if (status === "loading" || status === "redirecting") {
     return (
       <div className="flex min-h-[100dvh] items-center justify-center bg-zinc-950 text-zinc-400">
         Validating invitation…

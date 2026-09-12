@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { hrGetJob, hrCreateCandidate } from "../../actions";
+import { isUuid } from "@/lib/hiring/uuid";
 
 export default async function HrJobPage({
   params,
@@ -8,6 +9,18 @@ export default async function HrJobPage({
   const { jobId } = await params;
   const { org } = await searchParams;
   if (!org) return <p className="p-8 text-zinc-500">Missing organization.</p>;
+  if (!isUuid(jobId) || !isUuid(org)) {
+    return (
+      <div className="mx-auto max-w-lg p-8 text-zinc-300">
+        <h1 className="text-xl font-semibold text-zinc-50">Invalid link</h1>
+        <p className="mt-2 text-sm text-zinc-400">
+          This URL used placeholder IDs. Open{" "}
+          <Link href="/dev/hiring-links" className="text-sky-400 underline">/dev/hiring-links</Link>{" "}
+          for working demo URLs.
+        </p>
+      </div>
+    );
+  }
 
   const job = await hrGetJob(jobId, org);
   if (!job) return <p className="p-8 text-zinc-500">Job not found.</p>;

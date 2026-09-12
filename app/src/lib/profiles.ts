@@ -9,8 +9,13 @@ export function profileNamespace(){
  return createHash("sha256").update(key).digest("hex");
 }
 export async function getProfile(userId:string){
- const result=await db.query("SELECT profile,version,updated_at,classified_at FROM gmh_accounts.profiles WHERE clerk_instance=$1 AND clerk_user_id=$2",[profileNamespace(),userId]);
- const row=result.rows[0];return row?{profile:resumeSchema.parse(row.profile),version:row.version,updatedAt:row.updated_at,classifiedAt:row.classified_at}:null;
+ try {
+  const result=await db.query("SELECT profile,version,updated_at,classified_at FROM gmh_accounts.profiles WHERE clerk_instance=$1 AND clerk_user_id=$2",[profileNamespace(),userId]);
+  const row=result.rows[0];return row?{profile:resumeSchema.parse(row.profile),version:row.version,updatedAt:row.updated_at,classifiedAt:row.classified_at}:null;
+ } catch (error) {
+  if (error && typeof error === "object" && "code" in error && error.code === "42P01") return null;
+  throw error;
+ }
 }
 export async function saveProfile(userId:string,profile:Resume,version:number|null){
  const value=resumeSchema.parse(profile),namespace=profileNamespace();

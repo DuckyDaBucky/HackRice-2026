@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-get_me_hired = "GMHired1111111111111111111111111111111111"
+get_me_hired = "eZqUe8be2q8R6akfzAx9BZuQ4DnXezGbfTRPJZPpxk2"
 
 [registry]
 url = "https://api.apr.dev"

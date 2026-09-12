@@ -46,6 +46,52 @@ export async function uploadHiringResume(params: {
   return { resumeId, uploadUrl, extractedText: text };
 }
 
+export async function saveHiringResumeText(params: {
+  organizationId: string;
+  candidacyId: string;
+  text: string;
+  structuredFacts?: Record<string, unknown>;
+}) {
+  await requireOrgAccess(params.organizationId);
+  const text = params.text.trim();
+  if (text.length < 40) throw new Error("Paste at least a few lines of resume text.");
+
+  const resumeId = randomUUID();
+  await db.query(
+    `INSERT INTO hiring_resumes
+       (id, organization_id, candidacy_id, original_filename, r2_key, extracted_text, structured_facts)
+     VALUES ($1, $2, $3, 'pasted-resume.txt', $4, $5, $6::jsonb)`,
+    [
+      resumeId,
+      params.organizationId,
+      params.candidacyId,
+      `hiring/${params.organizationId}/${params.candidacyId}/${resumeId}`,
+      text,
+      JSON.stringify(params.structuredFacts ?? {}),
+    ],
+  );
+  await db.query(
+    `UPDATE candidacies SET resume_id = $2, resume_version = 1, status = 'questions_pending', updated_at = now()
+     WHERE id = $1`,
+    [params.candidacyId, resumeId],
+  );
+  return { resumeId, extractedText: text };
+}
+
+export async function attachParsedResumeProfile(params: {
+  organizationId: string;
+  candidacyId: string;
+  profile: Record<string, unknown>;
+}) {
+  await requireOrgAccess(params.organizationId);
+  const candidacy = await getCandidacy(params.candidacyId, params.organizationId);
+  if (!candidacy?.resume_id) throw new Error("Upload or paste a resume first.");
+  await db.query(
+    `UPDATE hiring_resumes SET structured_facts = $2::jsonb WHERE id = $1`,
+    [candidacy.resume_id, JSON.stringify(params.profile)],
+  );
+}
+
 export async function confirmCandidateIdentity(params: {
   organizationId: string;
   candidacyId: string;
