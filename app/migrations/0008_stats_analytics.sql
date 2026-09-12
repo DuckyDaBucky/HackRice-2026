@@ -1,4 +1,4 @@
--- 0007_stats_analytics.sql
+-- 0008_stats_analytics.sql
 --
 -- Adds the data model for the post-interview stats page: structured report
 -- findings (evidence-linked strengths/gaps) and presage-api biometric

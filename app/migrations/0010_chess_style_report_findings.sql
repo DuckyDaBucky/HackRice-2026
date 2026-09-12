@@ -1,4 +1,4 @@
--- 0009_chess_style_report_findings.sql
+-- 0010_chess_style_report_findings.sql
 --
 -- Replaces the competency-grouped report_findings shape with a chess.com-style
 -- move review: one verdict per answered turn (blunder/mistake/inaccuracy/good/
