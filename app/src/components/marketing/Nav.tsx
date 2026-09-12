@@ -6,10 +6,10 @@ import { clerkEnabled } from "@/lib/clerk";
 import { Logo } from "./Logo";
 
 const LINKS = [
-  { href: "#product", label: "Product" },
-  { href: "#workspaces", label: "For candidates" },
-  { href: "#workspaces", label: "For employers" },
-  { href: "#trust", label: "Trust" },
+  { href: "#individuals", label: "For Individuals" },
+  { href: "#employers", label: "For Employers" },
+  { href: "#how-it-works", label: "How it works" },
+  { href: "#waitlist", label: "Pricing" },
 ];
 
 export function Nav() {
@@ -39,7 +39,7 @@ export function Nav() {
             <Show when="signed-out">
               <SignInButton mode="modal">
                 <button className="text-sm text-muted transition-colors hover:text-foreground">
-                  Log in
+                  Sign in
                 </button>
               </SignInButton>
             </Show>
@@ -51,9 +51,10 @@ export function Nav() {
           )}
           <a
             href="#waitlist"
-            className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-[#03231e] transition-colors hover:bg-accent-hover"
+            className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
           >
-            Join waitlist
+            Get started
+            <ArrowIcon />
           </a>
         </div>
 
@@ -87,7 +88,7 @@ export function Nav() {
               <Show when="signed-out">
                 <SignInButton mode="modal">
                   <button className="text-sm text-muted hover:text-foreground">
-                    Log in
+                    Sign in
                   </button>
                 </SignInButton>
               </Show>
@@ -100,14 +101,36 @@ export function Nav() {
             <a
               href="#waitlist"
               onClick={() => setOpen(false)}
-              className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-[#03231e]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background"
             >
-              Join waitlist
+              Get started
+              <ArrowIcon />
             </a>
           </div>
         </div>
       )}
     </header>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 12 12"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M2 6h7M6 3l3 3-3 3"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 

@@ -26,10 +26,12 @@ export function LogoMark({ size = 28 }: { size?: number }) {
 export function Logo({
   size = "md",
   showWordmark = true,
+  onLight = false,
   className = "",
 }: {
   size?: keyof typeof SIZES;
   showWordmark?: boolean;
+  onLight?: boolean;
   className?: string;
 }) {
   const cfg = SIZES[size];
@@ -38,7 +40,9 @@ export function Logo({
       <LogoMark size={cfg.icon} />
       {showWordmark && (
         <span
-          className={`font-sans font-bold tracking-tight text-foreground ${cfg.wordmark}`}
+          className={`font-sans font-bold tracking-tight ${cfg.wordmark} ${
+            onLight ? "text-[#0b1120]" : "text-foreground"
+          }`}
         >
           GetMeHired
         </span>

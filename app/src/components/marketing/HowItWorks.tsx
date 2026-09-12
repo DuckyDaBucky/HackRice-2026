@@ -1,24 +1,55 @@
 const STEPS = [
-  { label: "Resume", icon: DocIcon },
-  { label: "Target role", icon: TargetIcon },
-  { label: "Mock interview", icon: CameraIcon },
-  { label: "Evidence-backed feedback", icon: CheckIcon },
+  {
+    n: "1",
+    title: "Upload or create a profile",
+    body: "Add your resume and tell us your target role.",
+    icon: ProfileIcon,
+  },
+  {
+    n: "2",
+    title: "Practice or screen",
+    body: "Answer real questions in a recorded or live interview.",
+    icon: CameraIcon,
+  },
+  {
+    n: "3",
+    title: "Get the evidence",
+    body: "A report scored against a rubric, linked to your transcript.",
+    icon: ReportIcon,
+  },
+  {
+    n: "4",
+    title: "Take the next step",
+    body: "Improve and retry, or move top candidates forward.",
+    icon: ArrowUpRightIcon,
+  },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="border-t border-border py-10 sm:py-12">
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+    <section id="how-it-works" className="border-t border-[#e5e7eb] bg-[#fafbfc] py-16 sm:py-20">
+      <div className="mx-auto max-w-6xl px-4 text-center sm:px-6 lg:px-8">
+        <h2 className="text-3xl font-semibold tracking-tight text-[#0b1120] sm:text-4xl">
+          How it works.
+        </h2>
+
+        <div className="mt-12 grid grid-cols-1 gap-10 sm:grid-cols-4 sm:gap-4">
           {STEPS.map((step, i) => (
-            <div key={step.label} className="flex items-center gap-3 sm:gap-4">
-              <div className="flex items-center gap-2.5 rounded-lg border border-border bg-surface px-4 py-3">
+            <div key={step.n} className="relative">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#eef1f6] text-[#0b1120]">
                 <step.icon />
-                <span className="text-sm font-medium text-foreground">
-                  {step.label}
-                </span>
               </div>
-              {i < STEPS.length - 1 && <ArrowIcon />}
+              {i < STEPS.length - 1 && (
+                <span className="absolute left-[calc(50%+2.5rem)] top-6 hidden w-[calc(100%-5rem)] items-center text-[#c3c8cf] sm:flex">
+                  <ArrowIcon />
+                </span>
+              )}
+              <p className="mt-4 text-sm font-semibold text-[#0b1120]">
+                {step.n}. {step.title}
+              </p>
+              <p className="mx-auto mt-1.5 max-w-[20ch] text-sm leading-relaxed text-[#5b6472]">
+                {step.body}
+              </p>
             </div>
           ))}
         </div>
@@ -29,27 +60,21 @@ export function HowItWorks() {
 
 function iconProps() {
   return {
-    width: 16,
-    height: 16,
-    viewBox: "0 0 16 16",
+    width: 18,
+    height: 18,
+    viewBox: "0 0 18 18",
     fill: "none",
     xmlns: "http://www.w3.org/2000/svg",
     "aria-hidden": true,
-    className: "shrink-0 text-accent",
   } as const;
 }
 
-function DocIcon() {
+function ProfileIcon() {
   return (
     <svg {...iconProps()}>
+      <circle cx="9" cy="6.5" r="2.5" stroke="currentColor" strokeWidth="1.2" />
       <path
-        d="M4 1.5h5l3 3v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1Z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M6 8h4M6 10.5h4"
+        d="M3.8 14.5a5.2 5.2 0 0 1 10.4 0"
         stroke="currentColor"
         strokeWidth="1.2"
         strokeLinecap="round"
@@ -58,44 +83,34 @@ function DocIcon() {
   );
 }
 
-function TargetIcon() {
+function CameraIcon() {
   return (
     <svg {...iconProps()}>
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.2" />
-      <circle cx="8" cy="8" r="0.75" fill="currentColor" />
+      <rect x="2.5" y="5" width="9.5" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M12 8 15.5 5.5v7L12 10" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
     </svg>
   );
 }
 
-function CameraIcon() {
+function ReportIcon() {
   return (
     <svg {...iconProps()}>
-      <rect
-        x="1.5"
-        y="4"
-        width="9"
-        height="8"
-        rx="1.5"
-        stroke="currentColor"
-        strokeWidth="1.2"
-      />
       <path
-        d="M10.5 6.8 14.5 4.5v7L10.5 9.2"
+        d="M5 2h5l3.5 3.5V15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1Z"
         stroke="currentColor"
         strokeWidth="1.2"
         strokeLinejoin="round"
       />
+      <path d="M6.5 9h5M6.5 11.5h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
 
-function CheckIcon() {
+function ArrowUpRightIcon() {
   return (
     <svg {...iconProps()}>
-      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" />
       <path
-        d="M5.2 8.2 7.1 10l3.7-4"
+        d="M5 13 13 5M7 5h6v6"
         stroke="currentColor"
         strokeWidth="1.2"
         strokeLinecap="round"
@@ -108,16 +123,16 @@ function CheckIcon() {
 function ArrowIcon() {
   return (
     <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
+      width="100%"
+      height="12"
+      viewBox="0 0 60 12"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      className="hidden shrink-0 text-muted/60 sm:block"
+      preserveAspectRatio="none"
     >
       <path
-        d="M2 8h11M9 4l4 4-4 4"
+        d="M0 6h54M48 2l6 4-6 4"
         stroke="currentColor"
         strokeWidth="1.2"
         strokeLinecap="round"

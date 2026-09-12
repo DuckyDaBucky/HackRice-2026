@@ -1,124 +1,135 @@
-const EVIDENCE = [
-  { label: "Ownership", state: "noted" as const },
-  { label: "Reasoning", state: "insufficient" as const },
-  { label: "Clarity", state: "noted" as const },
-];
+import { LogoMark } from "./Logo";
 
 export function ProductPreview() {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-surface">
-      <div className="flex items-center justify-between px-5 py-3">
-        <span className="text-sm text-muted">
-          Practice &middot; Product Designer
-        </span>
-        <span className="font-mono text-xs text-muted">Question 3 of 6</span>
-      </div>
-      <div className="h-px w-full bg-border">
-        <div className="h-px w-1/2 bg-accent" />
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <LogoMark size={18} />
+          <span className="text-sm font-medium text-foreground">
+            GetMeHired
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-xs text-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-400/80" />
+            Interview in progress
+          </span>
+          <span className="font-mono text-xs text-muted">08:42</span>
+          <span className="rounded-md bg-red-500/10 px-2 py-1 text-xs font-medium text-red-300">
+            End interview
+          </span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-px bg-border lg:grid-cols-[280px_1fr]">
-        <div className="relative flex flex-col items-center justify-center gap-3 bg-bg-elevated px-6 py-10">
-          <span className="absolute left-4 top-4 flex items-center gap-1.5 text-xs text-muted">
-            <span className="h-1.5 w-1.5 rounded-full bg-red-400/80" />
-            Recording
-          </span>
+      <div className="grid grid-cols-1 gap-px bg-border sm:grid-cols-[1.1fr_1fr]">
+        <div className="flex items-center justify-center bg-bg-elevated py-14">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-border text-sm font-medium text-foreground">
             JD
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-muted">
-            <MicOffIcon />
-            You
-          </div>
         </div>
 
-        <div className="bg-surface px-6 py-5">
-          <p className="text-xs text-muted">Current question</p>
-          <p className="mt-1.5 text-lg font-medium leading-snug text-foreground">
-            Tell me about a time you made a decision with incomplete
-            information.
+        <div className="bg-surface px-5 py-5">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted">Technical question</p>
+            <span className="font-mono text-xs text-muted">2 / 8</span>
+          </div>
+          <p className="mt-1.5 text-base font-medium leading-snug text-foreground">
+            Can you walk me through a project you&rsquo;re proud of from your
+            resume?
           </p>
 
-          <div className="mt-3 flex items-start gap-2 rounded-lg border border-border/70 bg-bg-elevated px-3 py-2.5">
-            <BranchIcon />
-            <p className="text-sm text-muted">
-              Follow-up: what data did you wish you had at the time?
-            </p>
-          </div>
-
-          <div className="mt-4 border-t border-border pt-4">
-            <p className="text-xs text-muted">Live transcript</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              &ldquo;We were two weeks from launch and the usage data hadn&rsquo;t
-              come in yet, so I looked at support tickets from the beta
-              instead
-              <span className="inline-block w-1.5 animate-pulse bg-muted/60 align-middle">
-                &nbsp;
-              </span>
-              &rdquo;
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-border/70 bg-bg-elevated px-3 py-2.5">
+            <TipIcon />
+            <p className="text-xs leading-relaxed text-muted">
+              Use the STAR method (Situation, Task, Action, Result) and be
+              specific.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-border px-6 py-4">
-        {EVIDENCE.map((e) => (
-          <span
-            key={e.label}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
-              e.state === "noted"
-                ? "border-accent/30 text-accent"
-                : "border-dashed border-border text-muted"
-            }`}
-          >
-            {e.label}
-            <span className="opacity-80">
-              {e.state === "noted" ? "noted" : "insufficient evidence"}
-            </span>
+      <div className="flex items-center justify-between border-t border-border px-4 py-3">
+        <span className="rounded-md border border-border px-3 py-1.5 text-xs text-muted">
+          Hide question
+        </span>
+        <div className="flex items-center gap-3 text-muted">
+          <MicIcon />
+          <CameraIcon />
+          <SettingsIcon />
+          <span className="flex items-end gap-0.5">
+            <span className="h-2 w-0.5 rounded-full bg-accent" />
+            <span className="h-3 w-0.5 rounded-full bg-accent" />
+            <span className="h-1.5 w-0.5 rounded-full bg-accent" />
           </span>
-        ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function MicOffIcon() {
+function iconProps() {
+  return {
+    width: 15,
+    height: 15,
+    viewBox: "0 0 16 16",
+    fill: "none",
+    xmlns: "http://www.w3.org/2000/svg",
+    "aria-hidden": true,
+  } as const;
+}
+
+function TipIcon() {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
+    <svg {...iconProps()} className="mt-0.5 shrink-0 text-accent">
       <path
-        d="M2 2L14 14M8 1.5a2 2 0 0 1 2 2v3.2M6 6.7V3.5a2 2 0 0 1 .6-1.43M4.5 8a3.5 3.5 0 0 0 5.6 2.8M11.4 9A3.5 3.5 0 0 0 11.5 8M8 11.5V14"
+        d="M8 1.5a4 4 0 0 0-2.2 7.3c.4.3.7.8.7 1.3v.4h3v-.4c0-.5.3-1 .7-1.3A4 4 0 0 0 8 1.5Z"
         stroke="currentColor"
-        strokeWidth="1.2"
+        strokeWidth="1.1"
+        strokeLinejoin="round"
+      />
+      <path d="M6.5 13h3M7 14.5h2" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MicIcon() {
+  return (
+    <svg {...iconProps()}>
+      <rect x="6" y="1.5" width="4" height="7" rx="2" stroke="currentColor" strokeWidth="1.1" />
+      <path
+        d="M4 7.5a4 4 0 0 0 8 0M8 11.5V14"
+        stroke="currentColor"
+        strokeWidth="1.1"
         strokeLinecap="round"
       />
     </svg>
   );
 }
 
-function BranchIcon() {
+function CameraIcon() {
   return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-      className="mt-0.5 shrink-0 text-accent"
-    >
+    <svg {...iconProps()}>
+      <rect x="1.5" y="4" width="9" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.1" />
       <path
-        d="M4 2.5v5c0 1.5 1 2.5 2.5 2.5H10M9 11.5l3-2 -3-2"
+        d="M10.5 6.8 14.5 4.5v7L10.5 9.2"
         stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
+        strokeWidth="1.1"
         strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SettingsIcon() {
+  return (
+    <svg {...iconProps()}>
+      <circle cx="8" cy="8" r="2.2" stroke="currentColor" strokeWidth="1.1" />
+      <path
+        d="M8 1.8v1.4M8 12.8v1.4M14.2 8h-1.4M3.2 8H1.8M12.3 3.7l-1 1M4.7 11.3l-1 1M12.3 12.3l-1-1M4.7 4.7l-1-1"
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinecap="round"
       />
     </svg>
   );

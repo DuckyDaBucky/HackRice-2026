@@ -30,17 +30,17 @@ const COMPETENCIES = [
 
 export function TrustSection() {
   return (
-    <section id="trust" className="border-t border-border py-14 sm:py-20">
+    <section id="trust" className="border-t border-[#e5e7eb] bg-[#fafbfc] py-14 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:gap-14">
           <div>
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            <h2 className="text-3xl font-semibold tracking-tight text-[#0b1120] sm:text-4xl">
               Scored on <em className="italic">evidence</em>, not
               impressions.
             </h2>
             <ul className="mt-6 flex flex-col gap-3">
               {PRINCIPLES.map((p) => (
-                <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-muted">
+                <li key={p} className="flex items-start gap-2.5 text-sm leading-relaxed text-[#3f4a52]">
                   <CheckIcon />
                   {p}
                 </li>
@@ -48,28 +48,28 @@ export function TrustSection() {
             </ul>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
-            <div className="flex items-center justify-between border-b border-border px-5 py-3">
-              <span className="text-sm font-medium text-foreground">
+          <div className="overflow-hidden rounded-xl border border-[#e5e7eb] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
+            <div className="flex items-center justify-between border-b border-[#e5e7eb] px-5 py-3">
+              <span className="text-sm font-medium text-[#0b1120]">
                 Evaluation report
               </span>
-              <span className="font-mono text-xs text-muted">Rubric v1</span>
+              <span className="font-mono text-xs text-[#8a92a0]">Rubric v1</span>
             </div>
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-[#eef0f3]">
               {COMPETENCIES.map((c) => (
                 <li key={c.name} className="px-5 py-3.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-foreground">{c.name}</span>
+                    <span className="text-sm text-[#0b1120]">{c.name}</span>
                     <span
                       className={`text-xs ${
-                        c.state === "noted" ? "text-accent" : "text-muted"
+                        c.state === "noted" ? "text-[#1ec9b3]" : "text-[#8a92a0]"
                       }`}
                     >
                       {c.state === "noted" ? "noted" : "insufficient evidence"}
                     </span>
                   </div>
                   {c.quote && (
-                    <p className="mt-1 text-xs leading-relaxed text-muted">
+                    <p className="mt-1 text-xs leading-relaxed text-[#5b6472]">
                       &ldquo;{c.quote}&rdquo;
                     </p>
                   )}
@@ -92,7 +92,7 @@ function CheckIcon() {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
-      className="mt-0.5 shrink-0 text-accent"
+      className="mt-0.5 shrink-0 text-[#1ec9b3]"
     >
       <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.2" />
       <path
