@@ -10,7 +10,7 @@ import { clerkEnabled } from "@/lib/clerk";
 import { currentUser } from "@clerk/nextjs/server";
 import { Dashboard } from "@/components/Dashboard";
 import { getSessionStats, listRecentSessions } from "@/lib/sessions";
-import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
+import { getProfile } from "@/lib/profiles";
 
 export default async function Home() {
   const user = clerkEnabled ? await currentUser() : null;
@@ -30,18 +30,18 @@ export default async function Home() {
     );
   }
 
-  const [stats, sessions] = await Promise.all([
+  const [stats, sessions, profile] = await Promise.all([
     getSessionStats(user.id),
     listRecentSessions(user.id),
+    getProfile(user.id),
   ]);
-  const answeredCounts = await countUploadedAttemptsBySession(sessions.map((s) => s.id));
 
   return (
     <Dashboard
       firstName={user.firstName}
       stats={stats}
       sessions={sessions}
-      answeredCounts={answeredCounts}
+      hasResume={profile !== null}
     />
   );
 }
