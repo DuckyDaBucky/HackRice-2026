@@ -54,17 +54,27 @@ export async function loadCorpus(): Promise<Corpus> {
   const version = process.env.GET_ME_HIRED_RESEARCH_VERSION;
   if (!version) throw new WorkbenchError("CORPUS_MISSING", "Set GET_ME_HIRED_RESEARCH_VERSION for database research.", 503);
   try {
-    const { db } = await import("../db");
-    const result = await db.query<{name:string;content:string;sha256:string;manifest_sha256:string}>(
-      "SELECT d.name,d.content,d.sha256,v.manifest_sha256 FROM gmh_research.documents d JOIN gmh_research.datasets v USING(version) WHERE d.version=$1", [version]);
+    const { orm } = await import("../db");
+    const { eq } = await import("drizzle-orm");
+    const { researchDatasets, researchDocuments } = await import("../db/schema");
+    const rows = await orm
+      .select({
+        name: researchDocuments.name,
+        content: researchDocuments.content,
+        sha256: researchDocuments.sha256,
+        manifestSha256: researchDatasets.manifestSha256,
+      })
+      .from(researchDocuments)
+      .innerJoin(researchDatasets, eq(researchDocuments.version, researchDatasets.version))
+      .where(eq(researchDocuments.version, version));
     const expected = new Set(["manifest.json", ...filenames.map(n=>`${n}.json`)]);
-    if (result.rows.length !== expected.size) throw new Error("Document count mismatch");
+    if (rows.length !== expected.size) throw new Error("Document count mismatch");
     const data: Record<string, unknown> = {};
     const hashes: Record<string, string> = {};
-    for (const row of result.rows) {
+    for (const row of rows) {
       if (!expected.delete(row.name)) throw new Error("Unexpected document");
       const checksum = createHash("sha256").update(row.content).digest("hex");
-      if (checksum !== row.sha256 || (row.name === "manifest.json" && checksum !== row.manifest_sha256)) throw new Error("Checksum mismatch");
+      if (checksum !== row.sha256 || (row.name === "manifest.json" && checksum !== row.manifestSha256)) throw new Error("Checksum mismatch");
       hashes[row.name] = checksum;
       data[row.name.replace(/\.json$/, "")] = JSON.parse(row.content);
     }

@@ -7,6 +7,7 @@ import {
   index,
   integer,
   jsonb,
+  pgSchema,
   pgTable,
   text,
   timestamp,
@@ -15,6 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const interviewModes = ["technical", "behavioral"] as const;
+export const interviewMoods = ["supportive", "neutral", "challenging"] as const;
 export const sessionStatuses = [
   "planned",
   "in_progress",
@@ -39,6 +41,13 @@ export const interviewSessions = pgTable(
     clerkUserId: text("clerk_user_id").notNull(),
     mode: text("mode", { enum: interviewModes }).notNull(),
     status: text("status", { enum: sessionStatuses }).default("in_progress").notNull(),
+    // Added by migrations/0004_session_setup_options.sql — kept in sync by
+    // hand (see AGENTS.md); do NOT regenerate these via drizzle-kit against
+    // a database that already applied 0004.
+    questionCount: integer("question_count").default(3).notNull(),
+    mood: text("mood", { enum: interviewMoods }).default("neutral").notNull(),
+    customPrompt: text("custom_prompt"),
+    voiceId: text("voice_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
     completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -351,7 +360,7 @@ export const audioTranscripts = pgTable(
     language: text("language").notNull().default("en"),
     status: text("status", { enum: transcriptStatuses }).notNull().default("not_started"),
     fullText: text("full_text"),
-    segments: jsonb("segments").notNull().default([]),
+    segments: jsonb("segments").$type<TranscriptSegment[]>().notNull().default([]),
     errorCode: text("error_code"),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
@@ -502,4 +511,47 @@ export type InterviewSessionConfig = typeof interviewSessionConfigs.$inferSelect
 export type InterviewPlanQuestion = typeof interviewPlanQuestions.$inferSelect;
 export type InterviewTurn = typeof interviewTurns.$inferSelect;
 export type MediaArtifact = typeof mediaArtifacts.$inferSelect;
+export type NewMediaArtifact = typeof mediaArtifacts.$inferInsert;
 export type AudioTranscript = typeof audioTranscripts.$inferSelect;
+export type NewAudioTranscript = typeof audioTranscripts.$inferInsert;
+
+// Workbench schemas (gmh_accounts, gmh_research) are provisioned outside the
+// migrations/ series. Models below mirror the live tables column-for-column
+// so application queries stay typed; DDL changes there must update both.
+export const gmhAccounts = pgSchema("gmh_accounts");
+
+export const accountProfiles = gmhAccounts.table("profiles", {
+  clerkInstance: text("clerk_instance").notNull(),
+  clerkUserId: text("clerk_user_id").notNull(),
+  profile: jsonb("profile").$type<unknown>().notNull(),
+  version: integer("version").default(1).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  classifiedAt: timestamp("classified_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const gmhResearch = pgSchema("gmh_research");
+
+export const researchDatasets = gmhResearch.table("datasets", {
+  version: text("version").notNull(),
+  manifestSha256: text("manifest_sha256").notNull(),
+  importedAt: timestamp("imported_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const researchDocuments = gmhResearch.table("documents", {
+  version: text("version").notNull(),
+  name: text("name").notNull(),
+  content: text("content").notNull(),
+  sha256: text("sha256").notNull(),
+});
+
+export type AccountProfile = typeof accountProfiles.$inferSelect;
+export type ResearchDocument = typeof researchDocuments.$inferSelect;
+
+export interface TranscriptSegment {
+  startMs: number;
+  endMs: number;
+  text: string;
+  confidence?: number | null;
+}
+
