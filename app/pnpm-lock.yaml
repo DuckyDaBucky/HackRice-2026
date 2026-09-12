@@ -19,10 +19,13 @@ importers:
         version: 7.9.2(next@16.3.5(@babel/core@7.29.7)(@types/node@22.20.2)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@langchain/core':
         specifier: ^1.2.10
-        version: 1.2.10
+        version: 1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2))
       '@langchain/google':
         specifier: ^0.2.5
-        version: 0.2.5(@langchain/core@1.2.10)
+        version: 0.2.5(@langchain/core@1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2)))
+      '@langchain/openai':
+        specifier: ^1.5.12
+        version: 1.5.12(@aws-sdk/credential-provider-node@3.972.83)(@langchain/core@1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2)))(@smithy/signature-v4@5.7.3)
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -993,6 +996,12 @@ packages:
   '@langchain/google@0.2.5':
     resolution: {integrity: sha512-FfCoVdB40KimYZtsdupX/F908YA//sCpDCnJdhkw+LeMvua7Izo50t3t78K6N5c3IqNwcdydlJzLhfe3i5+jWQ==}
     engines: {node: '>=20'}
+    peerDependencies:
+      '@langchain/core': ^1.2.10
+
+  '@langchain/openai@1.5.12':
+    resolution: {integrity: sha512-5tMWHUEo/ZGkLmSNxjA1w0ofRGoUiMXpI3pVrnvRgBBxFxHaZtDndzwZpU5Z8UFW/nWd4XW5Je/PEkZgW2K31w==}
+    engines: {node: '>=22'}
     peerDependencies:
       '@langchain/core': ^1.2.10
 
@@ -2892,6 +2901,30 @@ packages:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
     engines: {node: '>=12.20.0'}
 
+  openai@7.15.0:
+    resolution: {integrity: sha512-2DIwesnPSduw68MFx7nAdgvshrgvS8WOan5W8+tgUMlAy/tY+Q41g80Pa+w/v64rHA6rtn+dketa8QvMVxU96w==}
+    engines: {node: '>=22.0.0'}
+    peerDependencies:
+      '@aws-sdk/credential-provider-node': '>=3.972.0 <4'
+      '@smithy/hash-node': '>=4.3.0 <5'
+      '@smithy/signature-v4': '>=5.4.0 <6'
+      undici: '>=5 <9'
+      ws: ^8.21.0
+      zod: ^3.25 || ^4.0
+    peerDependenciesMeta:
+      '@aws-sdk/credential-provider-node':
+        optional: true
+      '@smithy/hash-node':
+        optional: true
+      '@smithy/signature-v4':
+        optional: true
+      undici:
+        optional: true
+      ws:
+        optional: true
+      zod:
+        optional: true
+
   option@0.2.4:
     resolution: {integrity: sha512-pkEqbDyl8ou5cpq+VsnQbe/WlEy5qS7xPzMS1U55OCG9KPvwFD46zDbxQIj3egJSFc3D+XhYOPUzz49zQAVy7A==}
 
@@ -4268,12 +4301,12 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@langchain/core@1.2.10':
+  '@langchain/core@1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2))':
     dependencies:
       '@cfworker/json-schema': 4.1.1
       '@standard-schema/spec': 1.1.0
       js-tiktoken: 1.0.21
-      langsmith: 0.10.2
+      langsmith: 0.10.2(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2))
       mustache: 4.2.0
       p-queue: 6.6.2
       zod: 4.6.2
@@ -4284,14 +4317,27 @@ snapshots:
       - openai
       - ws
 
-  '@langchain/google@0.2.5(@langchain/core@1.2.10)':
+  '@langchain/google@0.2.5(@langchain/core@1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2)))':
     dependencies:
-      '@langchain/core': 1.2.10
+      '@langchain/core': 1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2))
       eventsource-parser: 4.1.0
       google-auth-library: 11.0.2
       jose: 6.2.12
     transitivePeerDependencies:
       - supports-color
+
+  '@langchain/openai@1.5.12(@aws-sdk/credential-provider-node@3.972.83)(@langchain/core@1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2)))(@smithy/signature-v4@5.7.3)':
+    dependencies:
+      '@langchain/core': 1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2))
+      js-tiktoken: 1.0.21
+      openai: 7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2)
+      zod: 4.6.2
+    transitivePeerDependencies:
+      - '@aws-sdk/credential-provider-node'
+      - '@smithy/hash-node'
+      - '@smithy/signature-v4'
+      - undici
+      - ws
 
   '@napi-rs/canvas-android-arm64@0.1.80':
     optional: true
@@ -5881,9 +5927,11 @@ snapshots:
     dependencies:
       json-buffer: 3.0.1
 
-  langsmith@0.10.2:
+  langsmith@0.10.2(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2)):
     dependencies:
       p-queue: 6.6.2
+    optionalDependencies:
+      openai: 7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2)
 
   language-subtag-registry@0.3.23: {}
 
@@ -6153,6 +6201,12 @@ snapshots:
       es-object-atoms: 1.1.2
 
   obug@2.2.1: {}
+
+  openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(zod@4.6.2):
+    optionalDependencies:
+      '@aws-sdk/credential-provider-node': 3.972.83
+      '@smithy/signature-v4': 5.7.3
+      zod: 4.6.2
 
   option@0.2.4: {}
 

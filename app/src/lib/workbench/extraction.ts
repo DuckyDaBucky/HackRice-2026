@@ -19,7 +19,7 @@ export async function extractResume(buffer:Buffer, filename:string) {
     } else if (/\.docx$/i.test(filename) && buffer[0]===0x50 && buffer[1]===0x4b) {
       text=(await mammoth.extractRawText({buffer})).value;
     } else throw new WorkbenchError("FILE_TYPE", "Choose a valid PDF or DOCX file. Other formats are not supported.");
-    return {text:validateText(text),warnings:["Check extraction order and formatting before sending this text to Gemini."]};
+    return {text:validateText(text),warnings:["Check extraction order and formatting before sending this text to the AI reviewer."]};
   } catch(error) {
     if(error instanceof WorkbenchError) throw error;
     throw new WorkbenchError("EXTRACTION_FAILED", "Cannot read this document. It may be encrypted, damaged or unsupported. Paste its text instead.");

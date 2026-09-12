@@ -1,4 +1,5 @@
 import { parseGeneratedQuestion } from "@/lib/questions/parse-generated-question";
+import { completeJsonText, isLlmConfigured } from "@/lib/llm/provider";
 import type { InterviewMode } from "@/lib/questions/types";
 
 interface QuestionRequestBody {
@@ -49,8 +50,7 @@ Respond with strict JSON only:
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
+  if (!isLlmConfigured()) {
     return Response.json({ error: "Question generation is unavailable" }, { status: 503 });
   }
 
@@ -65,34 +65,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildQuestionPrompt(body) }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            thinkingConfig: { thinkingBudget: 128 },
-          },
-        }),
-      },
-    );
-    if (!response.ok) {
-      console.error("Gemini question request failed", response.status, await response.text());
-      return Response.json({ error: "Question generation failed" }, { status: 502 });
-    }
-
-    const data = await response.json();
-    const text: string | undefined = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const { text } = await completeJsonText(buildQuestionPrompt(body), { timeoutMs: 15_000 });
     const question = text ? parseGeneratedQuestion(text) : null;
     if (!question) {
       return Response.json({ error: "Question generation returned invalid output" }, { status: 502 });
     }
     return Response.json({ question });
   } catch (error) {
-    console.error("Gemini question request errored", error);
+    console.error("Question request errored", error);
     return Response.json({ error: "Question generation failed" }, { status: 502 });
   }
 }
