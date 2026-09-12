@@ -94,6 +94,11 @@ Control messages after start:
 {"type":"stop"}
 ```
 
+For a runnable webcam client, see the Python
+[`examples/camera_debug.py`](examples/camera_debug.py) example. It captures
+OpenCV BGR frames, prints live status/validation/metric events, and can save the
+complete event stream as JSONL for debugging.
+
 `includeRawProtobuf=false` can be added to the WebSocket URL to omit duplicate protobuf bytes from metric events. `includeVideoOutput=true` enables base64 processed-frame events.
 
 ## Output events
