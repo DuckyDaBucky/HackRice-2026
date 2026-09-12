@@ -8,6 +8,8 @@ export interface UseLiveCaptions {
   finalText: string;
   /** Timestamp of the last committed segment, or null before the first one. */
   lastFinalAt: number | null;
+  /** Timestamp of any detected speech, including a still-in-progress phrase. */
+  lastSpeechAt: number | null;
   /** Resets any prior transcript and begins listening for a new answer. */
   start: () => void;
   stop: () => void;
@@ -22,6 +24,7 @@ export function useLiveCaptions(): UseLiveCaptions {
   const [interimText, setInterimText] = useState("");
   const [finalText, setFinalText] = useState("");
   const [lastFinalAt, setLastFinalAt] = useState<number | null>(null);
+  const [lastSpeechAt, setLastSpeechAt] = useState<number | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   // Holds the latest beginListening so onend's restart can call it without
   // a "used before declared" self-reference (see beginListening below).
@@ -46,6 +49,10 @@ export function useLiveCaptions(): UseLiveCaptions {
     recognition.lang = "en-US";
 
     recognition.onresult = (event) => {
+      // A final segment can arrive while someone is continuing the same
+      // thought. Treat interim speech as activity too, so the interviewer
+      // never mistakes that commit for a completed answer.
+      setLastSpeechAt(Date.now());
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -87,6 +94,7 @@ export function useLiveCaptions(): UseLiveCaptions {
     setInterimText("");
     setFinalText("");
     setLastFinalAt(null);
+    setLastSpeechAt(null);
     beginListening();
   }, [isSupported, beginListening]);
 
@@ -96,5 +104,5 @@ export function useLiveCaptions(): UseLiveCaptions {
     recognition?.stop();
   }, []);
 
-  return { isSupported, interimText, finalText, lastFinalAt, start, stop };
+  return { isSupported, interimText, finalText, lastFinalAt, lastSpeechAt, start, stop };
 }

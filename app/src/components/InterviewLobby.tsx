@@ -4,7 +4,6 @@ import { VideoCameraIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { getVoiceLabel } from "@/lib/voice/presets";
 import { MOOD_OPTIONS, type InterviewMood } from "@/lib/interview-config";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
-import type { UseTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { InterviewMode } from "@/lib/questions/types";
 
 const MODE_LABEL: Record<InterviewMode, string> = {
@@ -17,16 +16,12 @@ export function InterviewLobby({
   recorder,
   voiceId,
   mood,
-  firstQuestionPrompt,
-  tts,
   resumeProgress,
 }: {
   mode: InterviewMode;
   recorder: UseCameraRecorder;
   voiceId: string;
   mood: InterviewMood;
-  firstQuestionPrompt: string;
-  tts: UseTextToSpeech;
   /** Present only when re-entering a session that already has uploaded answers. */
   resumeProgress?: { answered: number; total: number };
 }) {
@@ -35,11 +30,9 @@ export function InterviewLobby({
   const moodLabel = MOOD_OPTIONS.find((option) => option.id === mood)?.label ?? "Neutral";
 
   const handleJoin = async () => {
-    // Join click is the actual event that should trigger the first
-    // question's audio — await the real outcome instead of reading
-    // recorder.state afterward, which would be a stale closure.
-    const stream = await recorder.start();
-    if (stream) tts.speak(firstQuestionPrompt, voiceId, mood);
+    // The meeting view owns the first prompt after a successful camera join,
+    // which prevents duplicate speech and immediately begins the live turn.
+    await recorder.start();
   };
 
   return (
@@ -74,9 +67,7 @@ export function InterviewLobby({
         {isError && (
           <div className="flex items-start gap-2 rounded-xl bg-red-950/60 px-4 py-3 text-left text-sm text-red-300 ring-1 ring-inset ring-red-900">
             <WarningCircleIcon size={18} className="mt-0.5 shrink-0" />
-            <span>
-              {recorder.error?.message ?? "Could not access your camera or microphone."}
-            </span>
+            <span>{recorder.error?.message ?? "Could not access your camera or microphone."}</span>
           </div>
         )}
 

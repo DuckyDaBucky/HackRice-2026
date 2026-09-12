@@ -11,6 +11,8 @@ interface FollowUpRequestBody {
   customPrompt?: unknown;
 }
 
+const FALLBACK_FOLLOW_UP = "Could you expand on that with a little more detail?";
+
 function isValidBody(body: unknown): body is FollowUpRequestBody {
   if (typeof body !== "object" || body === null) return false;
   const b = body as Record<string, unknown>;
@@ -25,7 +27,7 @@ export async function POST(request: Request) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     console.error("GEMINI_API_KEY is not configured");
-    return Response.json({ followUp: null });
+    return Response.json({ followUp: FALLBACK_FOLLOW_UP });
   }
 
   let body: unknown;
@@ -70,7 +72,7 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       console.error("Gemini follow-up request failed", response.status, await response.text());
-      return Response.json({ followUp: null });
+      return Response.json({ followUp: FALLBACK_FOLLOW_UP });
     }
 
     const data = await response.json();
@@ -79,6 +81,6 @@ export async function POST(request: Request) {
     return Response.json({ followUp });
   } catch (error) {
     console.error("Gemini follow-up request errored", error);
-    return Response.json({ followUp: null });
+    return Response.json({ followUp: FALLBACK_FOLLOW_UP });
   }
 }

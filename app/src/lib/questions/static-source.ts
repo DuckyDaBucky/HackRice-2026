@@ -67,7 +67,7 @@ const QUESTIONS: Question[] = [
   },
 ];
 
-/** Placeholder question source until resume-driven / Gemini-generated packs exist. */
+/** Curated fallback questions when the live generator is unavailable. */
 export const staticQuestionSource: QuestionSource = {
   async getQuestions(mode: InterviewMode): Promise<Question[]> {
     return QUESTIONS.filter((q) => q.mode === mode);

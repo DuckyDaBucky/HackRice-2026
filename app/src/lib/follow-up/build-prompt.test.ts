@@ -31,6 +31,16 @@ describe("buildFollowUpPrompt", () => {
     expect(prompt.toLowerCase()).toContain("json");
   });
 
+  it("only permits moving on after a substantive answer", () => {
+    const prompt = buildFollowUpPrompt({
+      mode: "technical",
+      questionPrompt: "Walk me through a design decision.",
+      transcriptSoFar: "I used Postgres.",
+    });
+    expect(prompt).toContain("Return null ONLY when it has");
+    expect(prompt.toLowerCase()).toContain("specific detail");
+  });
+
   it("includes a mood-specific tone instruction", () => {
     const prompt = buildFollowUpPrompt({
       mode: "technical",

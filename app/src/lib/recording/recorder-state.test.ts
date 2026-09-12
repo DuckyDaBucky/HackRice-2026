@@ -20,6 +20,15 @@ describe("recorderReducer", () => {
     ).toBe("error");
   });
 
+  it("can retry camera permission after an error", () => {
+    expect(recorderReducer("error", { type: "REQUEST_PERMISSION" })).toBe(
+      "requesting-permission",
+    );
+    expect(
+      recorderReducer("requesting-permission", { type: "PERMISSION_GRANTED" }),
+    ).toBe("ready");
+  });
+
   it("moves from ready to recording on start", () => {
     expect(recorderReducer("ready", { type: "START" })).toBe("recording");
   });
