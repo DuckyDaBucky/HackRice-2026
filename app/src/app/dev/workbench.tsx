@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { corpusSchema, emptyResume, resumeSchema, type Corpus, type Project, type Resume } from "@/lib/workbench/schemas";
 import { populateTemplate, rankProjects } from "@/lib/workbench/ranking";
@@ -47,17 +48,26 @@ export default function Workbench() {
   function patchProject(id:string,patch:Partial<Project>){setProfile(p=>({...p,projects:p.projects.map(x=>x.id===id?{...x,...patch}:x)}));setReviewed(false);}
   function resetFilters(){setFamily("");setSpecialty("");setTechnology("");setSearch("");setCategory("");setPage(0);}
   const control=(label:string,value:string,onChange:(v:string)=>void,options:{id:string;label:string}[],placeholder:string)=><label className={styles.field}>{label}<select value={value} onChange={e=>{onChange(e.target.value);setPage(0);}}><option value="">{placeholder}</option>{options.map(o=><option key={o.id} value={o.id}>{o.label}</option>)}</select></label>;
+  const headings:Record<Tab,{title:string;description:string}>={
+    "Explore questions":{title:"A better place to start.",description:"Find the questions that fit your role. Look past the prompt and into what a good answer reveals."},
+    "Resume lab":{title:"Start with your experience.",description:"Bring your resume, review the evidence, and build a profile that tells your story accurately."},
+    "Project relevance":{title:"Find your strongest story.",description:"See how your projects connect to a role, with the evidence and missing details in view."},
+    "AI playground":{title:"Make practice personal.",description:"Turn your experience into an interview. Explore questions, submit answers, and decide what to remember."},
+    "Integration slots":{title:"The next parts of the picture.",description:"See what is connected, what is ready for a handoff, and what is still to come."},
+  };
   return <main className={styles.shell}>
-    <header className={styles.hero}><div><p className={styles.eyebrow}>GET ME HIRED / DEVELOPMENT</p><h1>Good questions.<br/><span>Better conversations.</span></h1><p className={styles.subtitle}>Explore the research, understand a resume, and find the right project to talk about.</p></div><div className={styles.stamp}><span className={styles.dot}/> Local research lab<p>Nothing here is a hiring score.</p><small>{corpus?`Dataset ${corpus.manifest.version}`:"Waiting for local dataset"}</small></div></header>
-    <div className={styles.stats}><div><strong>{corpus?.questions.length.toLocaleString()??"—"}</strong><span>original question probes</span></div><div><strong>{corpus?.roles.length??"—"}</strong><span>role families</span></div><div><strong>{corpus?.manifest.specialtyCount??"—"}</strong><span>specialties</span></div><div><strong>{corpus?.sources.length??"—"}</strong><span>reference sources</span></div></div>
-    <nav className={styles.tabs} aria-label="Workbench sections">{tabs.map(t=><button key={t} aria-current={tab===t?"page":undefined} onClick={()=>setTab(t)}>{t}</button>)}</nav>
+    <a className={styles.skip} href="#workbench-content">Skip to workspace</a>
+    <div className={styles.masthead}><Link href="/" className={styles.wordmark}>Get Me Hired<span className={styles.wordmarkAccent}>.</span></Link><span className={styles.workspaceLabel}>Development workspace</span><span className={styles.datasetStatus}>{corpus?"Research library loaded":"Loading research library"}</span></div>
+    <nav className={styles.tabs} aria-label="Workbench sections">{tabs.map((t,i)=><button key={t} aria-current={tab===t?"page":undefined} onClick={()=>setTab(t)}><span className={styles.tabNumber}>{String(i+1).padStart(2,"0")}</span>{t}</button>)}</nav>
+    <header className={styles.hero} id="workbench-content"><div><p className={styles.eyebrow}>{tab}</p><h1>{headings[tab].title}</h1><p className={styles.subtitle}>{headings[tab].description}</p></div><div className={styles.stamp}><span>Built around your experience</span><p>Practice with context.<br/>Review with evidence.</p><small>Private workspace · no hiring scores</small></div></header>
+    <div className={styles.stats}><div><strong>{corpus?.questions.length.toLocaleString()??"…"}</strong><span>question probes</span></div><div><strong>{corpus?.roles.length??"…"}</strong><span>role families</span></div><div><strong>{corpus?.manifest.specialtyCount??"…"}</strong><span>specialties</span></div><div><strong>{corpus?.sources.length??"…"}</strong><span>reference sources</span></div></div>
     {error&&<div role="alert" className={styles.error}>{error}<button onClick={()=>run("Reloading",async()=>{const [c,s]=await Promise.all([api("corpus"),api("status")]);setCorpus(corpusSchema.parse(c));setStatus(s);})}>Reload configuration</button></div>}
     <p className={styles.live} aria-live="polite">{busy||notice}</p>
     {(tab==="Explore questions"||tab==="Project relevance"||tab==="AI playground")&&<section className={styles.filters} aria-label="Role choices">
-      {control("01 · Role family",family,v=>{setFamily(v);setSpecialty("");setTechnology("");},corpus?.roles??[],"General / not sure")}
-      {control("02 · Specialty",specialty,setSpecialty,role?.specialties??[],"Any specialty")}
-      <p>Experience: {profile.experienceLevel} · assigned by AI from resume evidence</p>
-      {control("04 · Technology (optional)",technology,setTechnology,(role?.technologies??[]).map(t=>({id:t,label:t})),"No preference")}
+      {control("Role family",family,v=>{setFamily(v);setSpecialty("");setTechnology("");},corpus?.roles??[],"General / not sure")}
+      {control("Specialty",specialty,setSpecialty,role?.specialties??[],"Any specialty")}
+      <div className={styles.experience}><span>Experience</span><strong>{profile.experienceLevel==="unknown"?"Awaiting your profile":profile.experienceLevel}</strong><small>Assigned from resume evidence</small></div>
+      {control("Technology · optional",technology,setTechnology,(role?.technologies??[]).map(t=>({id:t,label:t})),"No preference")}
     </section>}
     {tab==="Explore questions"&&<>
       <div className={styles.searchbar}><label className={styles.field}>Search questions<input placeholder="Try debugging, migration, accessibility…" value={search} onChange={e=>{setSearch(e.target.value);setPage(0);}}/></label>{control("Interview category",category,setCategory,[{id:"behavioral",label:"Behavioral"},{id:"technical-behavioral",label:"Technical-behavioral"}],"Both categories")}<button onClick={resetFilters}>Reset filters</button></div>
