@@ -29,8 +29,11 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
 );
 
 function actionFor(session: SessionRecord): { label: string; href: string } {
-  if (session.status === "in_progress") {
-    return { label: "Resume", href: `/interview/${session.mode}?session=${session.id}` };
+  if (session.status === "in_progress" || session.status === "paused" || session.status === "planned") {
+    return {
+      label: session.status === "planned" ? "Start" : "Resume",
+      href: session.isDurable ? `/interview/session/${session.id}` : `/interview/${session.mode}?session=${session.id}`,
+    };
   }
   if (session.status === "abandoned") {
     return { label: "Try again", href: "/interview/setup" };
@@ -40,13 +43,17 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
 
 const STATUS_LABEL: Record<SessionRecord["status"], string> = {
   completed: "Completed",
-  in_progress: "Incomplete",
+  in_progress: "In progress",
+  paused: "Paused",
+  planned: "Ready to start",
   abandoned: "Abandoned",
 };
 
 const STATUS_STYLE: Record<SessionRecord["status"], string> = {
   completed: "bg-emerald-500/10 text-emerald-400",
   in_progress: "bg-amber-500/10 text-amber-400",
+  paused: "bg-amber-500/10 text-amber-400",
+  planned: "bg-sky-500/10 text-sky-400",
   abandoned: "bg-zinc-500/10 text-zinc-400",
 };
 
@@ -69,7 +76,7 @@ export function Dashboard({
           {firstName ? `Welcome back, ${firstName}` : "Welcome back"}
         </h1>
         <p className="text-base text-zinc-400">
-          Set up a practice session with the type, length, and interviewer you want.
+          Practice the interview you actually want, then return to the exact session when you are ready.
         </p>
       </div>
 
@@ -86,8 +93,7 @@ export function Dashboard({
               <div className="flex flex-col gap-1">
                 <span className="text-lg font-medium text-zinc-50">New practice session</span>
                 <p className="text-sm leading-relaxed text-zinc-400">
-                  Choose the interview type, number of questions, interviewer voice and mood, and
-                  an optional focus area.
+                  Choose interview tracks, time, role level, interviewer voice, tone, and a focus area.
                 </p>
               </div>
             </div>

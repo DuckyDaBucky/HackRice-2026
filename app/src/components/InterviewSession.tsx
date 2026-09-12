@@ -267,7 +267,6 @@ function ActiveInterview({
       mode={mode}
       voiceId={voiceId}
       mood={config.mood}
-      customPrompt={config.customPrompt}
       tts={tts}
       questionPrompt={currentQuestion.prompt}
       questionNumber={index + 1}
