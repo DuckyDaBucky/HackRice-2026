@@ -1,5 +1,17 @@
 # Integration plan and validation register
 
+## Integrations observed in code
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+| Integration | Source evidence | Actual scope |
+| --- | --- | --- |
+| Clerk | `@clerk/nextjs: ^7.9.2`; provider/header in layout; sign-in/sign-up pages; proxy; env placeholders | Authentication wiring present; valid credentials, successful login and authorization unverified |
+| PostgreSQL / TigerData | `pg: ^8.23.0`; pool in `src/lib/db.ts`; TigerData comment in `.env.example` | Connection utility only; no query callers, schema or migrations |
+| Next.js / React | Exact manifest versions 16.3.5 / 19.2.8 | Application scaffold |
+
+Backboard, Gemini, LangChain, ElevenLabs, Presage and Persona have no dependencies, adapters or environment variables in this source snapshot. Vultr has no infrastructure files. No transcription provider is configured. The original intended-provider register below is retained as a planning register, not an implementation inventory.
+
 The founder named Backboard, Vultr, Presage SmartSpectra SDK, LangChain, Gemini, ElevenLabs and possibly Persona. Provider names express intended choices, not proof that a feature is supported, licensed, configured or operational. No credentials are documented here.
 
 | Integration | Intended role | Status | Validate before implementation |

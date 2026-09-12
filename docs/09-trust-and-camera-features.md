@@ -1,5 +1,13 @@
 # Trust, recording and camera features
 
+## Implementation checkpoint
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+Clerk identity UI exists, but no explicit protected-route rules, application authorization, consent records, camera capture, private media storage or retention jobs have been added. No Presage signals or integrity flags are collected in the current application source. The requirements below describe work still to implement.
+
+The committed `.env.example` uses a placeholder database URL containing `sslmode=no-verify`. Record this as a configuration item to review against the chosen database service before deployment; it is not evidence that production certificate verification is configured. This documentation-only revision does not modify that configuration.
+
 These are proposed product requirements, not a jurisdiction-specific legal assessment or a claim of regulatory compliance.
 
 ## Recording and ownership

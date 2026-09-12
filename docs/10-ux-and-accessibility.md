@@ -1,5 +1,17 @@
 # UX and screen inventory
 
+## Current screen inventory
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+| Route | Current UI |
+| --- | --- |
+| `/` | “HackRice 2026” heading and sign-in/sign-up invitation |
+| `/sign-in/[[...sign-in]]` | Centered Clerk `SignIn` component |
+| `/sign-up/[[...sign-up]]` | Centered Clerk `SignUp` component |
+
+The shared header conditionally renders sign-in/sign-up buttons or a user button. Root metadata still uses HackRice 2026. Global CSS defines light/dark colors based on system preference and imports Tailwind. Geist fonts are loaded and exposed as variables, while the body currently specifies Arial/Helvetica/sans-serif. No workspace switch, camera controls, interview room or report UI exists. The remaining inventory is planned.
+
 ## Shared design principles
 
 Make the current workspace, interview format and recording state unambiguous. Use plain language: “Your answer is uploading” or “Transcript unavailable; retry processing” rather than provider errors. Never show fake processing completion while a provider is unavailable.

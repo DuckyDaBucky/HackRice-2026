@@ -1,5 +1,11 @@
 # AI workflows and context feedback
 
+## Implementation checkpoint
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+There is no model invocation, prompt template, context store, AI SDK integration, transcription workflow or streaming handler in the codebase. The workflows below are intended application contracts. Choose the Backboard/Gemini/LangChain responsibility boundary before adding adapters; neither Clerk identities nor a PostgreSQL pool alone supplies application memory.
+
 ## Question generation
 
 Inputs: corrected profile snapshot, actual resume evidence, target role, job description where supplied, selected interview categories, role/experience level, requested length and prior practice topics when authorized.

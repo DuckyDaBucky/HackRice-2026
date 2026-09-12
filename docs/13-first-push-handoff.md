@@ -1,5 +1,15 @@
 # First-push handoff and amendment guide
 
+## Reconciliation completed: source review
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+The connected GitHub app retrieved the current `main` snapshot, including the Next.js scaffold and existing documentation. Standard local `git fetch` still fails because HTTPS credentials are unavailable. This review therefore uses immutable GitHub source URLs rather than claiming the original local checkout is synchronized.
+
+No remote code files were edited. [Current codebase](14-current-codebase.md) and [development guide](15-development-guide.md) now document the actual application. Runtime verification and future changes should follow the existing `app/AGENTS.md`, which requires consulting the installed Next.js guides before code edits. No code edits or dependency installation were performed for this documentation revision.
+
+The “Starting state” section below is historical context for the initial September 12 baseline, not the current remote state.
+
 ## Starting state
 
 The documentation was authored in the existing local HackRice checkout at `Developer/Hackathons/HackRice 2026/HackRice-2026`. At authoring time the checkout had no implementation files or commits. A remote check required GitHub authentication, so the remote's latest contents could not be verified. The current chat working directory (`Documents/ChatGPT/Hire`) was not itself a Git repository.

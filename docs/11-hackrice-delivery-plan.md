@@ -1,5 +1,13 @@
 # HackRice delivery plan
 
+## Progress against the first push
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+Milestone 0 now has a source-level baseline: app structure, manifest, environment template, Clerk wiring and the database utility are documented in [current codebase](14-current-codebase.md). Local installation, successful login, database connectivity and deployment have not been verified, so milestone 0's runtime exit criterion is still open.
+
+Next concrete work: verify the scaffold with real local configuration, choose the schema/migration strategy, implement ownership checks, then start the recorded-practice vertical slice. A database pool is not yet session persistence, and sign-in UI is not yet workspace isolation. There is no test script or CI workflow in the inspected snapshot.
+
 This is a proposed build sequence, not a promise that all requested features fit the event. Team assignments and deadlines should be added after the first push and agreement on available time.
 
 ## Recommended demonstration slice

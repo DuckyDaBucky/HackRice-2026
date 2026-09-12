@@ -1,5 +1,15 @@
 # Proposed architecture
 
+## Implemented foundation
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+The current application is a single Next.js App Router project at `app/`, using Next.js 16.3.5, React/React DOM 19.2.8, TypeScript, Tailwind CSS 4 and pnpm 11.3.0. Clerk supplies the authentication components. `app/src/lib/db.ts` exports a `pg.Pool` using `DATABASE_URL`, with a global development cache. The environment example identifies TigerData (TimescaleDB) as the intended database service; no provisioning or live connection is demonstrated.
+
+No API route handlers, workers, schema/migrations, media store, AI adapters or real-time service exist. The component table below is the target architecture. Vultr remains the intended hosting provider from the product plan; the scaffold's generic Vercel README is not evidence of a deployment decision.
+
+See [code map](14-current-codebase.md) for source-level details and [development guide](15-development-guide.md) for commands and configuration.
+
 This is a provider-neutral design proposal. The first implementation push determines actual frameworks, deployment boundaries and libraries.
 
 ## Components

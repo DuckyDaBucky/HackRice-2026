@@ -1,5 +1,11 @@
 # Corporate experience
 
+## Implementation checkpoint
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+Clerk is wired into the shared layout and request proxy. There are no organization memberships, HR roles, requisitions, invitation handlers, candidate screening routes or interviewer panels in the application source. The proxy calls `clerkMiddleware()` with no explicit protection callback; no role or resource-ownership checks are present. Do not describe corporate isolation as implemented. These workflows remain requirements for future work.
+
 ## HR role setup
 
 **Confirmed:** HR uses the same underlying contextual question-generation technology through a dedicated corporate UI. It can send an automated screening interview or skip the automated screen and obtain questions for a human interviewer.

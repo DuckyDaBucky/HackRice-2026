@@ -1,5 +1,11 @@
 # Practice experience
 
+## Implementation checkpoint
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+Only home, sign-in and sign-up pages exist. Resume upload/parsing, target-role setup, camera/microphone capture, question generation, voice, live rooms and practice reports are not implemented in this snapshot. Future pages will live in the existing `app/src/app/` App Router structure. A signed-in user interface alone does not establish private ownership of sessions or media; that remains backend work.
+
 ## Setup and resume understanding
 
 **Confirmed flow:** upload resume → identify experience and individual projects → specify target role → generate appropriate questions → choose recorded or live practice → receive feedback.

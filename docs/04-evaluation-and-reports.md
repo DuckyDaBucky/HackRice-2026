@@ -1,5 +1,11 @@
 # Evaluation and reports
 
+## Implementation checkpoint
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+No transcript, rubric, evaluator, report schema, report page or score aggregation function exists. Every formula, coverage threshold and report contract below remains a proposal. The application has no evaluation-provider dependency or test fixtures yet.
+
 ## What is evaluated
 
 **Confirmed:** reports include answer rankings/scores, a composite and a breakdown appropriate to the interview and target role, grounded in transcription.

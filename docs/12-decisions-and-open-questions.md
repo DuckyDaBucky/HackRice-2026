@@ -1,5 +1,19 @@
 # Decisions and open questions
 
+## Source-backed decisions after the first push
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+| ID | Observed implementation choice | Evidence |
+| --- | --- | --- |
+| I-001 | App lives under `app/`, using `src/app` routing | Root README and source tree |
+| I-002 | Next.js 16.3.5; React/React DOM 19.2.8; pnpm 11.3.0 | `app/package.json` |
+| I-003 | Clerk for initial identity UI | Layout, sign-in/up pages, proxy and dependency |
+| I-004 | node-postgres connection pool; TigerData named in environment example | `src/lib/db.ts`, `.env.example` |
+| I-005 | TypeScript strict mode and `@/*` source alias | `tsconfig.json` |
+
+The first question below about application stack is now answered at source level. Still open: operational Node version, actual credential/database setup, migrations, explicit access controls, deployment target configuration and all interview integrations. The manifest's `@types/node: ^20` is a type dependency, not a Node runtime declaration.
+
 ## Confirmed product direction
 
 | ID | Decision | Source/status |

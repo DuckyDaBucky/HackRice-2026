@@ -2,11 +2,13 @@
 
 **HackRice 2026 · CS interview preparation and employer interviews**
 
-Initial planning baseline: September 12, 2026. Based on the founder's product description, before the first implementation push. These documents describe intended behavior, not features already shipped. No framework, API, deployment, integration, or vendor capability has been verified against implementation yet.
+Initial planning baseline: September 12, 2026. Updated after static inspection of main at `17f33a59747a1e251334b28e6019602593f35f83`. The repository now has a Next.js/Clerk/PostgreSQL scaffold. Interview features remain planned. Source presence is distinguished from runtime verification; no app build, provider call or deployment was tested in this documentation update.
 
 Get Me Hired is an exclusively video interview platform for behavioral and technical-behavioral interviews. Its structured practice experience is inspired by HackerRank, but coding exercises, coding contests, and a code execution judge are outside the current scope.
 
 ## Read this first
+
+Start with [current codebase](14-current-codebase.md) and [development guide](15-development-guide.md) for implementation facts; the product documents describe the target system.
 
 | Document | Purpose |
 | --- | --- |
@@ -23,6 +25,8 @@ Get Me Hired is an exclusively video interview platform for behavioral and techn
 | [HackRice delivery plan](11-hackrice-delivery-plan.md) | Recommended MVP, milestones, acceptance checks and demo |
 | [Decisions and open questions](12-decisions-and-open-questions.md) | Confirmed direction, proposals, dependencies and unresolved choices |
 | [First-push handoff](13-first-push-handoff.md) | How to reconcile this baseline with the first code push |
+| [Current codebase](14-current-codebase.md) | Verified stack, routes, authentication, database utility and implementation gaps |
+| [Development guide](15-development-guide.md) | Source-backed setup commands, configuration and verification steps |
 | [Change log](CHANGELOG.md) | Documentation changes and future implementation reconciliation |
 
 ## Status conventions

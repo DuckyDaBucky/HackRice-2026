@@ -1,5 +1,11 @@
 # Product brief
 
+## Implementation checkpoint
+
+Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+
+The repository now contains an application scaffold under `app/`. Its visible home page and metadata still say “HackRice 2026”; Get Me Hired remains the product name in this specification. Clerk authentication UI is present. No practice, corporate, interview, scoring or report screens exist yet. The product requirements below remain the intended destination, not shipped functionality. See [current codebase](14-current-codebase.md).
+
 ## Vision
 
 **Get Me Hired** helps CS candidates rehearse realistic video interviews and helps employers prepare, conduct, and review them. Both sides share question-generation and answer-evaluation components, but they have different workflows, permissions and reporting audiences.
