@@ -192,6 +192,7 @@ export const interviewSessionConfigs = pgTable(
     mood: text("mood", { enum: ["supportive", "neutral", "challenging"] as const })
       .notNull()
       .default("neutral"),
+    biometricsEnabled: boolean("biometrics_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -423,6 +424,73 @@ export const reportShareLinks = pgTable(
     check("report_share_links_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
   ],
 );
+
+/** Chess.com-style move review, applied to answers: a verdict per answered turn. */
+export const reportVerdicts = ["blunder", "mistake", "inaccuracy", "good", "best", "insufficient_evidence"] as const;
+
+export const reportFindings = pgTable(
+  "report_findings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => interviewSessions.id, { onDelete: "cascade" }),
+    generationId: uuid("generation_id")
+      .notNull()
+      .references(() => aiGenerations.id, { onDelete: "cascade" }),
+    turnId: uuid("turn_id")
+      .notNull()
+      .references(() => interviewTurns.id, { onDelete: "cascade" }),
+    verdict: text("verdict", { enum: reportVerdicts }).notNull(),
+    explanation: text("explanation").notNull(),
+    improvement: text("improvement"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("report_findings_session_idx").on(table.sessionId, table.createdAt),
+    index("report_findings_generation_idx").on(table.generationId),
+    unique("report_findings_generation_turn_key").on(table.generationId, table.turnId),
+  ],
+);
+
+export const biometricStatuses = [
+  "not_started",
+  "queued",
+  "processing",
+  "completed",
+  "retryable_failed",
+  "terminal_failed",
+] as const;
+
+export const biometricAnalyses = pgTable(
+  "biometric_analyses",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => interviewSessions.id, { onDelete: "cascade" }),
+    artifactId: uuid("artifact_id").references(() => mediaArtifacts.id, { onDelete: "set null" }),
+    provider: text("provider").notNull().default("presage_smartspectra"),
+    status: text("status", { enum: biometricStatuses }).notNull().default("not_started"),
+    analysisId: text("analysis_id"),
+    sdkVersion: text("sdk_version"),
+    metrics: jsonb("metrics").notNull().default({}),
+    errorCode: text("error_code"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("biometric_analyses_session_idx").on(table.sessionId, table.createdAt),
+    index("biometric_analyses_artifact_idx").on(table.artifactId),
+    unique("biometric_analyses_artifact_provider_key").on(table.artifactId, table.provider),
+  ],
+);
+
+export type ReportFinding = typeof reportFindings.$inferSelect;
+export type NewReportFinding = typeof reportFindings.$inferInsert;
+export type BiometricAnalysis = typeof biometricAnalyses.$inferSelect;
+export type NewBiometricAnalysis = typeof biometricAnalyses.$inferInsert;
 
 export type InterviewSession = typeof interviewSessions.$inferSelect;
 export type NewInterviewSession = typeof interviewSessions.$inferInsert;
