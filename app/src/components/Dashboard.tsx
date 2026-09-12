@@ -41,6 +41,12 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
   return { label: "Practice again", href: "/interview/setup" };
 }
 
+/** Only durable (v2) sessions have the turn/transcript history a report needs. */
+function reportHrefFor(session: SessionRecord): string | null {
+  if (session.status !== "completed" || !session.isDurable) return null;
+  return `/interview/session/${session.id}/report`;
+}
+
 const STATUS_LABEL: Record<SessionRecord["status"], string> = {
   completed: "Completed",
   in_progress: "In progress",
@@ -118,6 +124,7 @@ export function Dashboard({
                   const Icon = MODE_ICON[session.mode];
                   const answered = answeredCounts[session.id] ?? 0;
                   const action = actionFor(session);
+                  const reportHref = reportHrefFor(session);
                   return (
                     <li
                       key={session.id}
@@ -145,6 +152,14 @@ export function Dashboard({
                         >
                           {STATUS_LABEL[session.status]}
                         </span>
+                        {reportHref && (
+                          <Link
+                            href={reportHref}
+                            className="text-sm font-medium text-zinc-300 hover:text-zinc-100"
+                          >
+                            View report
+                          </Link>
+                        )}
                         <Link
                           href={action.href}
                           className="text-sm font-medium text-sky-400 hover:text-sky-300"

@@ -76,6 +76,7 @@ export interface StoredBiometricAnalysis {
   id: string;
   status: string;
   metrics: Record<string, unknown>;
+  errorCode: string | null;
   completedAt: string | null;
 }
 
@@ -87,9 +88,10 @@ export async function getBiometricAnalysesForSession(
     id: string;
     status: string;
     metrics: Record<string, unknown>;
+    error_code: string | null;
     completed_at: Date | null;
   }>(
-    `SELECT b.id, b.status, b.metrics, b.completed_at
+    `SELECT b.id, b.status, b.metrics, b.error_code, b.completed_at
      FROM biometric_analyses b
      JOIN interview_sessions s ON s.id = b.session_id
      WHERE b.session_id = $1 AND s.clerk_user_id = $2
@@ -100,6 +102,7 @@ export async function getBiometricAnalysesForSession(
     id: row.id,
     status: row.status,
     metrics: row.metrics,
+    errorCode: row.error_code,
     completedAt: row.completed_at?.toISOString() ?? null,
   }));
 }

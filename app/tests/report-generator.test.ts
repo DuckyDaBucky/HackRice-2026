@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createFallbackReport, reportInputHash } from "../src/lib/reports/generator";
-import { rawReportSchema, REPORT_COMPETENCIES } from "../src/lib/reports/contracts";
+import { rawReportSchema, REPORT_VERDICTS } from "../src/lib/reports/contracts";
 import type { ReportTranscriptTurn } from "../src/lib/reports/contracts";
 
 const turns: ReportTranscriptTurn[] = [
   {
-    turnId: "11111111-1111-1111-1111-111111111111",
-    planQuestionId: "22222222-2222-2222-2222-222222222222",
+    turnId: "11111111-1111-4111-8111-111111111111",
+    planQuestionId: "22222222-2222-4222-8222-222222222222",
     kind: "candidate_answer",
     position: 1,
     prompt: "Tell me about a time you owned an ambiguous problem.",
@@ -17,12 +17,18 @@ const turns: ReportTranscriptTurn[] = [
 ];
 
 describe("report fallback", () => {
-  it("never fabricates a score when the generator is unavailable", () => {
+  it("never fabricates a verdict when the generator is unavailable", () => {
     const fallback = createFallbackReport(turns);
     expect(fallback.source).toBe("fallback");
-    expect(fallback.findings).toHaveLength(REPORT_COMPETENCIES.length);
-    expect(fallback.findings.every((finding) => finding.kind === "insufficient_evidence")).toBe(true);
-    expect(fallback.findings.every((finding) => finding.evidenceTurnIds.length === 0)).toBe(true);
+    expect(fallback.findings).toHaveLength(1);
+    expect(fallback.findings[0].verdict).toBe("insufficient_evidence");
+    expect(fallback.findings[0].turnId).toBe(turns[0].turnId);
+    expect(fallback.overview.keyProblems.length).toBeGreaterThan(0);
+  });
+
+  it("produces no findings for a session with no answered turns", () => {
+    const fallback = createFallbackReport([]);
+    expect(fallback.findings).toHaveLength(0);
   });
 
   it("hashes transcript input deterministically", () => {
@@ -34,30 +40,42 @@ describe("report fallback", () => {
 describe("report finding schema", () => {
   it("accepts a well-formed model response", () => {
     const parsed = rawReportSchema.parse({
-      findings: REPORT_COMPETENCIES.map((competencyId) => ({
-        competencyId,
-        kind: "insufficient_evidence",
-        finding: "No relevant material in the transcript.",
-        improvement: null,
-        evidenceTurnIds: [],
-        confidence: "low",
-      })),
+      overview: { summary: "Overall solid.", keyProblems: ["Name the specific decision you made."] },
+      findings: [
+        {
+          turnId: turns[0].turnId,
+          verdict: "good",
+          explanation: "Names a concrete action and outcome.",
+          improvement: null,
+        },
+      ],
     });
-    expect(parsed.findings).toHaveLength(REPORT_COMPETENCIES.length);
+    expect(parsed.findings).toHaveLength(1);
+    expect(REPORT_VERDICTS).toContain(parsed.findings[0].verdict);
   });
 
-  it("rejects a finding with an unknown competency", () => {
+  it("rejects a finding with an unknown verdict", () => {
     expect(() =>
       rawReportSchema.parse({
+        overview: { summary: "x", keyProblems: ["y"] },
         findings: [
           {
-            competencyId: "not_a_real_competency",
-            kind: "gap",
-            finding: "x",
-            improvement: "y",
-            evidenceTurnIds: [],
-            confidence: "low",
+            turnId: turns[0].turnId,
+            verdict: "not_a_real_verdict",
+            explanation: "x",
+            improvement: null,
           },
+        ],
+      }),
+    ).toThrow();
+  });
+
+  it("requires at least one key problem in the overview", () => {
+    expect(() =>
+      rawReportSchema.parse({
+        overview: { summary: "x", keyProblems: [] },
+        findings: [
+          { turnId: turns[0].turnId, verdict: "good", explanation: "x", improvement: null },
         ],
       }),
     ).toThrow();

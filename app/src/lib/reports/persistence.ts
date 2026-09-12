@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import type { TranscriptSegment } from "@/lib/interviews/contracts";
-import type { ReportFindingInput, ReportTranscriptTurn } from "./contracts";
+import type { ReportFindingInput, ReportOverview, ReportTranscriptTurn } from "./contracts";
 
 /** True only for a session the caller owns and that has finished. */
 export async function isOwnedCompletedSession(sessionId: string, clerkUserId: string): Promise<boolean> {
@@ -24,7 +24,7 @@ export interface SessionTimelineContext {
     sequence: number;
     text: string | null;
   }>;
-  artifacts: Array<{ id: string; turnId: string | null; uploadStatus: string; r2Key: string }>;
+  artifacts: Array<{ id: string; turnId: string | null; uploadStatus: string; r2Key: string; durationMs: number | null }>;
   transcriptsByTurnId: Map<string, TranscriptSegment[]>;
 }
 
@@ -74,9 +74,11 @@ export async function getSessionTimelineContext(
     turn_id: string | null;
     upload_status: string;
     r2_key: string;
+    duration_ms: number | null;
   }>(
-    `SELECT id, turn_id, upload_status, r2_key FROM media_artifacts
-     WHERE session_id = $1 AND deleted_at IS NULL`,
+    `SELECT id, turn_id, upload_status, r2_key, duration_ms FROM media_artifacts
+     WHERE session_id = $1 AND deleted_at IS NULL
+     ORDER BY created_at ASC`,
     [sessionId],
   );
 
@@ -112,6 +114,7 @@ export async function getSessionTimelineContext(
       turnId: artifact.turn_id,
       uploadStatus: artifact.upload_status,
       r2Key: artifact.r2_key,
+      durationMs: artifact.duration_ms,
     })),
     transcriptsByTurnId,
   };
@@ -203,18 +206,16 @@ export async function completeReportGeneration(params: {
     for (const finding of params.findings) {
       await client.query(
         `INSERT INTO report_findings
-           (id, session_id, generation_id, competency_id, kind, finding, improvement, evidence_turn_ids, confidence)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+           (id, session_id, generation_id, turn_id, verdict, explanation, improvement)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [
           randomUUID(),
           params.sessionId,
           params.generationId,
-          finding.competencyId,
-          finding.kind,
-          finding.finding,
+          finding.turnId,
+          finding.verdict,
+          finding.explanation,
           finding.improvement,
-          finding.evidenceTurnIds,
-          finding.confidence,
         ],
       );
     }
@@ -252,12 +253,10 @@ export async function failReportGeneration(params: { sessionId: string; generati
 
 export interface StoredReportFinding {
   id: string;
-  competencyId: string;
-  kind: string;
-  finding: string;
+  turnId: string;
+  verdict: string;
+  explanation: string;
   improvement: string | null;
-  evidenceTurnIds: string[];
-  confidence: string;
 }
 
 export interface StoredReport {
@@ -265,6 +264,9 @@ export interface StoredReport {
   status: string;
   errorCode: string | null;
   generatedAt: string | null;
+  overview: ReportOverview | null;
+  usedFallback: boolean;
+  providerError: string | null;
   findings: StoredReportFinding[];
 }
 
@@ -275,8 +277,9 @@ export async function getLatestReport(sessionId: string, clerkUserId: string): P
     status: string;
     error_code: string | null;
     completed_at: Date | null;
+    result: { overview?: ReportOverview; source?: string; providerError?: string } | null;
   }>(
-    `SELECT g.id, g.status, g.error_code, g.completed_at
+    `SELECT g.id, g.status, g.error_code, g.completed_at, g.result
      FROM ai_generations g
      JOIN interview_sessions s ON s.id = g.session_id
      WHERE g.session_id = $1 AND s.clerk_user_id = $2 AND g.purpose = 'report' AND g.deleted_at IS NULL
@@ -289,14 +292,12 @@ export async function getLatestReport(sessionId: string, clerkUserId: string): P
 
   const findings = await db.query<{
     id: string;
-    competency_id: string;
-    kind: string;
-    finding: string;
+    turn_id: string;
+    verdict: string;
+    explanation: string;
     improvement: string | null;
-    evidence_turn_ids: string[];
-    confidence: string;
   }>(
-    `SELECT id, competency_id, kind, finding, improvement, evidence_turn_ids, confidence
+    `SELECT id, turn_id, verdict, explanation, improvement
      FROM report_findings
      WHERE generation_id = $1
      ORDER BY created_at ASC`,
@@ -308,14 +309,15 @@ export async function getLatestReport(sessionId: string, clerkUserId: string): P
     status: row.status,
     errorCode: row.error_code,
     generatedAt: row.completed_at?.toISOString() ?? null,
+    overview: row.result?.overview ?? null,
+    usedFallback: row.result?.source === "fallback",
+    providerError: row.result?.providerError ?? null,
     findings: findings.rows.map((finding) => ({
       id: finding.id,
-      competencyId: finding.competency_id,
-      kind: finding.kind,
-      finding: finding.finding,
+      turnId: finding.turn_id,
+      verdict: finding.verdict,
+      explanation: finding.explanation,
       improvement: finding.improvement,
-      evidenceTurnIds: finding.evidence_turn_ids,
-      confidence: finding.confidence,
     })),
   };
 }

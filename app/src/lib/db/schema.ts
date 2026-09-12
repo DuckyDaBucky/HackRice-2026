@@ -382,8 +382,8 @@ export const reportShareLinks = pgTable(
   ],
 );
 
-export const reportFindingKinds = ["strength", "gap", "insufficient_evidence"] as const;
-export const reportFindingConfidence = ["low", "medium", "high"] as const;
+/** Chess.com-style move review, applied to answers: a verdict per answered turn. */
+export const reportVerdicts = ["blunder", "mistake", "inaccuracy", "good", "best", "insufficient_evidence"] as const;
 
 export const reportFindings = pgTable(
   "report_findings",
@@ -395,27 +395,18 @@ export const reportFindings = pgTable(
     generationId: uuid("generation_id")
       .notNull()
       .references(() => aiGenerations.id, { onDelete: "cascade" }),
-    competencyId: text("competency_id").notNull(),
-    kind: text("kind", { enum: reportFindingKinds }).notNull(),
-    finding: text("finding").notNull(),
+    turnId: uuid("turn_id")
+      .notNull()
+      .references(() => interviewTurns.id, { onDelete: "cascade" }),
+    verdict: text("verdict", { enum: reportVerdicts }).notNull(),
+    explanation: text("explanation").notNull(),
     improvement: text("improvement"),
-    evidenceTurnIds: uuid("evidence_turn_ids").array().notNull().default([]),
-    evidenceStartMs: integer("evidence_start_ms"),
-    evidenceEndMs: integer("evidence_end_ms"),
-    confidence: text("confidence", { enum: reportFindingConfidence }).notNull().default("low"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("report_findings_session_idx").on(table.sessionId, table.createdAt),
     index("report_findings_generation_idx").on(table.generationId),
-    check(
-      "report_findings_evidence_start_check",
-      sql`${table.evidenceStartMs} is null or ${table.evidenceStartMs} >= 0`,
-    ),
-    check(
-      "report_findings_evidence_end_check",
-      sql`${table.evidenceEndMs} is null or ${table.evidenceEndMs} >= 0`,
-    ),
+    unique("report_findings_generation_turn_key").on(table.generationId, table.turnId),
   ],
 );
 

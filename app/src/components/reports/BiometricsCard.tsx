@@ -21,6 +21,7 @@ export function BiometricsCard({
   const completed = analyses.filter((analysis) => analysis.status === "completed");
   const pending = analyses.some((analysis) => analysis.status === "queued" || analysis.status === "processing");
   const failed = analyses.some((analysis) => analysis.status === "retryable_failed" || analysis.status === "terminal_failed");
+  const lastError = analyses.find((analysis) => analysis.errorCode)?.errorCode;
 
   return (
     <section className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4">
@@ -48,6 +49,11 @@ export function BiometricsCard({
         )}
       </div>
       {pending && <p className="text-sm text-zinc-500">Analyzing your recorded clips…</p>}
+      {failed && !pending && lastError && (
+        <p className="text-sm text-zinc-500">
+          Last attempt failed: {lastError === "fetch failed" ? "presage-api isn't reachable from the app." : lastError}
+        </p>
+      )}
       {completed.length > 0 && (
         <ul className="flex flex-col gap-2">
           {completed.map((analysis) => (

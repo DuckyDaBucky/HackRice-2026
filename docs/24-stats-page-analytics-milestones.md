@@ -79,6 +79,21 @@ insufficient-evidence) grounded in its transcripts, stored durably and queryable
 - `pnpm lint`, `pnpm exec tsc --noEmit`, `pnpm test --run` (121 tests, 12 new) and `pnpm build`
   all pass.
 
+### S1 redesign — chess.com-style move review, Sep 12, 2026
+
+Replaced the competency-grouped strength/gap/insufficient-evidence shape with a per-answer
+verdict, closer to how chess.com reviews a finished game: `blunder`/`mistake`/`inaccuracy`/
+`good`/`best`/`insufficient_evidence` per answered turn, each with an explanation of why and an
+optional improvement, plus one session-level `overview` (`summary` + ranked `keyProblems`).
+`report_findings` now has a direct `turn_id` foreign key (migration
+`0009_chess_style_report_findings.sql`, applied to the dev database) instead of a
+competency/evidence-array shape. `ai_generations.result` carries the `overview` object; there was
+no production data depending on the old shape yet, so the migration replaces the table rather than
+altering it. Live-verified against the actual dev database (Tiger Cloud service `t75o4scmb8`) and
+a running `next dev` instance, not just build/lint/test — env misconfiguration (`.env.local` at
+the wrong path, plus a typo'd `DATABASE_URL` host) and the missing 0007-0009 migrations were also
+found and fixed live in this pass.
+
 ---
 
 ## S2 — Derived process-mistake & transcript-marker analytics
