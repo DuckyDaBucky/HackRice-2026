@@ -4,7 +4,6 @@ const LINKS = [
   { href: "#individuals", label: "For Individuals" },
   { href: "#employers", label: "For Employers" },
   { href: "#how-it-works", label: "How it works" },
-  { href: "#waitlist", label: "Pricing" },
 ];
 
 export function Footer() {

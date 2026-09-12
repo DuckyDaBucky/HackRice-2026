@@ -11,6 +11,7 @@ import {
   TargetIcon,
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/marketing/Logo";
+import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
 import { clerkEnabled } from "@/lib/clerk";
 
 const NAV_ITEMS = [
@@ -33,8 +34,8 @@ export function DashboardShell({
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen bg-[#fafbfc]">
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-[#ebedf1] bg-white py-5 lg:flex">
+    <div className="flex min-h-screen bg-dash-bg">
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-dash-border bg-dash-sidebar py-5 lg:flex">
         <Link href="/" className="px-5">
           <Logo size="sm" onLight />
         </Link>
@@ -49,8 +50,8 @@ export function DashboardShell({
                 href={item.href}
                 className={`flex items-center gap-2.5 rounded-r-md border-l-2 py-1.5 pl-3 pr-3 text-[13.5px] font-medium transition-colors duration-150 ${
                   isActive
-                    ? "border-accent bg-[#eef8f6] text-[#0b1120]"
-                    : "border-transparent text-[#6b7280] hover:bg-[#f4f5f7] hover:text-[#0b1120]"
+                    ? "border-accent bg-dash-nav-active text-dash-text"
+                    : "border-transparent text-dash-text-muted hover:bg-dash-nav-hover hover:text-dash-text"
                 }`}
               >
                 <Icon size={17} weight="regular" className={isActive ? "text-accent-deep" : ""} />
@@ -60,22 +61,23 @@ export function DashboardShell({
           })}
         </nav>
 
-        <div className="flex items-center gap-2.5 border-t border-[#ebedf1] px-5 pt-4">
+        <div className="flex items-center gap-2.5 border-t border-dash-border px-5 pt-4">
           {clerkEnabled ? (
             <UserButton appearance={{ elements: { userButtonAvatarBox: "h-7 w-7" } }} />
           ) : (
-            <span className="h-7 w-7 shrink-0 rounded-full bg-[#eef1f6]" />
+            <span className="h-7 w-7 shrink-0 rounded-full bg-dash-border" />
           )}
-          <div className="flex min-w-0 flex-col">
-            <span className="truncate text-[13px] font-medium text-[#0b1120]">
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[13px] font-medium text-dash-text">
               {firstName ?? "Your account"}
             </span>
-            <span className="text-[11px] text-[#93a1b5]">Candidate</span>
+            <span className="text-[11px] text-dash-text-faint">Candidate</span>
           </div>
+          <ThemeToggle />
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-6 py-9 sm:px-9 lg:px-12">{children}</main>
+      <main className="min-w-0 flex-1 bg-dash-bg px-6 py-9 sm:px-9 lg:px-12">{children}</main>
     </div>
   );
 }

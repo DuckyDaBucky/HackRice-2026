@@ -10,7 +10,6 @@ import { SkillBars } from "@/components/dashboard/SkillBars";
 import { JoinInterview } from "@/components/dashboard/JoinInterview";
 import { WaveformAccent } from "@/components/dashboard/WaveformAccent";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-import { SAMPLE_EMPLOYER_INVITES } from "@/lib/dashboard/employer-invites";
 import {
   focusCopy,
   overallScore,
@@ -70,11 +69,11 @@ const STATUS_LABEL: Record<SessionRecord["status"], string> = {
 };
 
 const STATUS_STYLE: Record<SessionRecord["status"], string> = {
-  completed: "text-[#0f9d78]",
+  completed: "text-dash-success",
   in_progress: "text-amber-600",
   paused: "text-amber-600",
-  planned: "text-accent-deep",
-  abandoned: "text-[#93a1b5]",
+  planned: "text-dash-blue",
+  abandoned: "text-dash-text-faint",
 };
 
 function greeting(): string {
@@ -110,25 +109,29 @@ export function Dashboard({
     <DashboardShell active="Home" firstName={firstName}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-[#0b1120]">
+          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">
             {firstName ? `${greeting()}, ${firstName}.` : `${greeting()}.`}
           </h1>
-          <p className="mt-1 text-sm text-[#6b7280]">Practice today. Perform tomorrow.</p>
+          <p className="mt-1 text-sm text-dash-text-muted">Practice today. Perform tomorrow.</p>
         </div>
 
-        <section className="relative overflow-hidden rounded-xl border border-[#d7eee8] bg-[#f0fbf8] px-6 py-7 sm:px-8">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <section className="relative overflow-hidden rounded-xl border border-dash-border bg-dash-surface px-6 py-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-8">
+          <div
+            className="pointer-events-none absolute inset-0 [background:radial-gradient(120%_100%_at_100%_0%,color-mix(in_srgb,var(--color-accent)_10%,transparent),transparent_60%)]"
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="max-w-md">
-              <h2 className="text-xl font-semibold tracking-tight text-[#0b1120]">
+              <h2 className="text-xl font-semibold tracking-tight text-dash-text">
                 Ready for your next interview?
               </h2>
-              <p className="mt-1.5 text-sm text-[#475467]">
+              <p className="mt-1.5 text-sm text-dash-text-muted">
                 Practice with questions personalized to your resume and target role.
               </p>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link
                   href="/interview/setup"
-                  className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-semibold text-[#03231e] transition-colors duration-150 hover:bg-accent-hover active:scale-[0.98]"
+                  className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-semibold text-dash-on-accent transition-colors duration-150 hover:bg-accent-hover active:scale-[0.98]"
                 >
                   Start practice interview
                 </Link>
@@ -138,37 +141,6 @@ export function Dashboard({
             <WaveformAccent className="hidden shrink-0 sm:flex" />
           </div>
         </section>
-
-        {SAMPLE_EMPLOYER_INVITES.length > 0 && (
-          <section>
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
-              Employer interviews
-            </h2>
-            <div className="mt-3 divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
-              {SAMPLE_EMPLOYER_INVITES.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center justify-between gap-4 px-4 py-3.5"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-[#0b1120]">
-                      {invite.role} · {invite.company}
-                    </div>
-                    <div className="mt-0.5 text-xs text-[#93a1b5]">
-                      {invite.stage} · Due {invite.dueDate} · ~{invite.durationMinutes} minutes
-                    </div>
-                  </div>
-                  <Link
-                    href="/interview/setup"
-                    className="inline-flex h-8 shrink-0 items-center rounded-md border border-[#e3e7ee] px-3 text-sm font-medium text-[#0b1120] transition-colors duration-150 hover:bg-[#f4f5f7]"
-                  >
-                    Start interview
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {!hasCompleted ? (
           <EmptyState
@@ -181,16 +153,16 @@ export function Dashboard({
         ) : (
           <>
             {currentScores && overall !== null && (
-              <section className="rounded-xl border border-[#eef1f6] bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+              <section className="rounded-xl border border-dash-border bg-dash-surface p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
                   Performance
                 </h2>
                 <div className="mt-4 grid grid-cols-1 gap-8 sm:grid-cols-[160px_1fr]">
                   <div>
-                    <div className="text-4xl font-bold tabular-nums text-[#0b1120]">{overall}</div>
-                    <div className="mt-1 text-xs text-[#6b7280]">Interview readiness</div>
+                    <div className="text-4xl font-bold tabular-nums text-dash-text">{overall}</div>
+                    <div className="mt-1 text-xs text-dash-text-muted">Interview readiness</div>
                     {delta !== null && (
-                      <div className={`mt-1.5 text-xs font-medium ${delta >= 0 ? "text-accent-deep" : "text-[#93a1b5]"}`}>
+                      <div className={`mt-1.5 text-xs font-medium ${delta >= 0 ? "text-accent-deep" : "text-dash-text-faint"}`}>
                         {delta >= 0 ? "↑" : "↓"} {Math.abs(delta)}% vs. your previous interview
                       </div>
                     )}
@@ -202,7 +174,7 @@ export function Dashboard({
 
             <section>
               <div className="flex items-center justify-between">
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
                   Recent interviews
                 </h2>
                 <Link
@@ -214,7 +186,7 @@ export function Dashboard({
                 </Link>
               </div>
 
-              <ul className="mt-3 divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
+              <ul className="mt-3 divide-y divide-dash-border rounded-xl border border-dash-border bg-dash-surface">
                 {sessions.slice(0, 4).map((session) => {
                   const Icon = MODE_ICON[session.mode];
                   const action = actionFor(session);
@@ -226,15 +198,15 @@ export function Dashboard({
                   return (
                     <li
                       key={session.id}
-                      className="flex flex-col gap-2 px-4 py-3.5 transition-colors duration-150 hover:bg-[#f9fafb] sm:flex-row sm:items-center sm:gap-4"
+                      className="flex flex-col gap-2 px-4 py-3.5 transition-colors duration-150 hover:bg-dash-surface-hover sm:flex-row sm:items-center sm:gap-4"
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-3">
-                        <Icon size={16} weight="light" className="shrink-0 text-[#93a1b5]" />
+                        <Icon size={16} weight="light" className="shrink-0 text-dash-text-faint" />
                         <div className="min-w-0">
-                          <span className="truncate text-sm font-medium text-[#0b1120]">
+                          <span className="truncate text-sm font-medium text-dash-text">
                             {MODE_LABEL[session.mode]} practice · {MOOD_LABEL[session.mood] ?? "Neutral"}
                           </span>
-                          <div className="mt-0.5 truncate text-xs text-[#93a1b5]">
+                          <div className="mt-0.5 truncate text-xs text-dash-text-faint">
                             {shortDate(session.createdAt)}
                             {duration ? ` · ${duration} min` : ""} · {answered} of {session.questionCount}{" "}
                             answered
@@ -246,7 +218,7 @@ export function Dashboard({
                           {STATUS_LABEL[session.status]}
                         </span>
                         {score !== null && (
-                          <span className="text-sm font-semibold tabular-nums text-[#0b1120]">
+                          <span className="text-sm font-semibold tabular-nums text-dash-text">
                             {score}
                           </span>
                         )}
@@ -264,12 +236,12 @@ export function Dashboard({
             </section>
 
             {focus && (
-              <section className="rounded-xl border border-[#eef1f6] bg-[#f6f7f9] px-5 py-4">
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+              <section className="rounded-xl border border-dash-border bg-dash-surface-muted px-5 py-4">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
                   Next focus
                 </h2>
-                <p className="mt-2 text-sm font-medium text-[#0b1120]">{focus}</p>
-                <p className="mt-1 text-sm leading-relaxed text-[#475467]">{focusCopy(focus)}</p>
+                <p className="mt-2 text-sm font-medium text-dash-text">{focus}</p>
+                <p className="mt-1 text-sm leading-relaxed text-dash-text-muted">{focusCopy(focus)}</p>
                 <Link
                   href="/interview/setup"
                   className="mt-2.5 inline-flex items-center gap-1 text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
@@ -282,10 +254,10 @@ export function Dashboard({
           </>
         )}
 
-        <section className="flex items-center justify-between border-t border-[#eef1f6] pt-5">
+        <section className="flex items-center justify-between border-t border-dash-border pt-5">
           <div>
-            <div className="text-sm font-medium text-[#0b1120]">Resume</div>
-            <div className="mt-0.5 text-xs text-[#93a1b5]">
+            <div className="text-sm font-medium text-dash-text">Resume</div>
+            <div className="mt-0.5 text-xs text-dash-text-faint">
               {hasResume ? "On file — personalizing your questions." : "Not added yet."}
             </div>
           </div>

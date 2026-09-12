@@ -10,14 +10,14 @@ export function SkillBars({ scores, className = "" }: { scores: SkillScores; cla
     <div className={`flex flex-col gap-3 ${className}`}>
       {Object.entries(scores).map(([label, value]) => (
         <div key={label} className="flex items-center gap-3">
-          <span className="w-28 shrink-0 text-sm text-[#5b6474]">{label}</span>
-          <div className="h-1.5 flex-1 rounded-full bg-[#eef1f6]">
+          <span className="w-28 shrink-0 text-sm text-dash-text-muted">{label}</span>
+          <div className="h-1.5 flex-1 rounded-full bg-dash-border">
             <div
               className="h-1.5 rounded-full bg-accent transition-[width] duration-500 ease-out"
               style={{ width: `${value}%` }}
             />
           </div>
-          <span className="w-7 shrink-0 text-right text-sm font-medium tabular-nums text-[#0b1120]">
+          <span className="w-7 shrink-0 text-right text-sm font-medium tabular-nums text-dash-text">
             {value}
           </span>
         </div>

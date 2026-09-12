@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const INDIVIDUAL_POINTS = [
   "Questions built from your actual resume and projects",
   "Recorded or live practice, your choice",
@@ -43,13 +45,13 @@ export function TwoAudienceCards() {
                 </li>
               ))}
             </ul>
-            <a
-              href="#waitlist"
+            <Link
+              href="/sign-up"
               className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-[#0b1120] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
-              Join the waitlist
+              Sign up
               <ArrowIcon />
-            </a>
+            </Link>
           </div>
 
           <div
@@ -77,13 +79,13 @@ export function TwoAudienceCards() {
                 </li>
               ))}
             </ul>
-            <a
-              href="#waitlist"
+            <Link
+              href="/sign-up"
               className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-[#0b1120] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
-              Get early access
+              Sign up
               <ArrowIcon />
-            </a>
+            </Link>
           </div>
         </div>
       </div>

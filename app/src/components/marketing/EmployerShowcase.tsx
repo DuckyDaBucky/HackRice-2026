@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 const FEATURES = [
   {
     title: "Objective, evidence-linked scoring",
@@ -106,13 +108,13 @@ export function EmployerShowcase() {
               ))}
             </ul>
 
-            <a
-              href="#waitlist"
+            <Link
+              href="/sign-up"
               className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-[#0b1120] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
-              Get early access
+              Sign up
               <ArrowIcon />
-            </a>
+            </Link>
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-[#e5e7eb] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.06)]">
