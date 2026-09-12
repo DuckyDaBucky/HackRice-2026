@@ -13,7 +13,8 @@ export function SiteHeader() {
   const pathname = usePathname();
   if (
     !clerkEnabled ||
-    pathname.startsWith("/interview") ||
+    pathname === "/interview" ||
+    pathname.startsWith("/interview/") ||
     OWN_HEADER_ROUTES.includes(pathname)
   )
     return null;

@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 export function AppProviders({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/interview")) {
+  if (pathname === "/interview" || pathname.startsWith("/interview/")) {
     return children;
   }
 
