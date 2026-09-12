@@ -1,6 +1,6 @@
 "use client";
 
-import { ClerkProvider } from "@clerk/nextjs";
+import { AuthProvider } from "./auth-provider";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -16,5 +16,5 @@ export function AppProviders({ children }: { children: ReactNode }) {
     return children;
   }
 
-  return <ClerkProvider>{children}</ClerkProvider>;
+  return <AuthProvider>{children}</AuthProvider>;
 }

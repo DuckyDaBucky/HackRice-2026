@@ -1,10 +1,11 @@
+import { clerkEnabled } from "@/lib/clerk";
 import { currentUser } from "@clerk/nextjs/server";
 import { Dashboard } from "@/components/Dashboard";
 import { getSessionStats, listRecentSessions } from "@/lib/sessions";
 import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
 
 export default async function Home() {
-  const user = await currentUser();
+  const user = clerkEnabled ? await currentUser() : null;
 
   if (!user) {
     return (

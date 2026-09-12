@@ -53,7 +53,7 @@ export default function InterviewSetupPage() {
           Set up your practice interview
         </h1>
         <p className="text-base text-zinc-400">
-          Choose what you want to practice, then join when you're ready.
+          Choose what you want to practice, then join when you&apos;re ready.
         </p>
       </div>
 
@@ -130,7 +130,7 @@ export default function InterviewSetupPage() {
           ))}
         </div>
         <p className="text-xs text-zinc-500">
-          Shapes the interviewer's voice delivery and live follow-up questions.
+          Shapes the interviewer&apos;s voice delivery and live follow-up questions.
         </p>
       </div>
 

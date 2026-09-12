@@ -1,6 +1,15 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { clerkEnabled } from "@/lib/clerk";
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
-export default clerkMiddleware();
+export default clerkEnabled ? clerkMiddleware() : (request: NextRequest) => {
+  const path = request.nextUrl.pathname;
+  if (process.env.NODE_ENV !== "development" && (path === "/dev" || path.startsWith("/dev/") || path.startsWith("/api/dev/"))) return new NextResponse(null, { status: 404 });
+  if (path === "/dev" || path.startsWith("/dev/") || path.startsWith("/api/") || path.startsWith("/trpc")) {
+    return NextResponse.json({ error: { message: "Configure Clerk to access authenticated features." } }, { status: 503 });
+  }
+  return NextResponse.next();
+};
 
 export const config = {
   matcher: [

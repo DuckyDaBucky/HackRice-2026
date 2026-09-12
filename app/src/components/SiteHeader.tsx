@@ -1,12 +1,13 @@
 "use client";
 
+import { clerkEnabled } from "@/lib/clerk";
 import { usePathname } from "next/navigation";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
 /** Hidden on /interview routes: the call UI is full-bleed and owns its own header. */
 export function SiteHeader() {
   const pathname = usePathname();
-  if (pathname.startsWith("/interview")) return null;
+  if (!clerkEnabled || pathname.startsWith("/interview")) return null;
 
   return (
     <header className="flex items-center justify-between gap-4 px-6 py-4">
