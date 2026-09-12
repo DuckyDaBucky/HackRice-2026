@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import type { InterviewMood } from "@/lib/interview-config";
 
 export interface UseTextToSpeech {
   isSpeaking: boolean;
-  speak: (text: string, voiceId?: string) => Promise<void>;
+  speak: (text: string, voiceId?: string, mood?: InterviewMood) => Promise<void>;
   stop: () => void;
 }
 
@@ -32,14 +33,14 @@ export function useTextToSpeech(): UseTextToSpeech {
   }, []);
 
   const speak = useCallback(
-    async (text: string, voiceId?: string) => {
+    async (text: string, voiceId?: string, mood?: InterviewMood) => {
       stop();
       const requestId = requestIdRef.current;
       try {
         const response = await fetch("/api/interview/speak", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, voiceId }),
+          body: JSON.stringify({ text, voiceId, mood }),
         });
         if (requestId !== requestIdRef.current) return;
         if (!response.ok) return;
