@@ -41,7 +41,7 @@ export function Logo({
       {showWordmark && (
         <span
           className={`font-sans font-bold tracking-tight ${cfg.wordmark} ${
-            onLight ? "text-[#0b1120]" : "text-foreground"
+            onLight ? "text-dash-text" : "text-foreground"
           }`}
         >
           GetMeHired

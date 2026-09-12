@@ -105,15 +105,14 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
         <CheckCircleIcon size={40} weight="fill" className="text-sky-400" />
         <h1 className="text-2xl font-semibold tracking-tight">Interview complete</h1>
         <p className="max-w-md text-sm leading-relaxed text-zinc-400">
-          Your recordings and saved transcript are processing for the report. You can return to
-          the dashboard while that finishes.
+          Your recording and saved caption evidence are ready for review.
         </p>
         <button
           type="button"
-          onClick={() => router.push("/")}
+          onClick={() => router.push(`/reports/${initialState.session.id}`)}
           className="rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]"
         >
-          Return home
+          Review report
         </button>
       </div>
     );

@@ -2,14 +2,24 @@ import Link from "next/link";
 import {
   ArrowRightIcon,
   ChatCircleDotsIcon,
-  CheckCircleIcon,
   ClockCounterClockwiseIcon,
   CodeIcon,
-  FireIcon,
-  ListChecksIcon,
-  PlusIcon,
 } from "@phosphor-icons/react/ssr";
-import { formatRelativeTime } from "@/lib/format-relative-time";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { SkillBars } from "@/components/dashboard/SkillBars";
+import { JoinInterview } from "@/components/dashboard/JoinInterview";
+import { WaveformAccent } from "@/components/dashboard/WaveformAccent";
+import { EmptyState } from "@/components/dashboard/EmptyState";
+import {
+  focusCopy,
+  overallScore,
+  readinessDelta,
+  sessionDurationMinutes,
+  sessionScore,
+  shortDate,
+  skillBreakdown,
+  weakestCategory,
+} from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord, SessionStats } from "@/lib/sessions";
 import type { InterviewMode } from "@/lib/questions/types";
@@ -28,15 +38,24 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
   MOOD_OPTIONS.map((option) => [option.id, option.label]),
 );
 
+/** Mirrors the durable-session/report lifecycle from src/components/Dashboard.tsx on main. */
 function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "in_progress" || session.status === "paused" || session.status === "planned") {
     return {
       label: session.status === "planned" ? "Start" : "Resume",
-      href: session.isDurable ? `/interview/session/${session.id}` : `/interview/${session.mode}?session=${session.id}`,
+      href: session.isDurable
+        ? `/interview/session/${session.id}`
+        : `/interview/${session.mode}?session=${session.id}`,
     };
   }
   if (session.status === "abandoned") {
     return { label: "Try again", href: "/interview/setup" };
+  }
+  if (session.isDurable && session.reportStatus === "completed") {
+    return { label: "Review report", href: `/reports/${session.id}` };
+  }
+  if (session.isDurable && session.reportStatus === "processing") {
+    return { label: "Report preparing", href: `/reports/${session.id}` };
   }
   return { label: "Practice again", href: "/interview/setup" };
 }
@@ -56,113 +75,170 @@ const STATUS_LABEL: Record<SessionRecord["status"], string> = {
 };
 
 const STATUS_STYLE: Record<SessionRecord["status"], string> = {
-  completed: "bg-emerald-500/10 text-emerald-400",
-  in_progress: "bg-amber-500/10 text-amber-400",
-  paused: "bg-amber-500/10 text-amber-400",
-  planned: "bg-sky-500/10 text-sky-400",
-  abandoned: "bg-zinc-500/10 text-zinc-400",
+  completed: "text-dash-success",
+  in_progress: "text-amber-600",
+  paused: "text-amber-600",
+  planned: "text-dash-blue",
+  abandoned: "text-dash-text-faint",
 };
+
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
 
 export function Dashboard({
   firstName,
   stats,
   sessions,
   answeredCounts,
+  hasResume,
 }: {
   firstName: string | null;
   stats: SessionStats;
   sessions: SessionRecord[];
   answeredCounts: Record<string, number>;
+  hasResume: boolean;
 }) {
-  return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-10 px-6 py-12 sm:px-10 lg:py-16">
-      <div className="flex flex-col gap-2">
-        <span className="text-xs font-medium tracking-wide text-sky-400 uppercase">Dashboard</span>
-        <h1 className="text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
-          {firstName ? `Welcome back, ${firstName}` : "Welcome back"}
-        </h1>
-        <p className="text-base text-zinc-400">
-          Practice the interview you actually want, then return to the exact session when you are ready.
-        </p>
-      </div>
+  const hasCompleted = stats.completedSessions > 0;
+  const completed = sessions.filter((s) => s.status === "completed");
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_300px]">
-        <div className="flex flex-col gap-10">
-          <Link
-            href="/interview/setup"
-            className="group flex items-center justify-between gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-8 transition hover:-translate-y-0.5 hover:border-sky-800 hover:bg-zinc-900 active:scale-[0.98]"
-          >
-            <div className="flex items-center gap-5">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-sky-500/10 text-sky-400 transition group-hover:bg-sky-500/20">
-                <PlusIcon size={26} weight="light" />
-              </span>
-              <div className="flex flex-col gap-1">
-                <span className="text-lg font-medium text-zinc-50">New practice session</span>
-                <p className="text-sm leading-relaxed text-zinc-400">
-                  Choose interview tracks, time, role level, interviewer voice, tone, and a focus area.
-                </p>
+  const currentScores = completed[0] ? skillBreakdown(completed[0].id) : null;
+  const overall = currentScores ? overallScore(currentScores) : null;
+  const previousOverall = completed[1] ? overallScore(skillBreakdown(completed[1].id)) : null;
+  const delta = overall !== null ? readinessDelta(previousOverall, overall) : null;
+  const focus = currentScores ? weakestCategory(currentScores) : null;
+
+  return (
+    <DashboardShell active="Home" firstName={firstName}>
+      <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
+        <div>
+          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">
+            {firstName ? `${greeting()}, ${firstName}.` : `${greeting()}.`}
+          </h1>
+          <p className="mt-1 text-sm text-dash-text-muted">Practice today. Perform tomorrow.</p>
+        </div>
+
+        <section className="relative overflow-hidden rounded-xl border border-dash-border bg-dash-surface px-6 py-7 shadow-[0_1px_2px_rgba(15,23,42,0.04)] sm:px-8">
+          <div
+            className="pointer-events-none absolute inset-0 [background:radial-gradient(120%_100%_at_100%_0%,color-mix(in_srgb,var(--color-accent)_10%,transparent),transparent_60%)]"
+            aria-hidden="true"
+          />
+          <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-md">
+              <h2 className="text-xl font-semibold tracking-tight text-dash-text">
+                Ready for your next interview?
+              </h2>
+              <p className="mt-1.5 text-sm text-dash-text-muted">
+                Practice with questions personalized to your resume and target role.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Link
+                  href="/interview/setup"
+                  className="inline-flex h-9 items-center rounded-md bg-accent px-4 text-sm font-semibold text-dash-on-accent transition-colors duration-150 hover:bg-accent-hover active:scale-[0.98]"
+                >
+                  Start practice interview
+                </Link>
+                <JoinInterview />
               </div>
             </div>
-            <ArrowRightIcon
-              size={20}
-              className="shrink-0 text-sky-400 transition group-hover:translate-x-0.5"
-            />
-          </Link>
+            <WaveformAccent className="hidden shrink-0 sm:flex" />
+          </div>
+        </section>
 
-          <section className="flex flex-col gap-4">
-            <h2 className="text-sm font-medium text-zinc-400">Recent sessions</h2>
-            {sessions.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-zinc-800 px-6 py-14 text-center">
-                <ClockCounterClockwiseIcon size={28} weight="light" className="text-zinc-600" />
-                <p className="text-sm text-zinc-500">
-                  No sessions yet — set one up above and it will show up here.
-                </p>
+        {!hasCompleted ? (
+          <EmptyState
+            icon={ClockCounterClockwiseIcon}
+            title="No interviews yet"
+            body="Complete your first practice interview and your sessions will appear here."
+            ctaLabel="Start practicing"
+            ctaHref="/interview/setup"
+          />
+        ) : (
+          <>
+            {currentScores && overall !== null && (
+              <section className="rounded-xl border border-dash-border bg-dash-surface p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
+                  Performance
+                </h2>
+                <div className="mt-4 grid grid-cols-1 gap-8 sm:grid-cols-[160px_1fr]">
+                  <div>
+                    <div className="text-4xl font-bold tabular-nums text-dash-text">{overall}</div>
+                    <div className="mt-1 text-xs text-dash-text-muted">Interview readiness</div>
+                    {delta !== null && (
+                      <div className={`mt-1.5 text-xs font-medium ${delta >= 0 ? "text-accent-deep" : "text-dash-text-faint"}`}>
+                        {delta >= 0 ? "↑" : "↓"} {Math.abs(delta)}% vs. your previous interview
+                      </div>
+                    )}
+                  </div>
+                  <SkillBars scores={currentScores} className="max-w-sm" />
+                </div>
+              </section>
+            )}
+
+            <section>
+              <div className="flex items-center justify-between">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
+                  Recent interviews
+                </h2>
+                <Link
+                  href="/interviews"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
+                >
+                  View all
+                  <ArrowRightIcon size={11} />
+                </Link>
               </div>
-            ) : (
-              <ul className="flex flex-col divide-y divide-zinc-900 rounded-2xl border border-zinc-800 bg-zinc-900/30">
-                {sessions.map((session) => {
+
+              <ul className="mt-3 divide-y divide-dash-border rounded-xl border border-dash-border bg-dash-surface">
+                {sessions.slice(0, 4).map((session) => {
                   const Icon = MODE_ICON[session.mode];
-                  const answered = answeredCounts[session.id] ?? 0;
                   const action = actionFor(session);
                   const reportHref = reportHrefFor(session);
+                  const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
+                  const answered = answeredCounts[session.id] ?? 0;
+                  const isScored = session.status === "completed";
+                  const score = isScored ? sessionScore(session.id) : null;
                   return (
                     <li
                       key={session.id}
-                      className="flex items-center justify-between gap-4 px-5 py-4"
+                      className="flex flex-col gap-2 px-4 py-3.5 transition-colors duration-150 hover:bg-dash-surface-hover sm:flex-row sm:items-center sm:gap-4"
                     >
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">
-                          <Icon size={18} weight="light" />
-                        </span>
-                        <div className="flex min-w-0 flex-col">
-                          <span className="truncate text-sm font-medium text-zinc-200">
-                            {MODE_LABEL[session.mode]} practice ·{" "}
-                            {MOOD_LABEL[session.mood] ?? "Neutral"}
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        <Icon size={16} weight="light" className="shrink-0 text-dash-text-faint" />
+                        <div className="min-w-0">
+                          <span className="truncate text-sm font-medium text-dash-text">
+                            {MODE_LABEL[session.mode]} practice · {MOOD_LABEL[session.mood] ?? "Neutral"}
                           </span>
-                          <span className="text-xs text-zinc-500 tabular-nums">
-                            {formatRelativeTime(session.createdAt)} · {answered} of{" "}
-                            {session.questionCount} answered
-                          </span>
+                          <div className="mt-0.5 truncate text-xs text-dash-text-faint">
+                            {shortDate(session.createdAt)}
+                            {duration ? ` · ${duration} min` : ""} · {answered} of {session.questionCount}{" "}
+                            answered
+                          </div>
                         </div>
                       </div>
-
-                      <div className="flex shrink-0 items-center gap-3">
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_STYLE[session.status]}`}
-                        >
+                      <div className="flex shrink-0 items-center gap-4 pl-7 sm:pl-0">
+                        <span className={`text-xs font-medium ${STATUS_STYLE[session.status]}`}>
                           {STATUS_LABEL[session.status]}
                         </span>
+                        {score !== null && (
+                          <span className="text-sm font-semibold tabular-nums text-dash-text">
+                            {score}
+                          </span>
+                        )}
                         {reportHref && (
                           <Link
                             href={reportHref}
-                            className="text-sm font-medium text-zinc-300 hover:text-zinc-100"
+                            className="text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
                           >
-                            View report
+                            Answer review
                           </Link>
                         )}
                         <Link
                           href={action.href}
-                          className="text-sm font-medium text-sky-400 hover:text-sky-300"
+                          className="text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
                         >
                           {action.label}
                         </Link>
@@ -171,39 +247,43 @@ export function Dashboard({
                   );
                 })}
               </ul>
+            </section>
+
+            {focus && (
+              <section className="rounded-xl border border-dash-border bg-dash-surface-muted px-5 py-4">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
+                  Next focus
+                </h2>
+                <p className="mt-2 text-sm font-medium text-dash-text">{focus}</p>
+                <p className="mt-1 text-sm leading-relaxed text-dash-text-muted">{focusCopy(focus)}</p>
+                <Link
+                  href="/interview/setup"
+                  className="mt-2.5 inline-flex items-center gap-1 text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
+                >
+                  Practice this skill
+                  <ArrowRightIcon size={11} />
+                </Link>
+              </section>
             )}
-          </section>
-        </div>
+          </>
+        )}
 
-        <aside className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-zinc-400">Your progress</h2>
-          <StatRow icon={ListChecksIcon} label="Sessions" value={stats.totalSessions} />
-          <StatRow icon={CheckCircleIcon} label="Completed" value={stats.completedSessions} />
-          <StatRow icon={FireIcon} label="This week" value={stats.last7Days} />
-        </aside>
+        <section className="flex items-center justify-between border-t border-dash-border pt-5">
+          <div>
+            <div className="text-sm font-medium text-dash-text">Resume</div>
+            <div className="mt-0.5 text-xs text-dash-text-faint">
+              {hasResume ? "On file — personalizing your questions." : "Not added yet."}
+            </div>
+          </div>
+          <Link
+            href="/resume"
+            className="inline-flex items-center gap-1 text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
+          >
+            {hasResume ? "View resume" : "Add resume"}
+            <ArrowRightIcon size={11} />
+          </Link>
+        </section>
       </div>
-    </div>
-  );
-}
-
-function StatRow({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof CodeIcon;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="flex items-center gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 px-5 py-4">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-800 text-zinc-400">
-        <Icon size={18} weight="light" />
-      </span>
-      <div className="flex flex-col">
-        <span className="text-2xl font-semibold text-zinc-50 tabular-nums">{value}</span>
-        <span className="text-xs text-zinc-500">{label}</span>
-      </div>
-    </div>
+    </DashboardShell>
   );
 }

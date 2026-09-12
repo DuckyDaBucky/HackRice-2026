@@ -1,6 +1,7 @@
 "use client";
 
-import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useState } from "react";
 import { clerkEnabled } from "@/lib/clerk";
 import { Logo } from "./Logo";
@@ -9,7 +10,6 @@ const LINKS = [
   { href: "#individuals", label: "For Individuals" },
   { href: "#employers", label: "For Employers" },
   { href: "#how-it-works", label: "How it works" },
-  { href: "#waitlist", label: "Pricing" },
 ];
 
 export function Nav() {
@@ -49,24 +49,13 @@ export function Nav() {
               <UserButton />
             </Show>
           )}
-          {clerkEnabled ? (
-            <Show when="signed-out">
-              <SignUpButton mode="modal" fallbackRedirectUrl="/">
-                <button className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90">
-                  Get started
-                  <ArrowIcon />
-                </button>
-              </SignUpButton>
-            </Show>
-          ) : (
-            <a
-              href="#waitlist"
-              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
-            >
-              Get started
-              <ArrowIcon />
-            </a>
-          )}
+          <Link
+            href="/sign-up"
+            className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-90"
+          >
+            Get started
+            <ArrowIcon />
+          </Link>
         </div>
 
         <button
@@ -109,28 +98,14 @@ export function Nav() {
                 <UserButton />
               </Show>
             )}
-            {clerkEnabled ? (
-              <Show when="signed-out">
-                <SignUpButton mode="modal" fallbackRedirectUrl="/">
-                  <button
-                    onClick={() => setOpen(false)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background"
-                  >
-                    Get started
-                    <ArrowIcon />
-                  </button>
-                </SignUpButton>
-              </Show>
-            ) : (
-              <a
-                href="#waitlist"
-                onClick={() => setOpen(false)}
-                className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background"
-              >
-                Get started
-                <ArrowIcon />
-              </a>
-            )}
+            <Link
+              href="/sign-up"
+              onClick={() => setOpen(false)}
+              className="inline-flex items-center gap-1.5 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background"
+            >
+              Get started
+              <ArrowIcon />
+            </Link>
           </div>
         </div>
       )}

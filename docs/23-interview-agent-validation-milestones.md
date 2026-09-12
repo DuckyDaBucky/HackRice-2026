@@ -576,7 +576,15 @@ decision.
 
 ### Gate result
 
-`Not started`
+`Pass with stated risk` — `evaluation_reports` and `evaluation_items` now
+persist a versioned, no-score report after a completed durable session. Each
+item links to a plan question, candidate turn, optional private recording and
+the saved browser-caption excerpt that supports it. The private playback URL is
+minted only through an owner-checked Server Action. Missing captions are shown
+as “Insufficient evidence,” and report generation is recoverable so it never
+blocks interview completion. The first pass is deliberately deterministic and
+labels browser captions as draft evidence; provider transcription, richer
+evaluation and human rubric review remain required before a final M4 pass.
 
 ---
 
@@ -641,7 +649,12 @@ and every displayed control leads somewhere useful.
 
 ### Gate result
 
-`Not started`
+`Pass with stated risk` — durable planned/paused sessions resume through their
+actual session route; completed sessions with an available report lead to the
+new report route; and soft-deleted sessions are excluded. The first-session
+state explains the real three-step flow plus private recording/caption and
+resume behavior. Dashboard report-failure and browser/device fixture evidence
+remain before a final M5 pass.
 
 ---
 
@@ -686,7 +699,12 @@ and recover gracefully from the failures most likely at an event.
 
 ### Gate result
 
-`Not started`
+`In progress` — migrations 0005–0007 have been applied to the development
+database, the report and playback paths are owner-checked, and typecheck, lint,
+109 tests and a production build pass. The stopping point for this branch is
+intentional: full device/browser rehearsal, provider outage sampling and a
+production health-check/runbook need real deployment access rather than more
+local feature code.
 
 ---
 
