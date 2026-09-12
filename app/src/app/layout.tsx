@@ -26,6 +26,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <script
+          // Applies the saved dashboard theme before paint, avoiding a
+          // light-mode flash for users who picked dark. Scoped to the
+          // dash-* tokens only — doesn't affect the marketing pages.
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("dashboard-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();`,
+          }}
+        />
         <AppProviders>
           <SiteHeader />
           {children}

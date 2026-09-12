@@ -3,6 +3,46 @@
 :root {
   --background: #09090b;
   --foreground: #fafafa;
+
+  /* Dashboard theme tokens — light (default) */
+  --dash-bg: #fafbfc;
+  --dash-surface: #ffffff;
+  --dash-surface-muted: #f6f7f9;
+  --dash-surface-hover: #f9fafb;
+  --dash-nav-hover: #f4f5f7;
+  --dash-tint: #f0fbf8;
+  --dash-tint-border: #d7eee8;
+  --dash-border: #eef1f6;
+  --dash-border-strong: #e3e7ee;
+  --dash-text: #0b1120;
+  --dash-text-muted: #6b7280;
+  --dash-text-faint: #93a1b5;
+  --dash-icon-faint: #b7c0cc;
+  --dash-on-accent: #03231e;
+  --dash-success: #0f9d78;
+  --dash-solid: #0b1120;
+  --dash-solid-text: #ffffff;
+}
+
+/* Dashboard theme tokens — dark, reusing the existing brand navy palette */
+[data-theme="dark"] {
+  --dash-bg: #0b1120;
+  --dash-surface: #131b2c;
+  --dash-surface-muted: #172036;
+  --dash-surface-hover: #172036;
+  --dash-nav-hover: #182238;
+  --dash-tint: #0d2620;
+  --dash-tint-border: #1c3d34;
+  --dash-border: #232e42;
+  --dash-border-strong: #2b3852;
+  --dash-text: #f4f7fa;
+  --dash-text-muted: #93a1b5;
+  --dash-text-faint: #6b7891;
+  --dash-icon-faint: #4b5563;
+  --dash-on-accent: #03231e;
+  --dash-success: #34d399;
+  --dash-solid: #f4f7fa;
+  --dash-solid-text: #0b1120;
 }
 
 @theme inline {
@@ -17,6 +57,24 @@
   --color-bg-elevated: #0d1420;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-dash-bg: var(--dash-bg);
+  --color-dash-surface: var(--dash-surface);
+  --color-dash-surface-muted: var(--dash-surface-muted);
+  --color-dash-surface-hover: var(--dash-surface-hover);
+  --color-dash-nav-hover: var(--dash-nav-hover);
+  --color-dash-tint: var(--dash-tint);
+  --color-dash-tint-border: var(--dash-tint-border);
+  --color-dash-border: var(--dash-border);
+  --color-dash-border-strong: var(--dash-border-strong);
+  --color-dash-text: var(--dash-text);
+  --color-dash-text-muted: var(--dash-text-muted);
+  --color-dash-text-faint: var(--dash-text-faint);
+  --color-dash-icon-faint: var(--dash-icon-faint);
+  --color-dash-on-accent: var(--dash-on-accent);
+  --color-dash-success: var(--dash-success);
+  --color-dash-solid: var(--dash-solid);
+  --color-dash-solid-text: var(--dash-solid-text);
 }
 
 body {

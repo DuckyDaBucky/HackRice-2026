@@ -29,38 +29,38 @@ export default async function ResumePage() {
         {!account ? (
           <>
             <div>
-              <h1 className="text-[28px] font-semibold tracking-tight text-[#0b1120]">Resume</h1>
-              <p className="mt-1 text-sm text-[#6b7280]">
+              <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Resume</h1>
+              <p className="mt-1 text-sm text-dash-text-muted">
                 Personalize your interviews using your experience.
               </p>
             </div>
-            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-[#d8dee7] bg-[#fbfcfc] px-8 py-12 text-center transition-colors duration-150 hover:border-accent/50 hover:bg-[#f8fefc]">
-              <FileArrowUpIcon size={26} weight="light" className="text-[#93a1b5]" />
-              <h2 className="mt-1.5 text-base font-semibold text-[#0b1120]">Add your resume</h2>
-              <p className="max-w-sm text-sm text-[#6b7280]">
+            <div className="flex flex-col items-center gap-1.5 rounded-xl border border-dashed border-dash-border-strong bg-dash-surface-hover px-8 py-12 text-center transition-colors duration-150 hover:border-accent/50 hover:bg-dash-tint">
+              <FileArrowUpIcon size={26} weight="light" className="text-dash-text-faint" />
+              <h2 className="mt-1.5 text-base font-semibold text-dash-text">Add your resume</h2>
+              <p className="max-w-sm text-sm text-dash-text-muted">
                 We&rsquo;ll use your experience and skills to personalize your interview questions.
               </p>
               <div className="mt-3.5">
                 <ResumeUploadButton label="Choose resume" />
               </div>
-              <p className="mt-1 text-xs text-[#93a1b5]">PDF or DOCX · Max 10 MB</p>
+              <p className="mt-1 text-xs text-dash-text-faint">PDF or DOCX · Max 10 MB</p>
             </div>
           </>
         ) : (
           <>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-[#93a1b5]">
+                <p className="text-xs text-dash-text-faint">
                   Last updated{" "}
                   {new Date(account.updatedAt).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                   })}
                 </p>
-                <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-[#0b1120]">
+                <h1 className="mt-1 text-[28px] font-semibold tracking-tight text-dash-text">
                   {user.fullName ?? user.firstName ?? "Your profile"}
                 </h1>
-                <p className="mt-0.5 text-sm text-[#6b7280]">
+                <p className="mt-0.5 text-sm text-dash-text-muted">
                   {LEVEL_LABEL[account.profile.experienceLevel]}
                 </p>
               </div>
@@ -69,14 +69,14 @@ export default async function ResumePage() {
 
             {account.profile.skills.length > 0 && (
               <section>
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
                   Skills
                 </h2>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {account.profile.skills.map((skill) => (
                     <span
                       key={skill}
-                      className="rounded-md border border-[#e3e7ee] bg-[#f9fafb] px-2.5 py-1 text-xs font-medium text-[#0b1120]"
+                      className="rounded-md border border-dash-border-strong bg-dash-surface-hover px-2.5 py-1 text-xs font-medium text-dash-text"
                     >
                       {skill}
                     </span>
@@ -87,15 +87,15 @@ export default async function ResumePage() {
 
             {account.profile.projects.length > 0 && (
               <section>
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
                   Projects
                 </h2>
-                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
+                <ul className="mt-3 flex flex-col divide-y divide-dash-border rounded-xl border border-dash-border bg-dash-surface">
                   {account.profile.projects.map((project) => (
                     <li key={project.id} className="px-4 py-3">
-                      <div className="text-sm font-medium text-[#0b1120]">{project.name}</div>
+                      <div className="text-sm font-medium text-dash-text">{project.name}</div>
                       {project.description && (
-                        <p className="mt-0.5 text-sm text-[#5b6474]">{project.description}</p>
+                        <p className="mt-0.5 text-sm text-dash-text-muted">{project.description}</p>
                       )}
                     </li>
                   ))}
@@ -105,20 +105,20 @@ export default async function ResumePage() {
 
             {account.profile.sections.filter((s) => s.kind !== EDUCATION_KIND).length > 0 && (
               <section>
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
                   Experience
                 </h2>
-                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
+                <ul className="mt-3 flex flex-col divide-y divide-dash-border rounded-xl border border-dash-border bg-dash-surface">
                   {account.profile.sections
                     .filter((s) => s.kind !== EDUCATION_KIND)
                     .map((section, i) => (
                       <li key={i} className="px-4 py-3">
-                        <div className="text-sm font-medium text-[#0b1120]">
+                        <div className="text-sm font-medium text-dash-text">
                           {section.title}
                           {section.organization ? ` · ${section.organization}` : ""}
                         </div>
                         {section.dates && (
-                          <div className="mt-0.5 text-xs text-[#93a1b5]">{section.dates}</div>
+                          <div className="mt-0.5 text-xs text-dash-text-faint">{section.dates}</div>
                         )}
                       </li>
                     ))}
@@ -128,20 +128,20 @@ export default async function ResumePage() {
 
             {account.profile.sections.filter((s) => s.kind === EDUCATION_KIND).length > 0 && (
               <section>
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-[#6b7280]">
+                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
                   Education
                 </h2>
-                <ul className="mt-3 flex flex-col divide-y divide-[#eef1f6] rounded-xl border border-[#eef1f6] bg-white">
+                <ul className="mt-3 flex flex-col divide-y divide-dash-border rounded-xl border border-dash-border bg-dash-surface">
                   {account.profile.sections
                     .filter((s) => s.kind === EDUCATION_KIND)
                     .map((section, i) => (
                       <li key={i} className="px-4 py-3">
-                        <div className="text-sm font-medium text-[#0b1120]">
+                        <div className="text-sm font-medium text-dash-text">
                           {section.title}
                           {section.organization ? ` · ${section.organization}` : ""}
                         </div>
                         {section.dates && (
-                          <div className="mt-0.5 text-xs text-[#93a1b5]">{section.dates}</div>
+                          <div className="mt-0.5 text-xs text-dash-text-faint">{section.dates}</div>
                         )}
                       </li>
                     ))}
