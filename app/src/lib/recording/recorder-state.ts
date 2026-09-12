@@ -43,6 +43,9 @@ const TRANSITIONS: Partial<Record<RecorderState, Partial<Record<RecorderEvent["t
   stopped: {
     RESET_FOR_NEXT_QUESTION: "ready",
   },
+  error: {
+    REQUEST_PERMISSION: "requesting-permission",
+  },
 };
 
 /** Unknown events for the current state are ignored — the caller sees no state change. */

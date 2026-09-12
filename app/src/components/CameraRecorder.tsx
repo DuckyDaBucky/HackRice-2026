@@ -1,40 +1,53 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ChatCircleIcon,
   CircleIcon,
-  PauseIcon,
+  DotsThreeIcon,
+  EyeSlashIcon,
+  MicrophoneIcon,
+  MonitorArrowUpIcon,
   PhoneDisconnectIcon,
-  PlayIcon,
-  RecordIcon,
-  SignOutIcon,
+  RobotIcon,
   SpeakerHighIcon,
+  UsersThreeIcon,
+  VideoCameraIcon,
 } from "@phosphor-icons/react";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
 import { useLiveCaptions } from "@/hooks/useLiveCaptions";
 import type { UseTextToSpeech } from "@/hooks/useTextToSpeech";
 import { formatDuration } from "@/lib/recording/format-duration";
-import { shouldRequestFollowUp } from "@/lib/follow-up/should-request";
 import type { InterviewMode } from "@/lib/questions/types";
 
 const FOLLOW_UP_CHECK_INTERVAL_MS = 500;
+const ANSWER_SILENCE_MS = 5_000;
+const INTER_QUESTION_BUFFER_MS = 2_000;
+const MIN_ANSWER_CHARACTERS = 80;
+const MIN_ANSWER_WORDS = 12;
+const INSUFFICIENT_ANSWER_PROMPT = "Take your time. Could you expand on that with a little more detail?";
 
-const MODE_LABEL: Record<InterviewMode, string> = {
-  technical: "Technical",
-  behavioral: "Behavioral",
-};
+function MeetingTimer() {
+  const [elapsedMs, setElapsedMs] = useState(0);
 
-/** Keyed by question number at the call site so a new question remounts (and resets) this. */
+  useEffect(() => {
+    const startedAt = Date.now();
+    const id = window.setInterval(() => setElapsedMs(Date.now() - startedAt), 1_000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  return <>{formatDuration(elapsedMs)}</>;
+}
+
 function RecordingTimer({ state }: { state: UseCameraRecorder["state"] }) {
   const [elapsedMs, setElapsedMs] = useState(0);
 
   useEffect(() => {
     if (state !== "recording") return;
     const startedAt = Date.now() - elapsedMs;
-    const id = setInterval(() => setElapsedMs(Date.now() - startedAt), 250);
-    return () => clearInterval(id);
-    // Intentionally excludes elapsedMs: re-running this effect every tick
-    // would reset startedAt and the timer would never advance.
+    const id = window.setInterval(() => setElapsedMs(Date.now() - startedAt), 250);
+    return () => window.clearInterval(id);
+    // A new effect for each tick would reset the elapsed baseline.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
@@ -49,7 +62,12 @@ interface CameraRecorderProps {
   questionPrompt: string;
   questionNumber: number;
   totalQuestions: number;
-  onAnswerRecorded: (blob: Blob, mimeType: string, durationMs: number) => void;
+  onAnswerRecorded: (
+    blob: Blob,
+    mimeType: string,
+    durationMs: number,
+    transcript: string,
+  ) => Promise<void>;
   onLeave: () => void;
 }
 
@@ -65,241 +83,216 @@ export function CameraRecorder({
   onLeave,
 }: CameraRecorderProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const isLastQuestion = questionNumber === totalQuestions;
-  const isRecording = recorder.state === "recording";
-  const isPaused = recorder.state === "paused";
-
   const captions = useLiveCaptions();
+  const { record, reset, state: recorderState, stop } = recorder;
+  const {
+    finalText,
+    interimText,
+    lastSpeechAt,
+    start: startCaptions,
+    stop: stopCaptions,
+  } = captions;
+  const speak = tts.speak;
   const [followUp, setFollowUp] = useState<string | null>(null);
+  const [questionVisible, setQuestionVisible] = useState(true);
+  const [micEnabled, setMicEnabled] = useState(true);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [saving, setSaving] = useState(false);
   const hasRequestedFollowUpRef = useRef(false);
+  const currentQuestionRef = useRef<string | null>(null);
+  const transcriptLengthBeforeFollowUpRef = useRef(0);
+  const turnPendingRef = useRef(false);
+  const hasPromptedForMoreRef = useRef(false);
+  const isLastQuestion = questionNumber === totalQuestions;
+  const isRecording = recorderState === "recording";
 
   const stopCaptionsRef = useRef(captions.stop);
   useEffect(() => {
-    stopCaptionsRef.current = captions.stop;
+    stopCaptionsRef.current = stopCaptions;
   });
-  useEffect(() => {
-    return () => stopCaptionsRef.current();
-  }, []);
+  useEffect(() => () => stopCaptionsRef.current(), []);
 
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.srcObject = recorder.stream;
-    }
+    if (videoRef.current) videoRef.current.srcObject = recorder.stream;
   }, [recorder.stream]);
 
-  // While recording, watch for a natural pause long enough to ask (at most)
-  // one live follow-up for this question. See docs/16's analysis-pipeline
-  // decision and src/lib/follow-up/should-request.ts for the thresholds.
+  const completeAnswer = useCallback(async () => {
+    if (saving) return;
+    setSaving(true);
+    stopCaptions();
+    try {
+      const artifact = await stop();
+      await onAnswerRecorded(
+        artifact.blob,
+        artifact.mimeType,
+        artifact.durationMs,
+        `${finalText} ${interimText}`.trim(),
+      );
+      if (!isLastQuestion) reset();
+    } finally {
+      setSaving(false);
+      turnPendingRef.current = false;
+    }
+  }, [finalText, interimText, isLastQuestion, onAnswerRecorded, reset, saving, stop, stopCaptions]);
+
+  // The interviewer owns the turn: ask the question, then begin capturing
+  // only after the prompt has played. There is no candidate "start" action.
   useEffect(() => {
-    if (!isRecording) return;
-    const id = setInterval(() => {
-      if (hasRequestedFollowUpRef.current) return;
-      const msSinceLastFinalSegment = captions.lastFinalAt
-        ? Date.now() - captions.lastFinalAt
-        : 0;
+    const questionKey = `${questionNumber}:${questionPrompt}`;
+    if (recorderState !== "ready" || currentQuestionRef.current === questionKey) return;
+    hasRequestedFollowUpRef.current = false;
+    hasPromptedForMoreRef.current = false;
+    transcriptLengthBeforeFollowUpRef.current = 0;
+    turnPendingRef.current = false;
+    setFollowUp(null);
+    let cancelled = false;
+
+    const beginAnswer = async () => {
+      // A brief beat between turns feels like a real interviewer taking in
+      // the answer before introducing the next topic.
+      if (questionNumber > 1) {
+        await new Promise<void>((resolve) => {
+          window.setTimeout(resolve, INTER_QUESTION_BUFFER_MS);
+        });
+      }
+      await speak(questionPrompt, voiceId);
+      if (cancelled) return;
+      currentQuestionRef.current = questionKey;
+      startCaptions();
+      record();
+    };
+    void beginAnswer();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [questionNumber, questionPrompt, record, recorderState, speak, startCaptions, voiceId]);
+
+  // At a natural pause, the interviewer uses the existing model route to
+  // decide whether a clarifier is useful. Otherwise it closes the turn and
+  // moves to the next question automatically. One follow-up per question
+  // prevents an endless conversational loop.
+  useEffect(() => {
+    if (!isRecording || saving || tts.isSpeaking) return;
+    const id = window.setInterval(() => {
+      if (turnPendingRef.current || tts.isSpeaking) return;
+      const transcript = finalText.trim();
+      const transcriptLength = transcript.length;
+      const wordCount = transcript ? transcript.split(/\s+/).length : 0;
+      const hasNewSpeechAfterFollowUp = transcriptLength > transcriptLengthBeforeFollowUpRef.current;
+      const hasSubstantiveAnswer =
+        transcriptLength >= MIN_ANSWER_CHARACTERS && wordCount >= MIN_ANSWER_WORDS;
+      const hasEnoughSpeech = hasSubstantiveAnswer && hasNewSpeechAfterFollowUp;
+      const silenceMs = lastSpeechAt ? Date.now() - lastSpeechAt : 0;
+      const answerHasNaturallyPaused = hasEnoughSpeech && silenceMs >= ANSWER_SILENCE_MS;
+
+      // Silence after a partial response is not an answer. Keep listening
+      // and give the candidate a single, calm invitation to add substance.
       if (
-        !shouldRequestFollowUp({
-          hasFollowUpAlready: hasRequestedFollowUpRef.current,
-          msSinceLastFinalSegment,
-          transcriptLength: captions.finalText.length,
-        })
+        transcriptLength > 0 &&
+        !hasSubstantiveAnswer &&
+        silenceMs >= ANSWER_SILENCE_MS &&
+        !hasPromptedForMoreRef.current
       ) {
+        turnPendingRef.current = true;
+        hasPromptedForMoreRef.current = true;
+        setFollowUp(INSUFFICIENT_ANSWER_PROMPT);
+        void speak(INSUFFICIENT_ANSWER_PROMPT, voiceId).finally(() => {
+          turnPendingRef.current = false;
+        });
         return;
       }
-      hasRequestedFollowUpRef.current = true;
+
+      if (!answerHasNaturallyPaused) return;
+
+      turnPendingRef.current = true;
+      if (hasRequestedFollowUpRef.current) {
+        void completeAnswer();
+        return;
+      }
+
       fetch("/api/interview/follow-up", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode,
-          questionPrompt,
-          transcriptSoFar: captions.finalText,
-        }),
+        body: JSON.stringify({ mode, questionPrompt, transcriptSoFar: finalText }),
       })
         .then((res) => res.json())
-        .then((data: { followUp: string | null }) => {
-          // Speak it the moment it arrives — this fetch resolving is the
-          // event, not a state change for a separate effect to react to.
-          if (data.followUp) {
-            setFollowUp(data.followUp);
-            tts.speak(data.followUp, voiceId);
+        .then(async (data: { followUp: string | null }) => {
+          if (!data.followUp) {
+            await completeAnswer();
+            return;
           }
+          hasRequestedFollowUpRef.current = true;
+          transcriptLengthBeforeFollowUpRef.current = finalText.trim().length;
+          setFollowUp(data.followUp);
+          await speak(data.followUp, voiceId);
+          turnPendingRef.current = false;
         })
-        .catch(() => {
-          // No follow-up this time is fine; the interview continues either way.
-        });
+        .catch(() => completeAnswer());
     }, FOLLOW_UP_CHECK_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [isRecording, mode, questionPrompt, voiceId, captions.finalText, captions.lastFinalAt, tts]);
+    return () => window.clearInterval(id);
+  }, [completeAnswer, finalText, isRecording, lastSpeechAt, mode, questionPrompt, saving, speak, tts.isSpeaking, voiceId]);
 
-  const handleStartRecording = () => {
-    hasRequestedFollowUpRef.current = false;
-    setFollowUp(null);
-    captions.start();
-    recorder.record();
+  const toggleTrack = (kind: "audio" | "video") => {
+    const enabled = kind === "audio" ? !micEnabled : !cameraEnabled;
+    const tracks = kind === "audio" ? recorder.stream?.getAudioTracks() : recorder.stream?.getVideoTracks();
+    tracks?.forEach((track) => { track.enabled = enabled; });
+    if (kind === "audio") setMicEnabled(enabled);
+    else setCameraEnabled(enabled);
   };
 
-  const handleStop = async () => {
-    captions.stop();
-    const artifact = await recorder.stop();
-    onAnswerRecorded(artifact.blob, artifact.mimeType, artifact.durationMs);
-    if (!isLastQuestion) recorder.reset();
-  };
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-zinc-950 text-zinc-50">
-      <header className="flex items-center justify-between gap-4 px-6 py-4">
-        <div className="flex items-center gap-3">
-          <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-sky-400 ring-1 ring-inset ring-zinc-800">
-            {MODE_LABEL[mode]}
-          </span>
-          <span className="text-sm text-zinc-500">
-            Question {questionNumber} of {totalQuestions}
-          </span>
+    <div className="flex h-[100dvh] min-h-[600px] flex-col overflow-hidden bg-[#151515] text-[#f5f5f5]">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-[#2d2d2d] px-4 sm:px-6">
+        <div className="flex items-center gap-3 text-sm">
+          <span className="font-medium">Practice interview</span>
+          <span className="hidden text-zinc-400 sm:inline">{mode} · Question {questionNumber} of {totalQuestions}</span>
+          <span className="font-mono text-xs text-zinc-300"><MeetingTimer /></span>
         </div>
-        <button
-          type="button"
-          onClick={onLeave}
-          className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-zinc-400 transition hover:bg-zinc-900 hover:text-zinc-200 active:scale-[0.98]"
-        >
-          <SignOutIcon size={14} />
-          Leave interview
-        </button>
+        <div className="flex items-center gap-2 text-zinc-200">
+          <button type="button" aria-label="Participants" className="hidden rounded-md p-2 hover:bg-white/10 sm:block"><UsersThreeIcon size={20} /></button>
+          <button type="button" aria-label="Chat" className="hidden rounded-md p-2 hover:bg-white/10 sm:block"><ChatCircleIcon size={20} /></button>
+          <button type="button" aria-label="More options" className="hidden rounded-md p-2 hover:bg-white/10 sm:block"><DotsThreeIcon size={20} weight="bold" /></button>
+          <span className="mx-1 hidden h-6 w-px bg-white/15 sm:block" />
+          <button type="button" onClick={() => toggleTrack("video")} aria-label="Toggle camera" className={`rounded-md p-2 ${cameraEnabled ? "hover:bg-white/10" : "bg-white/15 text-red-300"}`}><VideoCameraIcon size={20} weight="fill" /></button>
+          <button type="button" onClick={() => toggleTrack("audio")} aria-label="Toggle microphone" className={`rounded-md p-2 ${micEnabled ? "hover:bg-white/10" : "bg-white/15 text-red-300"}`}><MicrophoneIcon size={20} weight="fill" /></button>
+          <button type="button" aria-label="Share screen" className="hidden rounded-md p-2 hover:bg-white/10 md:block"><MonitorArrowUpIcon size={20} weight="fill" /></button>
+          <button type="button" onClick={onLeave} className="ml-1 flex items-center gap-2 rounded-md bg-[#c8325c] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#dc3d68]"><PhoneDisconnectIcon size={17} weight="fill" /> Leave</button>
+        </div>
       </header>
 
-      <div className="flex flex-1 flex-col px-6 pb-6">
-        <div className="mb-4 flex h-1 shrink-0 gap-1.5">
-          {Array.from({ length: totalQuestions }, (_, i) => (
-            <div
-              key={i}
-              className={`h-full flex-1 rounded-full ${
-                i < questionNumber - 1
-                  ? "bg-sky-500"
-                  : i === questionNumber - 1
-                    ? "bg-sky-500/60"
-                    : "bg-zinc-800"
-              }`}
-            />
-          ))}
-        </div>
+      <main className="grid min-h-0 flex-1 grid-cols-1 gap-1 bg-[#0b0b0b] p-1 md:grid-cols-2">
+        <section className="relative min-h-0 overflow-hidden bg-[#1c1c1c]">
+          {recorder.state === "error" ? (
+            <div className="flex h-full items-center justify-center px-8 text-center text-sm text-red-200">{recorder.error?.message ?? "Lost the camera connection."}</div>
+          ) : (
+            <>
+              <video ref={videoRef} autoPlay muted playsInline className={`h-full w-full scale-x-[-1] object-cover transition-opacity ${cameraEnabled ? "opacity-100" : "opacity-0"}`} />
+              {!cameraEnabled && <div className="absolute inset-0 flex items-center justify-center text-zinc-500"><VideoCameraIcon size={48} /></div>}
+              <span className="absolute bottom-3 left-3 rounded bg-black/65 px-2.5 py-1.5 text-xs font-medium">You</span>
+              {isRecording && <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded bg-black/65 px-2.5 py-1.5 text-xs"><CircleIcon size={8} weight="fill" className="animate-pulse text-red-400" />Recording · <RecordingTimer key={questionNumber} state={recorderState} /></span>}
+              {isRecording && (finalText || interimText) && <p className="absolute bottom-12 left-3 right-3 max-h-20 overflow-hidden bg-black/70 px-3 py-2 text-sm text-white">{finalText} <span className="text-zinc-300">{interimText}</span></p>}
+            </>
+          )}
+        </section>
 
-        <div className="grid flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="flex flex-col items-center justify-center gap-6 rounded-2xl bg-zinc-900 p-8 text-center ring-1 ring-inset ring-zinc-800">
-            <div
-              className={`flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-sky-700 text-lg font-semibold text-white ${
-                tts.isSpeaking ? "ring-4 ring-sky-500/30" : ""
-              }`}
-            >
-              AI
-            </div>
-            <div className="flex flex-col gap-2">
-              <span className="flex items-center justify-center gap-1.5 text-xs font-medium text-zinc-500">
-                AI Interviewer
-                {tts.isSpeaking && <SpeakerHighIcon size={12} className="text-sky-400" />}
-              </span>
-              <p className="text-lg font-medium leading-relaxed text-zinc-100">
-                {questionPrompt}
-              </p>
-              {followUp && (
-                <p className="mt-2 text-sm leading-relaxed text-sky-300">
-                  Follow-up: {followUp}
-                </p>
-              )}
-            </div>
-          </div>
+        <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_30%,#33385d,transparent_42%),linear-gradient(135deg,#16182a,#0e1018)] p-6 text-center">
+          <div className={`flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 via-sky-400 to-indigo-500 shadow-[0_0_0_10px_rgba(255,255,255,0.05)] transition ${tts.isSpeaking ? "scale-105 shadow-[0_0_0_10px_rgba(255,255,255,0.05),0_0_45px_rgba(95,186,255,0.35)]" : ""}`}><RobotIcon size={60} weight="duotone" className="text-white" /></div>
+          <div className="mt-5 flex items-center gap-2 text-sm font-medium">GetMeHired interviewer {tts.isSpeaking && <SpeakerHighIcon size={16} className="animate-pulse text-sky-300" />}</div>
 
-          <div className="relative flex min-h-[280px] items-center justify-center overflow-hidden rounded-2xl bg-black ring-1 ring-inset ring-zinc-800">
-            {recorder.state === "error" ? (
-              <p className="max-w-xs px-6 text-center text-sm text-red-300">
-                {recorder.error?.message ?? "Lost the camera connection."}
-              </p>
-            ) : (
-              <>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="h-full w-full scale-x-[-1] object-cover"
-                />
-                <span className="absolute bottom-3 left-3 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">
-                  You
-                </span>
-                {(isRecording || isPaused) && (
-                  <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded-full bg-black/60 px-2.5 py-1 text-xs font-medium text-white">
-                    <CircleIcon
-                      size={8}
-                      weight="fill"
-                      className={isRecording ? "text-red-500 animate-pulse" : "text-zinc-400"}
-                    />
-                    {isRecording ? "REC" : "PAUSED"}{" "}
-                    <RecordingTimer key={questionNumber} state={recorder.state} />
-                  </span>
-                )}
-                {isRecording && (captions.finalText || captions.interimText) && (
-                  <p className="absolute bottom-12 left-3 right-3 max-h-20 overflow-hidden rounded-lg bg-black/70 px-3 py-2 text-sm text-white">
-                    {captions.finalText}{" "}
-                    <span className="text-zinc-400">{captions.interimText}</span>
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </div>
+          {questionVisible && <div className="absolute bottom-5 left-5 right-5 rounded-xl bg-[#20222b]/90 p-4 text-left shadow-lg backdrop-blur-sm">
+            <div className="mb-2 flex items-center justify-between gap-4 text-xs text-zinc-400"><span className="capitalize">{mode} question</span><span>{questionNumber} / {totalQuestions}</span></div>
+            <p className="text-base font-medium leading-6 text-zinc-50 sm:text-lg">{followUp ?? questionPrompt}</p>
+          </div>}
+        </section>
+      </main>
 
-      <footer className="flex items-center justify-center gap-3 pb-10">
-        {recorder.state === "ready" && (
-          <button
-            type="button"
-            onClick={handleStartRecording}
-            className="flex items-center gap-2 rounded-full bg-red-500 px-6 py-3 text-sm font-medium text-white transition active:scale-[0.98]"
-          >
-            <RecordIcon size={18} weight="fill" />
-            Start recording
-          </button>
-        )}
-
-        {isRecording && (
-          <>
-            <button
-              type="button"
-              onClick={recorder.pause}
-              className="flex items-center gap-2 rounded-full bg-zinc-800 px-5 py-3 text-sm font-medium text-zinc-100 transition active:scale-[0.98]"
-            >
-              <PauseIcon size={18} weight="fill" />
-              PauseIcon
-            </button>
-            <button
-              type="button"
-              onClick={handleStop}
-              className="flex items-center gap-2 rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]"
-            >
-              {isLastQuestion ? <PhoneDisconnectIcon size={18} weight="fill" /> : null}
-              {isLastQuestion ? "Finish interview" : "Next question"}
-            </button>
-          </>
-        )}
-
-        {isPaused && (
-          <>
-            <button
-              type="button"
-              onClick={recorder.resume}
-              className="flex items-center gap-2 rounded-full bg-zinc-800 px-5 py-3 text-sm font-medium text-zinc-100 transition active:scale-[0.98]"
-            >
-              <PlayIcon size={18} weight="fill" />
-              Resume
-            </button>
-            <button
-              type="button"
-              onClick={handleStop}
-              className="flex items-center gap-2 rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]"
-            >
-              {isLastQuestion ? "Finish interview" : "Next question"}
-            </button>
-          </>
-        )}
+      <footer className="flex h-[92px] shrink-0 items-center justify-center gap-3 bg-[#171717] px-4">
+        <button type="button" onClick={() => toggleTrack("audio")} aria-label="Toggle microphone" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${micEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><MicrophoneIcon size={21} weight="fill" /></button>
+        <button type="button" onClick={() => toggleTrack("video")} aria-label="Toggle camera" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${cameraEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><VideoCameraIcon size={21} weight="fill" /></button>
+        <div aria-live="polite" className="min-w-44 text-center text-sm text-zinc-300">{saving ? "Interviewer is moving on…" : tts.isSpeaking ? "Interviewer is asking…" : isRecording ? "Listening…" : "Preparing next question…"}</div>
+        <button type="button" onClick={() => setQuestionVisible((value) => !value)} className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${questionVisible ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#3b3b3b]"}`} aria-label={questionVisible ? "Hide question" : "Show question"}><EyeSlashIcon size={21} /></button>
       </footer>
     </div>
   );

@@ -12,6 +12,7 @@ export function useTextToSpeech(): UseTextToSpeech {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const playbackResolveRef = useRef<(() => void) | null>(null);
   // Bumped on every stop()/speak(). A speak() call whose token has since
   // been superseded discards its result instead of playing — otherwise an
   // in-flight fetch from an effect React Strict Mode double-invoked (or a
@@ -23,6 +24,8 @@ export function useTextToSpeech(): UseTextToSpeech {
   const stop = useCallback(() => {
     requestIdRef.current += 1;
     audioRef.current?.pause();
+    playbackResolveRef.current?.();
+    playbackResolveRef.current = null;
     audioRef.current = null;
     if (objectUrlRef.current) {
       URL.revokeObjectURL(objectUrlRef.current);
@@ -52,11 +55,30 @@ export function useTextToSpeech(): UseTextToSpeech {
 
         const audio = new Audio(url);
         audioRef.current = audio;
-        audio.onended = () => setIsSpeaking(false);
-        audio.onerror = () => setIsSpeaking(false);
+        await new Promise<void>((resolve) => {
+          // Some browsers (and headless environments) can play an audio
+          // element without ever delivering `ended`. Keep the interview
+          // moving if that happens; normal playback still completes through
+          // `onended` first.
+          const fallbackMs = Math.min(
+            20_000,
+            Math.max(3_000, text.trim().split(/\s+/).length * 500 + 2_000),
+          );
+          let fallbackId: number | null = null;
+          const finish = () => {
+            if (fallbackId !== null) window.clearTimeout(fallbackId);
+            if (requestId === requestIdRef.current) setIsSpeaking(false);
+            if (playbackResolveRef.current === finish) playbackResolveRef.current = null;
+            resolve();
+          };
 
-        setIsSpeaking(true);
-        await audio.play();
+          fallbackId = window.setTimeout(finish, fallbackMs);
+          playbackResolveRef.current = finish;
+          audio.onended = finish;
+          audio.onerror = finish;
+          setIsSpeaking(true);
+          audio.play().catch(finish);
+        });
       } catch {
         if (requestId === requestIdRef.current) setIsSpeaking(false);
       }

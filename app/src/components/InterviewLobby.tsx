@@ -3,7 +3,6 @@
 import { VideoCameraIcon, WarningCircleIcon } from "@phosphor-icons/react";
 import { VoicePicker } from "@/components/VoicePicker";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
-import type { UseTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { InterviewMode } from "@/lib/questions/types";
 
 const MODE_LABEL: Record<InterviewMode, string> = {
@@ -16,25 +15,17 @@ export function InterviewLobby({
   recorder,
   voiceId,
   onVoiceIdChange,
-  firstQuestionPrompt,
-  tts,
 }: {
   mode: InterviewMode;
   recorder: UseCameraRecorder;
   voiceId: string;
   onVoiceIdChange: (id: string) => void;
-  firstQuestionPrompt: string;
-  tts: UseTextToSpeech;
 }) {
   const isRequesting = recorder.state === "requesting-permission";
   const isError = recorder.state === "error";
 
   const handleJoin = async () => {
-    // Join click is the actual event that should trigger the first
-    // question's audio — await the real outcome instead of reading
-    // recorder.state afterward, which would be a stale closure.
-    const stream = await recorder.start();
-    if (stream) tts.speak(firstQuestionPrompt, voiceId);
+    await recorder.start();
   };
 
   return (

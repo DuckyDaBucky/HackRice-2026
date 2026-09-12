@@ -18,6 +18,27 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Database
+
+The app uses Drizzle ORM with PostgreSQL. Define `DATABASE_URL` in `.env.local`,
+then import the typed client and schema from the server:
+
+```ts
+import { eq } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import { interviewSessions } from "@/lib/db/schema";
+
+const sessions = await orm
+  .select()
+  .from(interviewSessions)
+  .where(eq(interviewSessions.clerkUserId, userId));
+```
+
+Use `pnpm db:generate` after schema changes. `pnpm db:migrate`, `pnpm db:push`,
+and `pnpm db:studio` target the database in `DATABASE_URL`. The existing DEV
+database already has migrations `0001` and `0002`; do not replay Drizzle's
+`0000` baseline against it.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

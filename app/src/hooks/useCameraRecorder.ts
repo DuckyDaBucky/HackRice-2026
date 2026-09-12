@@ -49,6 +49,10 @@ export function useCameraRecorder(): UseCameraRecorder {
   const disposedRef = useRef(false);
 
   useEffect(() => {
+    // React Strict Mode runs an extra setup → cleanup → setup cycle in
+    // development. Reset this in setup so that rehearsal cleanup does not
+    // leave the live hook permanently disposed and reject every camera stream.
+    disposedRef.current = false;
     return () => {
       disposedRef.current = true;
     };
@@ -61,6 +65,7 @@ export function useCameraRecorder(): UseCameraRecorder {
   );
 
   const start = useCallback(async (): Promise<MediaStream | null> => {
+    setError(null);
     dispatch({ type: "REQUEST_PERMISSION" });
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -191,6 +196,7 @@ export function useCameraRecorder(): UseCameraRecorder {
     stream?.getTracks().forEach((track) => track.stop());
     recorderRef.current = null;
     setStream(null);
+    setError(null);
     setState("idle");
   }, [stream]);
 

@@ -18,6 +18,30 @@ interface AnsweredQuestion {
   durationMs: number;
   mimeType: string;
   status: "queued" | "failed";
+  transcript: string;
+}
+
+interface GeneratedQuestionResponse {
+  question?: unknown;
+}
+
+async function generateQuestion(
+  mode: InterviewMode,
+  questionNumber: number,
+  previous: Array<{ question: string; answer: string }>,
+): Promise<string | null> {
+  try {
+    const response = await fetch("/api/interview/question", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode, questionNumber, previous }),
+    });
+    if (!response.ok) return null;
+    const data = (await response.json()) as GeneratedQuestionResponse;
+    return typeof data.question === "string" && data.question.trim() ? data.question.trim() : null;
+  } catch {
+    return null;
+  }
 }
 
 export function InterviewSession({ mode }: { mode: InterviewMode }) {
@@ -34,7 +58,21 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
   const [sessionId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
-    staticQuestionSource.getQuestions(mode).then(setQuestions);
+    let cancelled = false;
+    const loadQuestions = async () => {
+      const fallbackQuestions = await staticQuestionSource.getQuestions(mode);
+      const openingQuestion = await generateQuestion(mode, 1, []);
+      if (cancelled) return;
+      setQuestions(
+        openingQuestion
+          ? [{ id: `${mode}-generated-1`, mode, prompt: openingQuestion }, ...fallbackQuestions.slice(1)]
+          : fallbackQuestions,
+      );
+    };
+    void loadQuestions();
+    return () => {
+      cancelled = true;
+    };
   }, [mode]);
 
   const cleanupRef = useRef({ release: recorder.release, stopSpeech: tts.stop });
@@ -128,8 +166,6 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
         recorder={recorder}
         voiceId={voiceId}
         onVoiceIdChange={setVoiceId}
-        firstQuestionPrompt={questions[0].prompt}
-        tts={tts}
       />
     );
   }
@@ -146,7 +182,7 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
       questionNumber={index + 1}
       totalQuestions={questions.length}
       onLeave={leaveInterview}
-      onAnswerRecorded={(blob, mimeType, durationMs) => {
+      onAnswerRecorded={async (blob, mimeType, durationMs, transcript) => {
         const artifact = {
           id: crypto.randomUUID(),
           blob,
@@ -154,30 +190,42 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
           durationMs,
           createdAt: new Date().toISOString(),
         };
-        inMemorySink
-          .submit(artifact, { sessionId, questionId: currentQuestion.id })
-          .then(() =>
-            setAnswers((prev) => [
-              ...prev,
-              { question: currentQuestion, durationMs, mimeType, status: "queued" },
-            ]),
-          )
-          .catch(() =>
-            setAnswers((prev) => [
-              ...prev,
-              { question: currentQuestion, durationMs, mimeType, status: "failed" },
-            ]),
-          );
+        let status: AnsweredQuestion["status"] = "queued";
+        try {
+          await inMemorySink.submit(artifact, {
+            sessionId,
+            questionId: currentQuestion.id,
+          });
+        } catch {
+          status = "failed";
+        }
+        setAnswers((prev) => [
+          ...prev,
+          { question: currentQuestion, durationMs, mimeType, status, transcript },
+        ]);
 
         if (index + 1 >= questions.length) {
           recorder.release();
           tts.stop();
           setDone(true);
         } else {
-          // Advancing to the next question is the event that should speak
-          // it — called directly here, not derived from an effect
-          // watching questionPrompt after the fact.
-          tts.speak(questions[index + 1].prompt, voiceId);
+          const previous = [
+            ...answers.map((answer) => ({
+              question: answer.question.prompt,
+              answer: answer.transcript,
+            })),
+            { question: currentQuestion.prompt, answer: transcript },
+          ];
+          const generatedQuestion = await generateQuestion(mode, index + 2, previous);
+          if (generatedQuestion) {
+            setQuestions((existing) =>
+              existing?.map((question, questionIndex) =>
+                questionIndex === index + 1
+                  ? { id: `${mode}-generated-${index + 2}`, mode, prompt: generatedQuestion }
+                  : question,
+              ) ?? existing,
+            );
+          }
           setIndex((prev) => prev + 1);
         }
       }}
