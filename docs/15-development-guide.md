@@ -1,12 +1,14 @@
 # Development setup and verification guide
 
+> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+
 Source baseline: `17f33a59747a1e251334b28e6019602593f35f83`. Commands below follow the committed manifest and configuration. They were not executed during this docs-only review.
 
 ## Work in the application directory
 
 The Git repository root holds `app/` and `docs/`; run application commands inside `app/`. The landing page is `app/src/app/page.tsx` relative to the repository root, not the generic scaffold README's `app/page.tsx`.
 
-Use pnpm 11.3.0 as declared by `packageManager`, preserving the committed pnpm lockfile. The repository does not declare an operational Node version. Verify compatibility for the selected runtime and package manager and agree on a team version before assuming a particular Node installation is sufficient.
+Use pnpm 11.3.0 as declared by `packageManager`, preserving the committed pnpm lockfile. `app/package.json` declares `"engines": { "node": ">=22.12.0" }` — this is Vitest 5's own floor (`^22.12.0 || ^24.0.0 || >=26.0.0`), not an arbitrary choice; Next.js itself only requires `>=20.9.0`, but `pnpm test` will not run correctly below the Vitest-driven floor. `@types/node` is pinned to `^22` to match.
 
 ```sh
 cd app

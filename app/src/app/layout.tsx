@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AuthProvider } from "@/components/auth-provider";
-import { Footer } from "@/components/marketing/Footer";
-import { Nav } from "@/components/marketing/Nav";
+import { AppProviders } from "@/components/AppProviders";
+import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -17,22 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "GetMeHired: Interview practice that knows your resume",
-  description:
-    "GetMeHired is a pre-launch technical-behavioral interview practice and screening platform. Get notified when recorded practice interviews open.",
-  metadataBase: new URL("https://getmehired.today"),
-  openGraph: {
-    title: "GetMeHired",
-    description:
-      "Contextual interview practice and employer screening, grounded in your actual resume and transcript-linked evidence.",
-    url: "https://getmehired.today",
-    siteName: "GetMeHired",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "GetMeHired",
-    description: "Interview practice that knows your resume. Coming soon.",
-  },
+  description: "Personalized interview practice and evidence-based feedback. Built at HackRice 2026.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -42,11 +26,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <Nav />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </AuthProvider>
+        <AppProviders>
+          <SiteHeader />
+          {children}
+        </AppProviders>
       </body>
     </html>
   );

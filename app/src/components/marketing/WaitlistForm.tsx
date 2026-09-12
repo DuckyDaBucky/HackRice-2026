@@ -33,7 +33,7 @@ export function WaitlistForm({
         }`}
       >
         <CheckIcon />
-        Thanks. We will let you know when practice opens.
+        Preview only: your email has not been saved. Registration is not open yet.
       </p>
     );
   }
@@ -74,7 +74,7 @@ export function WaitlistForm({
         type="submit"
         className="shrink-0 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-[#03231e] transition-transform duration-150 hover:bg-accent-hover active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        Join the waitlist
+        Preview signup
       </button>
     </form>
   );

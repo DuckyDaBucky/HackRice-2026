@@ -1,5 +1,7 @@
 # HackRice delivery plan
 
+> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+
 ## Progress against the first push
 
 Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
@@ -34,7 +36,7 @@ Then reuse that working foundation for one corporate requisition, invitation and
 
 **Next:** minimal corporate workflow and private interviewer guidance.
 
-**Stretch:** true live practice, live corporate screening, avatars/art packs, editable persistent learning context, Presage service.
+**Stretch:** avatars/art packs, editable persistent learning context and a validated Presage service. Live analysis and live feedback are excluded.
 
 **Deferred:** custom model training, automated cheating claims, automatic hiring decisions, meeting bots in Teams or other external platforms, coding judge.
 

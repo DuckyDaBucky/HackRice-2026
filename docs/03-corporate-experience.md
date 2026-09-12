@@ -1,5 +1,7 @@
 # Corporate experience
 
+> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+
 ## Implementation checkpoint
 
 Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
@@ -21,7 +23,7 @@ HR reviews generated questions before publishing an interview template. Save the
 3. The candidate sees employer identity, expected duration, format, media/data use and any retry limits.
 4. The candidate confirms their resume/profile and completes a device check.
 5. The system delivers questions in text and ElevenLabs voice, optionally with an avatar.
-6. The candidate answers in recorded or, later, live format according to the invitation.
+6. The candidate records and submits answers according to the invitation; analysis follows submission.
 7. Processing creates transcript and evidence-based evaluation for authorized reviewers.
 8. HR reviews the original answer and can annotate or dispute AI feedback before any decision.
 
@@ -37,7 +39,7 @@ The candidate-facing page must never receive hidden answer guides or interviewer
 
 ## Review dashboard
 
-Proposed views: requisition list, invitation statuses, scheduled/live sessions, processing queue, candidate report, replay with transcript, rubric evidence, reviewer notes, and export. Display incomplete or low-confidence reports prominently. Keep AI output separate from human ratings and notes; log human overrides and reasons.
+Proposed views: requisition list, invitation statuses, interview sessions, processing queue, candidate report, replay with transcript, rubric evidence, reviewer notes, and export. Display incomplete or low-confidence reports prominently. Keep AI output separate from human ratings and notes; log human overrides and reasons.
 
 Use job-relevant rubrics rather than age or unrelated personal traits. A role-level rubric should be shared across candidates for that role. Personalized questions can vary while testing comparable competencies; direct numeric comparison is inappropriate when rubrics or question difficulty differ materially.
 

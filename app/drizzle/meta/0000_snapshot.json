@@ -1,0 +1,357 @@
+{
+  "id": "9232259a-b4ba-4ad2-bd3c-b6b9eba488ff",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.answer_attempts": {
+      "name": "answer_attempts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "question_id": {
+          "name": "question_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "media_ref": {
+          "name": "media_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mime_type": {
+          "name": "mime_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration_ms": {
+          "name": "duration_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recorded_at": {
+          "name": "recorded_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upload_status": {
+          "name": "upload_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "analysis_status": {
+          "name": "analysis_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'not_started'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "idx_answer_attempts_question_id": {
+          "name": "idx_answer_attempts_question_id",
+          "columns": [
+            {
+              "expression": "question_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "answer_attempts_session_mode_fkey": {
+          "name": "answer_attempts_session_mode_fkey",
+          "tableFrom": "answer_attempts",
+          "tableTo": "interview_sessions",
+          "columnsFrom": [
+            "session_id",
+            "mode"
+          ],
+          "columnsTo": [
+            "id",
+            "mode"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "answer_attempts_question_mode_fkey": {
+          "name": "answer_attempts_question_mode_fkey",
+          "tableFrom": "answer_attempts",
+          "tableTo": "questions",
+          "columnsFrom": [
+            "question_id",
+            "mode"
+          ],
+          "columnsTo": [
+            "id",
+            "mode"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "answer_attempts_session_question_key": {
+          "name": "answer_attempts_session_question_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "session_id",
+            "question_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "answer_attempts_mode_check": {
+          "name": "answer_attempts_mode_check",
+          "value": "\"answer_attempts\".\"mode\" in ('technical', 'behavioral')"
+        },
+        "answer_attempts_duration_ms_check": {
+          "name": "answer_attempts_duration_ms_check",
+          "value": "\"answer_attempts\".\"duration_ms\" is null or \"answer_attempts\".\"duration_ms\" >= 0"
+        },
+        "answer_attempts_upload_status_check": {
+          "name": "answer_attempts_upload_status_check",
+          "value": "\"answer_attempts\".\"upload_status\" in ('pending', 'uploading', 'uploaded', 'failed')"
+        },
+        "answer_attempts_analysis_status_check": {
+          "name": "answer_attempts_analysis_status_check",
+          "value": "\"answer_attempts\".\"analysis_status\" in ('not_started', 'queued', 'processing', 'completed', 'failed')"
+        },
+        "answer_attempts_uploaded_media_check": {
+          "name": "answer_attempts_uploaded_media_check",
+          "value": "\"answer_attempts\".\"upload_status\" <> 'uploaded' or \"answer_attempts\".\"media_ref\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.interview_sessions": {
+      "name": "interview_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "clerk_user_id": {
+          "name": "clerk_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'in_progress'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "idx_interview_sessions_clerk_user_id": {
+          "name": "idx_interview_sessions_clerk_user_id",
+          "columns": [
+            {
+              "expression": "clerk_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "interview_sessions_id_mode_key": {
+          "name": "interview_sessions_id_mode_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "mode"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "interview_sessions_mode_check": {
+          "name": "interview_sessions_mode_check",
+          "value": "\"interview_sessions\".\"mode\" in ('technical', 'behavioral')"
+        },
+        "interview_sessions_status_check": {
+          "name": "interview_sessions_status_check",
+          "value": "\"interview_sessions\".\"status\" in ('in_progress', 'completed', 'abandoned')"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.questions": {
+      "name": "questions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "mode": {
+          "name": "mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sequence": {
+          "name": "sequence",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "questions_mode_sequence_key": {
+          "name": "questions_mode_sequence_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "mode",
+            "sequence"
+          ]
+        },
+        "questions_id_mode_key": {
+          "name": "questions_id_mode_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "id",
+            "mode"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "questions_mode_check": {
+          "name": "questions_mode_check",
+          "value": "\"questions\".\"mode\" in ('technical', 'behavioral')"
+        },
+        "questions_sequence_check": {
+          "name": "questions_sequence_check",
+          "value": "\"questions\".\"sequence\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
