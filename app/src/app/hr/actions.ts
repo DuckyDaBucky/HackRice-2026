@@ -6,7 +6,6 @@ import { provisionOrganization, requireOrgMembership, getProvisionedOrganization
 import { createJob, listJobs, getJob } from "@/lib/hiring/jobs-service";
 import {
   createCandidacyDraft,
-  uploadHiringResume,
   confirmCandidateIdentity,
   getCandidacy,
 } from "@/lib/hiring/candidacies";

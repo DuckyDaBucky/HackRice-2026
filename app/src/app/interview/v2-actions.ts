@@ -19,6 +19,7 @@ import {
   transitionOwnedV2Session,
 } from "@/lib/interviews/persistence";
 import { rephraseInterviewQuestion } from "@/lib/interviews/rephrase";
+import { llmTextModel } from "@/lib/llm/provider";
 import { AGENT_PROMPT_VERSION, agentInputHash, decideNextTurn } from "@/lib/interviews/agent";
 import type { AgentDecision } from "@/lib/interviews/agent-contracts";
 import { getUploadedObjectMetadata, artifactClipKey, createPlaybackUrl, createUploadUrl } from "@/lib/storage/r2";
@@ -131,7 +132,7 @@ export async function decidePersistedInterviewNextTurn(params: {
   const inputHash = agentInputHash(context);
   const generationId = await beginAgentDecision({
     context,
-    model: process.env.GEMINI_MODEL || "gemini-3.6-flash",
+    model: llmTextModel("agent"),
     promptVersion: AGENT_PROMPT_VERSION,
     inputHash,
   });

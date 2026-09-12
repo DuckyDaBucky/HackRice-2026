@@ -1,5 +1,5 @@
 export const integrationSlots = [
-  {id:"generation",name:"Interview generation",status:"Available in AI playground",detail:"Generate personalized questions, stream Gemini chat and evaluate text answers. Requires a working Gemini key."},
+  {id:"generation",name:"Interview generation",status:"Available in AI playground",detail:"Generate personalized questions, stream AI chat and evaluate text answers. Requires a working LLM key (MODEL_API_KEY)."},
   {id:"memory",name:"Backboard memory",status:"Available in AI playground",detail:"Inspect, save, edit and delete approved per-user practice notes. Requires a working Backboard key; nothing is saved automatically."},
   {id:"spectra",name:"Presage SmartSpectra",status:"Exploratory",detail:"SDK input/output contract and runtime need validation. No camera or physiological data is captured."},
   {id:"voice",name:"ElevenLabs + avatars",status:"Deferred",detail:"Future question speech and optional artwork. No synthesis or avatar service is connected."},
