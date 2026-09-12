@@ -3,6 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { ChartBarIcon } from "@phosphor-icons/react/ssr";
 import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { getDashboardShellContext } from "@/lib/dashboard/shell-props";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { SkillBars } from "@/components/dashboard/SkillBars";
 import { Sparkline } from "@/components/dashboard/Sparkline";
@@ -24,10 +25,11 @@ export default async function AnalyticsPage() {
 
   const sessions = await listRecentSessions(user.id, 50);
   const completed = sessions.filter((s) => s.status === "completed");
+  const shell = await getDashboardShellContext(user.id);
 
   if (completed.length === 0) {
     return (
-      <DashboardShell active="Analytics" firstName={user.firstName}>
+      <DashboardShell active="Analytics" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
         <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6">
           <div>
             <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics</h1>
@@ -66,7 +68,7 @@ export default async function AnalyticsPage() {
   const needsImprovement = ranked.slice(-2).reverse();
 
   return (
-    <DashboardShell active="Analytics" firstName={user.firstName}>
+    <DashboardShell active="Analytics" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics</h1>

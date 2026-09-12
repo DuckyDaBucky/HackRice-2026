@@ -69,6 +69,12 @@ export function DashboardShell({
           })}
         </nav>
 
+        {canSwitchDashboardView(role) && (
+          <div className="mx-3 mb-3 mt-auto">
+            <ViewSwitcher currentView={dashboardView} />
+          </div>
+        )}
+
         <div className="flex items-center gap-2.5 border-t border-dash-border px-5 pt-4">
           {clerkEnabled ? (
             <UserButton appearance={{ elements: { userButtonAvatarBox: "h-7 w-7" } }} />
@@ -81,7 +87,6 @@ export function DashboardShell({
             </span>
             <span className="text-[11px] text-dash-text-faint">{roleLabel(role)}</span>
           </div>
-          {canSwitchDashboardView(role) && <ViewSwitcher currentView={dashboardView} />}
           <ThemeToggle />
         </div>
       </aside>

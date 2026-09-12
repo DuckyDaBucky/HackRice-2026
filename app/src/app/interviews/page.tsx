@@ -4,6 +4,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { ClockCounterClockwiseIcon } from "@phosphor-icons/react/ssr";
 import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { getDashboardShellContext } from "@/lib/dashboard/shell-props";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { listRecentSessions } from "@/lib/sessions";
 import { sessionDurationMinutes, sessionScore, shortDate } from "@/lib/dashboard/performance";
@@ -63,9 +64,10 @@ export default async function InterviewsPage() {
   if (!user) redirect("/sign-in?redirect_url=%2Finterviews");
 
   const sessions = await listRecentSessions(user.id, 50);
+  const shell = await getDashboardShellContext(user.id);
 
   return (
-    <DashboardShell active="Interviews" firstName={user.firstName}>
+    <DashboardShell active="Interviews" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">
