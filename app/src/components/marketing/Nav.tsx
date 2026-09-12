@@ -1,13 +1,14 @@
 "use client";
 
-import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useState } from "react";
 import { clerkEnabled } from "@/lib/clerk";
 import { Logo } from "./Logo";
 
 const LINKS = [
-  { href: "#how-it-works", label: "How it works" },
-  { href: "#workspaces", label: "Workspaces" },
+  { href: "#product", label: "Product" },
+  { href: "#workspaces", label: "For candidates" },
+  { href: "#workspaces", label: "For employers" },
   { href: "#trust", label: "Trust" },
 ];
 
@@ -15,16 +16,16 @@ export function Nav() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <a href="#top" className="shrink-0">
           <Logo size="sm" />
         </a>
 
-        <nav className="hidden items-center gap-8 lg:flex">
+        <nav className="hidden items-center gap-7 lg:flex">
           {LINKS.map((link) => (
             <a
-              key={link.href}
+              key={link.label}
               href={link.href}
               className="text-sm text-muted transition-colors hover:text-foreground"
             >
@@ -33,25 +34,28 @@ export function Nav() {
           ))}
         </nav>
 
-        {clerkEnabled && (
-          <div className="hidden items-center gap-4 lg:flex">
+        <div className="hidden items-center gap-5 lg:flex">
+          {clerkEnabled && (
             <Show when="signed-out">
               <SignInButton mode="modal">
                 <button className="text-sm text-muted transition-colors hover:text-foreground">
-                  Sign in
+                  Log in
                 </button>
               </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="rounded-full border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent transition-colors hover:border-accent hover:bg-accent/10">
-                  Sign up
-                </button>
-              </SignUpButton>
             </Show>
+          )}
+          {clerkEnabled && (
             <Show when="signed-in">
               <UserButton />
             </Show>
-          </div>
-        )}
+          )}
+          <a
+            href="#waitlist"
+            className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-[#03231e] transition-colors hover:bg-accent-hover"
+          >
+            Join waitlist
+          </a>
+        </div>
 
         <button
           type="button"
@@ -69,7 +73,7 @@ export function Nav() {
           <nav className="flex flex-col gap-1 pt-3">
             {LINKS.map((link) => (
               <a
-                key={link.href}
+                key={link.label}
                 href={link.href}
                 onClick={() => setOpen(false)}
                 className="rounded-lg px-2 py-2 text-sm text-muted hover:bg-surface hover:text-foreground"
@@ -78,25 +82,29 @@ export function Nav() {
               </a>
             ))}
           </nav>
-          {clerkEnabled && (
-            <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
+          <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
+            {clerkEnabled && (
               <Show when="signed-out">
                 <SignInButton mode="modal">
                   <button className="text-sm text-muted hover:text-foreground">
-                    Sign in
+                    Log in
                   </button>
                 </SignInButton>
-                <SignUpButton mode="modal">
-                  <button className="rounded-full border border-accent/40 px-4 py-1.5 text-sm font-medium text-accent hover:border-accent">
-                    Sign up
-                  </button>
-                </SignUpButton>
               </Show>
+            )}
+            {clerkEnabled && (
               <Show when="signed-in">
                 <UserButton />
               </Show>
-            </div>
-          )}
+            )}
+            <a
+              href="#waitlist"
+              onClick={() => setOpen(false)}
+              className="rounded-full bg-accent px-4 py-1.5 text-sm font-medium text-[#03231e]"
+            >
+              Join waitlist
+            </a>
+          </div>
         </div>
       )}
     </header>
