@@ -11,7 +11,6 @@ export function profileNamespace() {
   if (!key) throw new WorkbenchError("AUTH_CONFIG", "Clerk is not configured.", 503);
   return createHash("sha256").update(key).digest("hex");
 }
-
 export async function getProfile(userId: string) {
   const rows = await orm
     .select({
