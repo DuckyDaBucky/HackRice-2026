@@ -1,5 +1,11 @@
 # Live interviewer voice and live follow-ups
 
+## Current status — September 12, 2026
+
+TTS, browser captions and Gemini interview routes are implemented in main. The workbench speech plan is separate. Old statements about missing local keys describe that checkpoint, not a current account-status check. This audit did not call ElevenLabs. Captions/live follow-up prompts do not constitute live scoring or candidate feedback. See [current codebase](14-current-codebase.md).
+
+## Historical design / checkpoint
+
 ## Status
 
 Built. Supersedes the "ElevenLabs voice (questions are shown as text for

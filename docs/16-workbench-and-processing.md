@@ -12,13 +12,13 @@ Presage remains exploratory. Recording analysis support must be verified rather 
 
 ## Development workbench
 
-The branch adds `/dev` and `/api/dev/[operation]` to the existing Next.js App Router application. Both require development mode and Clerk authentication. Mutating endpoints also enforce same-origin requests. The page includes role and question exploration, local PDF/DOCX text extraction, an editable profile, project relevance explanations, curated template previews and unconnected integration panels.
+Main includes `/dev` and `/api/dev/[operation]` to the existing Next.js App Router application. Both require development mode and Clerk authentication. Mutating endpoints also enforce same-origin requests. The page includes role and question exploration, local PDF/DOCX text extraction, an editable profile, project relevance explanations, curated template previews and unconnected integration panels.
 
 PDF and DOCX uploads are limited to 10 MB; extraction does not provide OCR. Scanned or unreadable documents require pasted text. Uploads are processed in memory. Model submission is a separate explicit action. Profile review is required before ranking or export. Project ranking is a deterministic evidence-availability heuristic for selecting questions, not a candidate hiring score or validated assessment of project quality.
 
 Gemini work was handed over from the second implementation task and resumed. The AI playground includes streaming practice chat, structured question packs and reports generated only after an answer is explicitly submitted. Streaming chat is a development assistant, not live interview analysis. Model configuration and credentials remain server-side. Backboard is intended to own user memory; corpus storage is reference data, not a competing memory store.
 
-Future ElevenLabs speech and optional avatars attach to question presentation. Subtitles must offer small, medium, large and extra-large sizes, readable contrast and independently available text. Voice, avatars, subtitles and Presage remain integration slots; Gemini and Backboard have their own functional playground controls. No successful media session is implied.
+Future ElevenLabs speech and optional avatars attach to question presentation. Subtitles must offer small, medium, large and extra-large sizes, readable contrast and independently available text. Within this workbench, voice, avatars, subtitle rendering and Presage remain integration slots; the separate interview UI now has TTS/captions and the repository has a native Presage wrapper. Gemini and Backboard have their own functional playground controls. No successful media session is implied.
 
 ## Research storage and import
 
@@ -32,7 +32,7 @@ Set `GET_ME_HIRED_RESEARCH_SOURCE=database` and `GET_ME_HIRED_RESEARCH_VERSION` 
 
 ## Verification status
 
-Local focused tests cover extraction, malformed input, unknown fields, deterministic rankings, missing template fields and development/authentication guards. Browser sign-in has encountered a Clerk redirect loop, so authenticated end-to-end operation is not yet verified. Interview recording, playback reports and corporate overlays are product contracts, not delivered features of this workbench.
+Local focused tests cover extraction, malformed input, unknown fields, deterministic rankings, missing template fields and development/authentication guards. The earlier local Clerk redirect loop was resolved using a consistent localhost origin; the authenticated workbench and corpus were inspected in-browser. This is not a complete media acceptance test. Interview recording, playback reports and corporate overlays are product contracts, not delivered features of this workbench.
 
 ## AI playground implementation
 
@@ -46,7 +46,7 @@ Tests cover AI route access, origin rejection, unsupported evidence, malformed o
 
 ## Final integration checks — September 12, 2026
 
-Lint, TypeScript, production build and 20 focused tests passed. A real Gemini smoke test generated two questions, evaluated a completed synthetic answer into five report dimensions and streamed chat successfully. A real Backboard smoke test verified save, edit, delete, reset and separate-user lookup; its temporary assistant was removed. Research database integrity and the application reader were verified separately. The authenticated browser path remains unverified because local Clerk navigation loops; do not treat server/provider tests as a browser acceptance pass.
+Lint, TypeScript, production build and 20 focused tests passed. A real Gemini smoke test generated two questions, evaluated a completed synthetic answer into five report dimensions and streamed chat successfully. A real Backboard smoke test verified save, edit, delete, reset and separate-user lookup; its temporary assistant was removed. Research database integrity and the application reader were verified separately. This was an earlier checkpoint. Subsequent authenticated workbench inspection succeeded; the latest combined app has 75 passing tests and production builds with and without Clerk keys. Full media/provider acceptance remains separate.
 
 Run `pnpm check:ai` and `pnpm check:memory` from `app/` to repeat the synthetic provider checks; these require valid keys and may incur provider usage. `pnpm check:corpus` validates the configured data source.
 
@@ -54,12 +54,12 @@ Resume parsing makes at most two provider attempts. Authentication, quota, unava
 
 ## Interview planning before speech integration
 
-The backend path is extraction → LLM profile and experience classification → user correction → weighted interview plan → structured Gemini question pack → explicit answer submission → evidence-linked report → optional reviewed Backboard note. The parser assigns experience and explains its classification. An explicit target seniority overrides question difficulty; otherwise the corrected parsed level is used. Unknown experience remains unknown.
+The backend path is extraction → LLM profile and experience classification → user correction → weighted interview plan → structured Gemini question pack → explicit answer submission → evidence-linked report → optional reviewed Backboard note. The parser assigns experience and explains its classification. Experience is assigned by the LLM under the strict criteria in the account-profile document, including after source-fact corrections; no user seniority selector is exposed. Unknown experience remains unknown.
 
 Each generation loads one validated corpus snapshot. Role family limits the candidate pool. Specialty, experience, optional technology and resume skills increase sampling weights. Sampling is without replacement, favors distinct scenarios and includes both interview categories where available. Each response contains the selection seed, dataset version, weighting factors, selected corpus IDs and project component scores. Reusing a seed reproduces selection for identical inputs, not Gemini wording. The playground supplies recently selected IDs to avoid repeat seed topics within that browser session; it does not create persistent memory. Exact semantic non-repetition of model-authored wording is not guaranteed.
 
 Projects use role relevance, specialty technologies, explicit technology preferences, competency evidence, contribution, decisions and outcomes. Missing evidence remains separate from weak matches. A focus project is sampled among at most three documented projects within 15 score points of the strongest. Its named-project question must cite evidence from that project or the pack is rejected. This supports questions such as “Tell me about your work on [project] and the tradeoff you made,” without manufacturing a responsibility or result. Projects without evidence do not receive that guaranteed focus slot.
 
-The model receives the full confirmed profile, target description, effective experience, selected question seeds, project explanations and optional approved Backboard notes. The combined context influences questions; no single universal candidate score determines the interview. Generation validates counts, category balance, project IDs, evidence and corpus provenance. Corpus failures are surfaced rather than silently losing the research context. The response is a speech-ready text question pack; ElevenLabs, video recording, transcription and timestamped playback remain separate integration work.
+The model receives the full confirmed profile, target description, effective experience, selected question seeds, project explanations and optional approved Backboard notes. The combined context influences questions; no single universal candidate score determines the interview. Generation validates counts, category balance, project IDs, evidence and corpus provenance. Corpus failures are surfaced rather than silently losing the research context. The response is a speech-ready text question pack. Separate interview TTS, capture and R2 upload paths now exist, but the pack-to-session handoff, durable aligned transcription and timestamped report playback remain integration work.
 
 In the playground, reviewed profile and selected role context are enabled by default and can be deselected. `scripts/check-pipeline.ts` exercises parsing, experience propagation, named-project generation and submitted-answer reporting with synthetic data.

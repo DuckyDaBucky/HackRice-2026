@@ -1,102 +1,43 @@
 # Current codebase: technical reference
 
-> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+Audited against main `192feef234ca127f198eb4cece3a1ad376232e6f` on September 12, 2026. This replaces the original scaffold inventory. Source presence and runtime verification are distinguished below.
 
-Snapshot: `17f33a59747a1e251334b28e6019602593f35f83`, main, reviewed September 12, 2026. This document records static source observations. “Present” does not mean successfully run, tested or deployed.
+## Applications and stack
 
-## Repository layout
+- `app/`: Next.js 16.3.5, React 19.2.8, TypeScript, Tailwind 4, Clerk, pnpm (manifest: 11.3.0), Node >=22.12.0. PostgreSQL uses a shared `pg` pool plus Drizzle ORM. LangChain/Google, Zod, PDF/DOCX extraction and AWS S3-compatible clients are installed.
+- `presage-api/`: separate Fastify/TypeScript native SmartSpectra service, with HTTP video analysis and live WebSocket contracts, Docker configuration and injected-adapter tests. See its [README](../presage-api/README.md). It is not wired into the browser interview flow.
+- `docs/`: product requirements, current implementation references and historical build slices. Number prefixes overlap; full filenames identify documents.
 
-```text
-README.md                       root pointer to app/
-app/
-  AGENTS.md                     instructions for future code edits
-  README.md                     generic scaffold instructions
-  package.json                  scripts and declared dependencies
-  pnpm-lock.yaml                committed dependency resolution
-  pnpm-workspace.yaml           build/release-age package policy
-  .env.example                  Clerk and database configuration template
-  next.config.ts                default empty Next configuration
-  tsconfig.json                 strict typing and source alias
-  eslint.config.mjs             Next core-web-vitals and TypeScript configs
-  postcss.config.mjs            Tailwind PostCSS plugin
-  src/
-    proxy.ts                    Clerk request middleware
-    lib/db.ts                   node-postgres pool
-    app/
-      layout.tsx                fonts, metadata, Clerk provider and header
-      globals.css               Tailwind import, colors and typography
-      page.tsx                  placeholder home
-      sign-in/[[...sign-in]]/page.tsx
-      sign-up/[[...sign-up]]/page.tsx
-docs/                           requirements, proposed design and code context
-```
+## Routes and behavior
 
-There is one application package, not an implemented multi-service platform. No public media directory, database migration directory, API handlers, background workers, test suite or CI workflow is present in this snapshot.
+| Route / source | Implemented behavior and boundaries |
+| --- | --- |
+| `/` | Marketing landing page for visitors; signed-in users receive the database-backed dashboard. Waitlist is a preview only and does not save email. |
+| `/sign-in`, `/sign-up` | Clerk widgets when configured; setup message without a publishable key. |
+| `/dev`, `/api/dev/*` | Development-only Clerk-authenticated workbench; extraction, profile review, corpus browser, project ranking, Gemini questions/chat/reports and Backboard controls. Writes check origin. |
+| `/api/profile` | Clerk-owned profile persistence and version checks; available independently of development-only UI. |
+| `/interview`, `/interview/setup`, `/interview/[mode]` | Public demo shell, setup options, camera/microphone recording, browser captions, spoken prompts, question progression and session resume UI. |
+| `/api/interview/question`, `/follow-up`, `/speak` | Separate direct Gemini question/follow-up calls and ElevenLabs TTS. These public demo routes are excluded from Clerk middleware; do not describe them as protected corporate APIs. |
+| `src/app/interview/actions.ts` | Authenticated session tracking, owner checks and signed R2 upload operations. Public camera access does not imply anonymous durable upload permission. |
 
-## Stack and configuration
+`AppProviders` preserves the public interview route exception. Without a Clerk publishable key, public pages can render; profile APIs fail closed and development routes remain unavailable in production. With keys, the existing server-side identity checks still apply. Organization/HR authorization is not implemented.
 
-Source: [package manifest](https://github.com/DuckyDaBucky/HackRice-2026/blob/17f33a59747a1e251334b28e6019602593f35f83/app/package.json), [TypeScript config](https://github.com/DuckyDaBucky/HackRice-2026/blob/17f33a59747a1e251334b28e6019602593f35f83/app/tsconfig.json).
+## Data and media
 
-| Item | Manifest/config value | Interpretation |
-| --- | --- | --- |
-| Next.js | 16.3.5 | Exact framework dependency |
-| React / React DOM | 19.2.8 | Exact rendering dependencies |
-| Clerk | ^7.9.2 | Declared range; installed resolution governed by lockfile |
-| pg | ^8.23.0 | PostgreSQL client dependency |
-| Package manager | pnpm@11.3.0 | Explicit packageManager field |
-| TypeScript | ^5; strict: true | Type checking enabled; noEmit |
-| Tailwind / PostCSS plugin | ^4 | CSS utility framework |
-| ESLint | ^9; eslint-config-next 16.3.5 | Lint configuration |
-| TypeScript target | ES2017 | Compilation target, not supported-browser certification |
-| Source alias | @/* maps to ./src/* | Imports can address source from app root |
-| Package name | t3code-92051f96 | Scaffold identifier; not product branding |
-| Node runtime | Not declared in engines | @types/node ^20 does not pin runtime |
+`src/lib/db.ts` exports the pool and Drizzle ORM. `src/lib/db/schema.ts`, `drizzle/` and `migrations/` contain schema/migration assets. Session and answer-attempt helpers support the dashboard and upload tracking. Separate `gmh_accounts` and `gmh_research` schemas serve profiles and versioned research. Backboard note ownership uses an ignored local registry, not a production-ready shared ownership service.
 
-Next config exports an empty configuration object. The workspace policy disallows the unrs-resolver build script and exempts listed Next 16.3.5 packages from minimum-release-age filtering. Preserve these files in a docs-only change; do not casually remove install policy to resolve an uninvestigated installation problem.
+`src/lib/storage/r2.ts` signs upload and playback URLs. `r2-sink.ts` uploads answer media and confirms status through owner-checked server actions. A signing helper is not a completed recording review player: the current session summary does not implement timestamped report playback. R2 credentials, bucket CORS and database state require separate validation. Do not run both migration approaches blindly against an existing database; reconcile its applied history first.
 
-## Request and render flow
+## AI boundaries
 
-1. The request passes through the matching [proxy](https://github.com/DuckyDaBucky/HackRice-2026/blob/17f33a59747a1e251334b28e6019602593f35f83/app/src/proxy.ts), which exports `clerkMiddleware()`.
-2. The [root layout](https://github.com/DuckyDaBucky/HackRice-2026/blob/17f33a59747a1e251334b28e6019602593f35f83/app/src/app/layout.tsx) wraps the header and page in `ClerkProvider`.
-3. The header uses `Show` for signed-out/signed-in states. Signed-out visitors get `SignInButton` and `SignUpButton`; signed-in visitors get `UserButton`.
-4. The home page renders a static heading and onboarding sentence. It does not query the database.
-5. The optional catch-all sign-in/sign-up routes render Clerk's respective hosted UI components inside centered containers.
+The workbench uses LangChain structured outputs and `GOOGLE_API_KEY` with `GEMINI_MODEL`. It classifies experience from resume evidence, selects weighted corpus seeds and relevant projects, and creates text packs. Users correct source facts; they do not choose their own experience level. Reports evaluate explicitly submitted text, not live camera behavior.
 
-The matcher excludes many static files and explicitly includes API/trpc paths. This is matching configuration only: no API/trpc handlers are implemented. There is no explicit `auth.protect` call or role/ownership logic in the reviewed source. Conditional header rendering must not be mistaken for data-access enforcement.
+The interview route uses `GEMINI_API_KEY` and its own direct model requests. It has a seeded/static source and dynamic next-question generation from prior answers, but is not connected to the workbench's resume-grounded pack. Browser captions are not a durable, timestamp-aligned transcription service. The workbench speech plan remains `prepared-not-synthesized`; the separate interview TTS endpoint is implemented.
 
-## Data layer
+## Remaining product work
 
-Source: [db.ts](https://github.com/DuckyDaBucky/HackRice-2026/blob/17f33a59747a1e251334b28e6019602593f35f83/app/src/lib/db.ts).
+Connect the question-pack handoff, recording/transcript/report persistence and timestamped replay. Implement HR workspaces, invitations, interviewer answer overlays, optional avatars and subtitle size controls. Blockchain invitations remain documentation only. The native Presage wrapper needs a provisioned runtime test and application integration; its existence does not establish measurement validity or candidate scoring support.
 
-`db` is exported as an existing `global._pgPool` or a new `Pool({ connectionString: process.env.DATABASE_URL })`. In non-production environments the pool is assigned to the global cache, supporting reuse during development reloads. The file does not set custom pool limits, timeouts, certificate options or query helpers.
+## Verification evidence
 
-There are no imports/callers of this utility in the other current source files. A configured URL and exported pool do not establish an actual database connection, persisted user record or successful query. No database tables, foreign keys, migration tool, tenant-scoping convention, transactions or repository abstraction have been committed.
-
-The environment example names TigerData (TimescaleDB). This identifies intended service context but does not prove an extension, hypertable or provisioned service exists. The product primarily needs ordinary relational records first; any timeseries-specific design remains a future decision.
-
-## Styles and branding
-
-The layout loads Geist and Geist Mono through `next/font/google` and defines CSS variables. Global CSS imports Tailwind, maps theme tokens and sets system-preference light/dark colors. The explicit body font is Arial/Helvetica/sans-serif, so loaded font variables alone do not establish a consistent Geist body font. Root metadata and the home heading still say HackRice 2026.
-
-These are implementation observations for future UI work, not changes made by this revision.
-
-## Feature readiness
-
-| Area | Source state | Remaining work |
-| --- | --- | --- |
-| Sign-in/up | Clerk provider, widgets and proxy present | Real configuration and runtime validation |
-| Database | Pool utility present | Connectivity, schema, migrations, ownership rules |
-| Practice/corporate separation | Not implemented | Workspace model, permissions, routes |
-| Resume personalization | Not implemented | Upload, parsing, correction, generation |
-| Recorded/live interviews | Not implemented | Capture, storage, transport, session state |
-| Speech/transcription | Not implemented | Provider selection, adapters and processing |
-| Reports/context loop | Not implemented | Rubric, evaluation, persistence and feedback |
-| Presage/avatars/Persona | Not implemented | Feasibility and scoped integration design |
-| Hosting | No deployment files | Decide/configure environment and operations |
-| Tests | No test script or suite | Add tests alongside implemented behavior |
-
-## Verification limits
-
-All source files and configuration listed above were read from the pinned commit. The recursive repository tree was not truncated. Dependency installation, lint, build, login, database access and provider calls were not performed. There are no performance or production-readiness claims.
-
-The root docs preserve the larger plan. Resolve differences between a future implementation and these descriptions by updating the snapshot and evidence links, not by changing working code to fit an old proposal.
+The merge validation passed 75 app tests, ESLint, TypeScript through production builds, and production builds with and without Clerk keys. No-key HTTP checks passed for landing/sign-in/public interview rendering, blocked profile access and unavailable production development routes. Earlier synthetic Gemini/Backboard and research-database checks are recorded in the workbench docs; they were not rerun in this documentation audit. Live ElevenLabs synthesis, full R2 round trips, native SmartSpectra processing, production deployment and the complete resume-to-recording-to-report journey are not certified by these checks.

@@ -5,11 +5,13 @@
 
 **HackRice 2026 · CS interview preparation and employer interviews**
 
-Initial planning baseline: September 12, 2026. The combined implementation now includes the authenticated development workbench, resume processing, account profiles and question planning alongside the camera recorder and interview voice slice from main. The documents below distinguish implemented behavior from proposed features; the workbench question pack and the interview session's static question source remain separate integration boundaries. Reports provide feedback after answers; live captions and spoken prompts are not live candidate evaluation.
+Initial planning baseline: September 12, 2026. The combined implementation now includes the authenticated development workbench, resume processing, account profiles and question planning alongside the camera recorder and interview voice slice from main. The documents below distinguish implemented behavior from proposed features; the workbench question pack and the interview session’s separate static/dynamic question sources remain separate integration boundaries. Reports provide feedback after answers; live captions and spoken prompts are not live candidate evaluation.
 
 Get Me Hired is an exclusively video interview platform for behavioral and technical-behavioral interviews. Its structured practice experience is inspired by HackerRank, but coding exercises, coding contests, and a code execution judge are outside the current scope.
 
 ## Read this first
+
+Current audit: main `192feef234ca127f198eb4cece3a1ad376232e6f`, September 12, 2026. The numbered build-slice documents retain historical checkpoints beneath explicit current-status notes.
 
 Start with [current codebase](14-current-codebase.md) and [development guide](15-development-guide.md) for implementation facts; the product documents describe the target system.
 
@@ -33,9 +35,9 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 | [Camera recorder build slice](16-camera-recorder-build-slice.md) | Reconciles this plan with the interview-practice foundation currently being implemented |
 | [Camera recorder component](17-camera-recorder-component.md) | Spec for the capture component: states, interfaces, testability boundary |
 | [Data model slice](18-data-model-slice.md) | Minimal interview-practice schema (sessions/questions/answer attempts), verified against the real DEV database |
-| [Presage feasibility spike](19-presage-feasibility-spike.md) | SmartSpectra has no browser support; scope and options for whoever builds the biometric piece |
-| [Recording storage and playback](20-recording-storage-and-playback.md) | Object storage upload flow (buildable now) and a timestamped feedback-marker timeline (depends on evaluation existing) |
-| [Live interview voice](21-live-interview-voice.md) | ElevenLabs TTS + live captions + live follow-ups, built and verified except an ElevenLabs API key |
+| [Presage feasibility spike](19-presage-feasibility-spike.md) | Historical feasibility research; native wrapper now exists in presage-api/ |
+| [Recording storage and playback](20-recording-storage-and-playback.md) | Implemented R2 upload wiring and proposed review flow and a timestamped feedback-marker timeline (depends on evaluation existing) |
+| [Live interview voice](21-live-interview-voice.md) | ElevenLabs TTS + live captions + live follow-ups, implemented; live provider availability requires separate verification |
 | [Change log](CHANGELOG.md) | Documentation changes and future implementation reconciliation |
 
 ## Status conventions
