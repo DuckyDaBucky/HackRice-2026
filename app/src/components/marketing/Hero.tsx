@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ProductPreview } from "./ProductPreview";
 
 export function Hero() {
@@ -14,13 +15,13 @@ export function Hero() {
           grounded in what you said, not a guess.
         </p>
         <div className="mt-7 flex flex-wrap items-center justify-end gap-6">
-          <a
-            href="#waitlist"
+          <Link
+            href="/sign-up"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-accent"
           >
-            Join the waitlist
+            Sign up
             <ArrowIcon />
-          </a>
+          </Link>
           <a
             href="#employers"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-muted transition-colors hover:text-foreground"

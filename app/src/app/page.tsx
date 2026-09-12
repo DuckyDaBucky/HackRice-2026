@@ -5,12 +5,13 @@ import { TwoAudienceCards } from "@/components/marketing/TwoAudienceCards";
 import { EmployerShowcase } from "@/components/marketing/EmployerShowcase";
 import { TrustSection } from "@/components/marketing/TrustSection";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
-import { WaitlistCta } from "@/components/marketing/WaitlistCta";
+import { FinalCta } from "@/components/marketing/FinalCta";
 import { clerkEnabled } from "@/lib/clerk";
 import { currentUser } from "@clerk/nextjs/server";
 import { Dashboard } from "@/components/Dashboard";
 import { getSessionStats, listRecentSessions } from "@/lib/sessions";
 import { getProfile } from "@/lib/profiles";
+import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
 
 export default async function Home() {
   const user = clerkEnabled ? await currentUser() : null;
@@ -24,7 +25,7 @@ export default async function Home() {
         <EmployerShowcase />
         <TrustSection />
         <HowItWorks />
-        <WaitlistCta />
+        <FinalCta />
         <Footer />
       </div>
     );
@@ -35,12 +36,14 @@ export default async function Home() {
     listRecentSessions(user.id),
     getProfile(user.id),
   ]);
+  const answeredCounts = await countUploadedAttemptsBySession(sessions.map((s) => s.id));
 
   return (
     <Dashboard
       firstName={user.firstName}
       stats={stats}
       sessions={sessions}
+      answeredCounts={answeredCounts}
       hasResume={profile !== null}
     />
   );
