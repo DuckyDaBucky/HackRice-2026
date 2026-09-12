@@ -16,6 +16,7 @@ import type { UseTextToSpeech } from "@/hooks/useTextToSpeech";
 import { formatDuration } from "@/lib/recording/format-duration";
 import { shouldRequestFollowUp } from "@/lib/follow-up/should-request";
 import type { InterviewMode } from "@/lib/questions/types";
+import type { InterviewMood } from "@/lib/interview-config";
 
 const FOLLOW_UP_CHECK_INTERVAL_MS = 500;
 
@@ -45,6 +46,8 @@ interface CameraRecorderProps {
   recorder: UseCameraRecorder;
   mode: InterviewMode;
   voiceId: string;
+  mood: InterviewMood;
+  customPrompt: string | null;
   tts: UseTextToSpeech;
   questionPrompt: string;
   questionNumber: number;
@@ -57,6 +60,8 @@ export function CameraRecorder({
   recorder,
   mode,
   voiceId,
+  mood,
+  customPrompt,
   tts,
   questionPrompt,
   questionNumber,
@@ -114,6 +119,8 @@ export function CameraRecorder({
           mode,
           questionPrompt,
           transcriptSoFar: captions.finalText,
+          mood,
+          customPrompt,
         }),
       })
         .then((res) => res.json())
@@ -122,7 +129,7 @@ export function CameraRecorder({
           // event, not a state change for a separate effect to react to.
           if (data.followUp) {
             setFollowUp(data.followUp);
-            tts.speak(data.followUp, voiceId);
+            tts.speak(data.followUp, voiceId, mood);
           }
         })
         .catch(() => {
@@ -130,7 +137,17 @@ export function CameraRecorder({
         });
     }, FOLLOW_UP_CHECK_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [isRecording, mode, questionPrompt, voiceId, captions.finalText, captions.lastFinalAt, tts]);
+  }, [
+    isRecording,
+    mode,
+    questionPrompt,
+    voiceId,
+    mood,
+    customPrompt,
+    captions.finalText,
+    captions.lastFinalAt,
+    tts,
+  ]);
 
   const handleStartRecording = () => {
     hasRequestedFollowUpRef.current = false;

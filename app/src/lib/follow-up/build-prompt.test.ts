@@ -30,4 +30,24 @@ describe("buildFollowUpPrompt", () => {
     expect(prompt).toContain("followUp");
     expect(prompt.toLowerCase()).toContain("json");
   });
+
+  it("includes a mood-specific tone instruction", () => {
+    const prompt = buildFollowUpPrompt({
+      mode: "technical",
+      questionPrompt: "Walk me through a design decision.",
+      transcriptSoFar: "I chose Postgres because",
+      mood: "challenging",
+    });
+    expect(prompt.toLowerCase()).toContain("pointed, skeptical follow-up");
+  });
+
+  it("includes the candidate's focus area when provided", () => {
+    const prompt = buildFollowUpPrompt({
+      mode: "technical",
+      questionPrompt: "Walk me through a design decision.",
+      transcriptSoFar: "I chose Postgres because",
+      customPrompt: "distributed systems tradeoffs",
+    });
+    expect(prompt).toContain("distributed systems tradeoffs");
+  });
 });

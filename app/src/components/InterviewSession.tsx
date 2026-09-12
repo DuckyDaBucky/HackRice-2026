@@ -5,37 +5,62 @@ import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { CameraRecorder } from "@/components/CameraRecorder";
 import { InterviewLobby } from "@/components/InterviewLobby";
-import { useCameraRecorder } from "@/hooks/useCameraRecorder";
-import { useTextToSpeech } from "@/hooks/useTextToSpeech";
-import { useVoicePreference } from "@/hooks/useVoicePreference";
-import { inMemorySink } from "@/lib/recording/mock-sink";
+import { useCameraRecorder, type UseCameraRecorder } from "@/hooks/useCameraRecorder";
+import { useTextToSpeech, type UseTextToSpeech } from "@/hooks/useTextToSpeech";
+import { r2Sink } from "@/lib/recording/r2-sink";
 import { formatDuration } from "@/lib/recording/format-duration";
 import { staticQuestionSource } from "@/lib/questions/static-source";
+import { DEFAULT_VOICE_ID } from "@/lib/voice/presets";
+import {
+  abandonInterviewSession,
+  completeInterviewSession,
+  getResumeState,
+  startInterviewSession,
+} from "@/app/interview/actions";
+import type { SessionConfig } from "@/lib/sessions";
 import type { InterviewMode, Question } from "@/lib/questions/types";
 
 interface AnsweredQuestion {
   question: Question;
   durationMs: number;
   mimeType: string;
-  status: "queued" | "failed";
+  status: "uploaded" | "failed";
 }
 
-export function InterviewSession({ mode }: { mode: InterviewMode }) {
+type InterviewSessionProps =
+  | { mode: InterviewMode; resumeSessionId: string; setup?: undefined }
+  | { mode: InterviewMode; resumeSessionId?: undefined; setup: SessionConfig };
+
+export function InterviewSession(props: InterviewSessionProps) {
+  const { mode, resumeSessionId } = props;
   const router = useRouter();
   const recorder = useCameraRecorder();
   const tts = useTextToSpeech();
-  const { voiceId, setVoiceId } = useVoicePreference();
   const [questions, setQuestions] = useState<Question[] | null>(null);
-  const [index, setIndex] = useState(0);
-  const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
-  const [done, setDone] = useState(false);
-
-  // sessionId is per-mount for now — sessions aren't persisted yet (see docs/16).
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const [sessionId] = useState(() => resumeSessionId ?? crypto.randomUUID());
+  // null until a fresh setup's implicit "nothing uploaded yet" applies, or the resume fetch resolves.
+  const [resolved, setResolved] = useState<{
+    uploadedQuestionIds: Set<string>;
+    config: SessionConfig;
+  } | null>(resumeSessionId ? null : { uploadedQuestionIds: new Set(), config: props.setup });
 
   useEffect(() => {
     staticQuestionSource.getQuestions(mode).then(setQuestions);
   }, [mode]);
+
+  useEffect(() => {
+    if (!resumeSessionId) return;
+    getResumeState(resumeSessionId)
+      .then((state) => {
+        if (!state) {
+          router.push("/");
+          return;
+        }
+        setResolved({ uploadedQuestionIds: new Set(state.uploadedQuestionIds), config: state.config });
+      })
+      .catch(() => router.push("/"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeSessionId]);
 
   const cleanupRef = useRef({ release: recorder.release, stopSpeech: tts.stop });
   useEffect(() => {
@@ -48,13 +73,7 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
     };
   }, []);
 
-  const leaveInterview = () => {
-    recorder.release();
-    tts.stop();
-    router.push("/interview");
-  };
-
-  if (!questions) {
+  if (!questions || !resolved) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-zinc-950 text-zinc-400">
         Loading questions…
@@ -62,13 +81,69 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
     );
   }
 
-  if (questions.length === 0) {
+  const activeQuestions = questions.slice(0, resolved.config.questionCount);
+
+  if (activeQuestions.length === 0) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-zinc-950 text-zinc-400">
         No questions are available for this mode yet.
       </div>
     );
   }
+
+  return (
+    <ActiveInterview
+      mode={mode}
+      sessionId={sessionId}
+      questions={activeQuestions}
+      uploadedQuestionIds={resolved.uploadedQuestionIds}
+      config={resolved.config}
+      recorder={recorder}
+      tts={tts}
+    />
+  );
+}
+
+/** Only mounts once questions and any resume point are known, so the starting index can be a plain lazy initializer instead of an effect-driven setState. */
+function ActiveInterview({
+  mode,
+  sessionId,
+  questions,
+  uploadedQuestionIds,
+  config,
+  recorder,
+  tts,
+}: {
+  mode: InterviewMode;
+  sessionId: string;
+  questions: Question[];
+  uploadedQuestionIds: Set<string>;
+  config: SessionConfig;
+  recorder: UseCameraRecorder;
+  tts: UseTextToSpeech;
+}) {
+  const router = useRouter();
+  const [index, setIndex] = useState(() => {
+    const firstUnanswered = questions.findIndex((q) => !uploadedQuestionIds.has(q.id));
+    return firstUnanswered === -1 ? questions.length - 1 : firstUnanswered;
+  });
+  const [answers, setAnswers] = useState<AnsweredQuestion[]>([]);
+  const [done, setDone] = useState(() => uploadedQuestionIds.size >= questions.length);
+
+  useEffect(() => {
+    // The session row is only created once the candidate actually joins (camera granted),
+    // not just for loading the lobby — otherwise every visit that bounces off the lobby
+    // leaves a permanent zero-progress "Incomplete" entry on the dashboard. Idempotent via
+    // ON CONFLICT DO NOTHING, so this is also a safe no-op when resuming an existing row.
+    if (recorder.stream) startInterviewSession(sessionId, mode, config).catch(() => {});
+  }, [recorder.stream, sessionId, mode, config]);
+
+  const leaveInterview = () => {
+    recorder.release();
+    tts.stop();
+    abandonInterviewSession(sessionId).catch(() => {});
+    router.push("/");
+  };
 
   if (done) {
     const totalMs = answers.reduce((sum, a) => sum + a.durationMs, 0);
@@ -78,9 +153,8 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
           <CheckCircleIcon size={40} weight="fill" className="text-sky-400" />
           <h1 className="text-2xl font-semibold tracking-tight">Interview complete</h1>
           <p className="max-w-sm text-sm text-zinc-400">
-            {answers.length} answers recorded in {formatDuration(totalMs)}. Each was queued
-            for analysis as soon as it was recorded, no analyzer is wired up yet, so this
-            just lists what would have been sent.
+            {answers.length} answers uploaded in {formatDuration(totalMs)}. Analysis isn&apos;t
+            wired up yet, so no feedback is available for this session.
           </p>
         </div>
 
@@ -98,7 +172,7 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
                 <span>{formatDuration(answer.durationMs)}</span>
                 <span
                   className={`rounded-full px-2 py-0.5 font-medium ${
-                    answer.status === "queued"
+                    answer.status === "uploaded"
                       ? "bg-sky-500/10 text-sky-400"
                       : "bg-red-500/10 text-red-400"
                   }`}
@@ -121,15 +195,22 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
     );
   }
 
+  const voiceId = config.voiceId ?? DEFAULT_VOICE_ID;
+
   if (recorder.stream === null) {
     return (
       <InterviewLobby
         mode={mode}
         recorder={recorder}
         voiceId={voiceId}
-        onVoiceIdChange={setVoiceId}
-        firstQuestionPrompt={questions[0].prompt}
+        mood={config.mood}
+        firstQuestionPrompt={questions[index].prompt}
         tts={tts}
+        resumeProgress={
+          uploadedQuestionIds.size > 0
+            ? { answered: uploadedQuestionIds.size, total: questions.length }
+            : undefined
+        }
       />
     );
   }
@@ -141,6 +222,8 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
       recorder={recorder}
       mode={mode}
       voiceId={voiceId}
+      mood={config.mood}
+      customPrompt={config.customPrompt}
       tts={tts}
       questionPrompt={currentQuestion.prompt}
       questionNumber={index + 1}
@@ -154,12 +237,12 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
           durationMs,
           createdAt: new Date().toISOString(),
         };
-        inMemorySink
+        r2Sink
           .submit(artifact, { sessionId, questionId: currentQuestion.id })
           .then(() =>
             setAnswers((prev) => [
               ...prev,
-              { question: currentQuestion, durationMs, mimeType, status: "queued" },
+              { question: currentQuestion, durationMs, mimeType, status: "uploaded" },
             ]),
           )
           .catch(() =>
@@ -172,12 +255,13 @@ export function InterviewSession({ mode }: { mode: InterviewMode }) {
         if (index + 1 >= questions.length) {
           recorder.release();
           tts.stop();
+          completeInterviewSession(sessionId).catch(() => {});
           setDone(true);
         } else {
           // Advancing to the next question is the event that should speak
           // it — called directly here, not derived from an effect
           // watching questionPrompt after the fact.
-          tts.speak(questions[index + 1].prompt, voiceId);
+          tts.speak(questions[index + 1].prompt, voiceId, config.mood);
           setIndex((prev) => prev + 1);
         }
       }}

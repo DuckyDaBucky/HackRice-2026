@@ -1,11 +1,14 @@
 import { buildFollowUpPrompt } from "@/lib/follow-up/build-prompt";
 import { parseFollowUpResponse } from "@/lib/follow-up/parse-response";
+import { isInterviewMood, MAX_CUSTOM_PROMPT_LENGTH } from "@/lib/interview-config";
 import type { InterviewMode } from "@/lib/questions/types";
 
 interface FollowUpRequestBody {
   mode: InterviewMode;
   questionPrompt: string;
   transcriptSoFar: string;
+  mood?: unknown;
+  customPrompt?: unknown;
 }
 
 function isValidBody(body: unknown): body is FollowUpRequestBody {
@@ -36,7 +39,14 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const prompt = buildFollowUpPrompt(body);
+  const prompt = buildFollowUpPrompt({
+    ...body,
+    mood: isInterviewMood(body.mood) ? body.mood : undefined,
+    customPrompt:
+      typeof body.customPrompt === "string"
+        ? body.customPrompt.slice(0, MAX_CUSTOM_PROMPT_LENGTH)
+        : undefined,
+  });
 
   try {
     const response = await fetch(

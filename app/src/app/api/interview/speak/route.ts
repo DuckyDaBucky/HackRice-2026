@@ -1,8 +1,18 @@
 import { DEFAULT_VOICE_ID } from "@/lib/voice/presets";
+import { isInterviewMood, type InterviewMood } from "@/lib/interview-config";
 
 // ElevenLabs voice IDs are opaque alphanumeric identifiers. This isn't
 // their real format spec, just a sanity check before it goes into a URL.
 const VOICE_ID_PATTERN = /^[A-Za-z0-9]{10,40}$/;
+
+// stability: lower = more expressive/variable delivery. style: higher =
+// more exaggerated delivery style. Real ElevenLabs voice_settings, not
+// cosmetic — this is the actual lever "mood" has on the interviewer's voice.
+const MOOD_VOICE_SETTINGS: Record<InterviewMood, { stability: number; style: number }> = {
+  supportive: { stability: 0.75, style: 0.15 },
+  neutral: { stability: 0.5, style: 0 },
+  challenging: { stability: 0.3, style: 0.5 },
+};
 
 export async function POST(request: Request) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -18,9 +28,10 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { text, voiceId: requestedVoiceId } = (body ?? {}) as {
+  const { text, voiceId: requestedVoiceId, mood } = (body ?? {}) as {
     text?: unknown;
     voiceId?: unknown;
+    mood?: unknown;
   };
   if (typeof text !== "string" || text.trim().length === 0) {
     return Response.json({ error: "text is required" }, { status: 400 });
@@ -28,6 +39,7 @@ export async function POST(request: Request) {
   if (requestedVoiceId !== undefined && typeof requestedVoiceId !== "string") {
     return Response.json({ error: "voiceId must be a string" }, { status: 400 });
   }
+  const voiceSettings = MOOD_VOICE_SETTINGS[isInterviewMood(mood) ? mood : "neutral"];
 
   // Chosen in-app on the lobby screen (see useVoicePreference) takes
   // precedence over the server-side default, so voice choice never needs
@@ -48,6 +60,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         text,
         model_id: "eleven_turbo_v2_5",
+        voice_settings: voiceSettings,
       }),
     });
 
