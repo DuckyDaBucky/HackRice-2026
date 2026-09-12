@@ -680,6 +680,192 @@ export async function confirmArtifactUploaded(params: {
   if (result.rowCount !== 1) throw new Error("Recording upload cannot be confirmed.");
 }
 
+export interface EvidenceLinkedReport {
+  id: string;
+  status: "processing" | "completed" | "retryable_failed" | "terminal_failed";
+  rubricVersion: string;
+  summary: {
+    answeredCount: number;
+    skippedCount: number;
+    transcriptCount: number;
+    artifactCount: number;
+    transcriptSource: "browser_caption_draft";
+  };
+  generatedAt: string | null;
+  items: Array<{
+    id: string;
+    planQuestionId: string | null;
+    turnId: string | null;
+    artifactId: string | null;
+    competency: string;
+    coverage: "observed" | "insufficient";
+    finding: string;
+    nextStep: string;
+    evidenceText: string | null;
+  }>;
+}
+
+type ReportEvidenceRow = {
+  plan_question_id: string;
+  content_type: string;
+  prompt: string;
+  question_status: string;
+  turn_id: string | null;
+  artifact_id: string | null;
+  transcript: string | null;
+};
+
+function nextStepFor(contentType: string) {
+  if (contentType === "behavioral") return "Practice a concise situation, action, and outcome structure for a future example.";
+  if (contentType === "system_design") return "Practice naming constraints, tradeoffs, and one reliability failure mode before proposing components.";
+  if (contentType === "code_explanation") return "Practice stating the approach, complexity, and one edge case before walking through implementation details.";
+  return "Practice stating the decision criteria and one concrete tradeoff before giving your conclusion.";
+}
+
+/**
+ * Creates the initial no-score report from durable candidate-owned evidence.
+ * Browser captions are useful immediately but explicitly remain draft evidence
+ * until a provider transcription is introduced in a later report version.
+ */
+export async function ensureEvidenceLinkedReport(sessionId: string, clerkUserId: string): Promise<EvidenceLinkedReport> {
+  return transaction(async (client) => {
+    const session = await client.query<{ id: string }>(
+      `SELECT id FROM interview_sessions
+       WHERE id = $1 AND clerk_user_id = $2 AND status = 'completed'
+         AND deleted_at IS NULL FOR UPDATE`,
+      [sessionId, clerkUserId],
+    );
+    if (session.rowCount !== 1) throw new Error("A report is available only after this interview is complete.");
+
+    const existing = await client.query<{ id: string; status: EvidenceLinkedReport["status"] }>(
+      `SELECT id, status FROM evaluation_reports
+       WHERE session_id = $1 AND version = 1 AND deleted_at IS NULL FOR UPDATE`,
+      [sessionId],
+    );
+    const reportId = existing.rows[0]?.id ?? randomUUID();
+    if (!existing.rowCount) {
+      await client.query(
+        `INSERT INTO evaluation_reports (id, session_id, version, status, rubric_version)
+         VALUES ($1, $2, 1, 'processing', 'practice-report-v1')`,
+        [reportId, sessionId],
+      );
+    }
+
+    const evidence = await client.query<ReportEvidenceRow>(
+      `SELECT q.id AS plan_question_id, q.content_type, q.prompt, q.status AS question_status,
+              answer.id AS turn_id, artifact.id AS artifact_id, transcript.full_text AS transcript
+       FROM interview_plan_questions q
+       LEFT JOIN LATERAL (
+         SELECT t.id FROM interview_turns t
+         WHERE t.session_id = q.session_id AND t.plan_question_id = q.id
+           AND t.kind = 'candidate_answer' AND t.deleted_at IS NULL
+         ORDER BY t.sequence DESC LIMIT 1
+       ) answer ON true
+       LEFT JOIN LATERAL (
+         SELECT a.id FROM media_artifacts a
+         WHERE a.session_id = q.session_id AND a.turn_id = answer.id
+           AND a.upload_status = 'uploaded' AND a.deleted_at IS NULL
+         ORDER BY a.uploaded_at DESC NULLS LAST LIMIT 1
+       ) artifact ON true
+       LEFT JOIN LATERAL (
+         SELECT tr.full_text FROM audio_transcripts tr
+         WHERE tr.artifact_id = artifact.id AND tr.status = 'completed'
+           AND tr.deleted_at IS NULL AND tr.full_text IS NOT NULL
+         ORDER BY tr.completed_at DESC NULLS LAST LIMIT 1
+       ) transcript ON true
+       WHERE q.session_id = $1 AND q.deleted_at IS NULL AND q.superseded_at IS NULL
+       ORDER BY q.position`,
+      [sessionId],
+    );
+    const rows = evidence.rows;
+    const answeredCount = rows.filter((row) => row.question_status === "answered").length;
+    const skippedCount = rows.filter((row) => row.question_status === "skipped").length;
+    const transcriptCount = rows.filter((row) => Boolean(row.transcript?.trim())).length;
+    const artifactCount = rows.filter((row) => Boolean(row.artifact_id)).length;
+    const summary: EvidenceLinkedReport["summary"] = {
+      answeredCount,
+      skippedCount,
+      transcriptCount,
+      artifactCount,
+      transcriptSource: "browser_caption_draft",
+    };
+
+    await client.query("DELETE FROM evaluation_items WHERE report_id = $1", [reportId]);
+    for (const row of rows) {
+      const transcript = row.transcript?.trim() ?? "";
+      const observed = transcript.length >= 40;
+      await client.query(
+        `INSERT INTO evaluation_items
+           (report_id, plan_question_id, turn_id, artifact_id, competency, coverage, finding, next_step, evidence_text)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          reportId,
+          row.plan_question_id,
+          row.turn_id,
+          row.artifact_id,
+          row.content_type.replaceAll("_", " "),
+          observed ? "observed" : "insufficient",
+          observed
+            ? `A saved response is available for: ${row.prompt}`
+            : row.question_status === "skipped"
+              ? "This question was skipped, so there is no response evidence to review."
+              : "There is not enough saved transcript evidence for a practice observation on this question.",
+          nextStepFor(row.content_type),
+          observed ? transcript.slice(0, 320) : null,
+        ],
+      );
+    }
+    await client.query(
+      `UPDATE evaluation_reports
+       SET status = 'completed', summary = $2::jsonb, error_code = NULL, generated_at = now()
+       WHERE id = $1`,
+      [reportId, JSON.stringify(summary)],
+    );
+    return readOwnedEvidenceLinkedReport(client, sessionId, clerkUserId);
+  });
+}
+
+async function readOwnedEvidenceLinkedReport(client: PoolClient, sessionId: string, clerkUserId: string): Promise<EvidenceLinkedReport> {
+  const reportResult = await client.query<{
+    id: string; status: EvidenceLinkedReport["status"]; rubric_version: string;
+    summary: EvidenceLinkedReport["summary"]; generated_at: Date | null;
+  }>(
+    `SELECT r.id, r.status, r.rubric_version, r.summary, r.generated_at
+     FROM evaluation_reports r JOIN interview_sessions s ON s.id = r.session_id
+     WHERE r.session_id = $1 AND s.clerk_user_id = $2 AND r.deleted_at IS NULL
+       AND s.deleted_at IS NULL ORDER BY r.version DESC LIMIT 1`,
+    [sessionId, clerkUserId],
+  );
+  const report = reportResult.rows[0];
+  if (!report) throw new Error("Interview report not found.");
+  const items = await client.query<EvidenceLinkedReport["items"][number] & { plan_question_id: string | null; turn_id: string | null; artifact_id: string | null; evidence_text: string | null; next_step: string }>(
+    `SELECT id, plan_question_id, turn_id, artifact_id, competency, coverage, finding, next_step, evidence_text
+     FROM evaluation_items WHERE report_id = $1 ORDER BY created_at, id`,
+    [report.id],
+  );
+  return {
+    id: report.id,
+    status: report.status,
+    rubricVersion: report.rubric_version,
+    summary: report.summary,
+    generatedAt: report.generated_at?.toISOString() ?? null,
+    items: items.rows.map((item) => ({
+      id: item.id, planQuestionId: item.plan_question_id, turnId: item.turn_id, artifactId: item.artifact_id,
+      competency: item.competency, coverage: item.coverage, finding: item.finding,
+      nextStep: item.next_step, evidenceText: item.evidence_text,
+    })),
+  };
+}
+
+export async function getOwnedEvidenceLinkedReport(sessionId: string, clerkUserId: string) {
+  const client = await db.connect();
+  try {
+    return await readOwnedEvidenceLinkedReport(client, sessionId, clerkUserId);
+  } finally {
+    client.release();
+  }
+}
+
 export async function markArtifactRetryableFailure(artifactId: string, sessionId: string) {
   await db.query(
     `UPDATE media_artifacts AS artifact

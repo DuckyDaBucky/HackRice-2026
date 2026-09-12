@@ -171,6 +171,8 @@ export const transcriptStatuses = [
 ] as const;
 export const generationPurposes = ["plan", "next_turn", "report"] as const;
 export const generationStatuses = ["pending", "running", "completed", "failed"] as const;
+export const reportStatuses = ["processing", "completed", "retryable_failed", "terminal_failed"] as const;
+export const reportCoverageStatuses = ["observed", "insufficient"] as const;
 
 /** Immutable setup snapshots. Focus-area changes create a new revision. */
 export const interviewSessionConfigs = pgTable(
@@ -292,6 +294,47 @@ export const mediaArtifacts = pgTable(
   (table) => [
     unique("media_artifacts_r2_key_key").on(table.r2Key),
     check("media_artifacts_duration_check", sql`${table.durationMs} is null or ${table.durationMs} >= 0`),
+  ],
+);
+
+export const evaluationReports = pgTable(
+  "evaluation_reports",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionId: uuid("session_id").notNull().references(() => interviewSessions.id, { onDelete: "cascade" }),
+    version: integer("version").notNull().default(1),
+    status: text("status", { enum: reportStatuses }).notNull().default("processing"),
+    rubricVersion: text("rubric_version").notNull(),
+    summary: jsonb("summary").notNull().default({}),
+    errorCode: text("error_code"),
+    generatedAt: timestamp("generated_at", { withTimezone: true }),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("evaluation_reports_session_version_key").on(table.sessionId, table.version),
+    check("evaluation_reports_version_check", sql`${table.version} >= 1`),
+  ],
+);
+
+export const evaluationItems = pgTable(
+  "evaluation_items",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reportId: uuid("report_id").notNull().references(() => evaluationReports.id, { onDelete: "cascade" }),
+    planQuestionId: uuid("plan_question_id").references(() => interviewPlanQuestions.id, { onDelete: "set null" }),
+    turnId: uuid("turn_id").references(() => interviewTurns.id, { onDelete: "set null" }),
+    artifactId: uuid("artifact_id").references(() => mediaArtifacts.id, { onDelete: "set null" }),
+    competency: text("competency").notNull(),
+    coverage: text("coverage", { enum: reportCoverageStatuses }).notNull(),
+    finding: text("finding").notNull(),
+    nextStep: text("next_step").notNull(),
+    evidenceText: text("evidence_text"),
+    evidenceStartMs: integer("evidence_start_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check("evaluation_items_evidence_start_check", sql`${table.evidenceStartMs} is null or ${table.evidenceStartMs} >= 0`),
   ],
 );
 

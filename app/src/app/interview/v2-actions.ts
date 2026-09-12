@@ -7,9 +7,11 @@ import {
   createCandidateAnswerTurn,
   createInterviewerTurn,
   createSkipTurn,
+  ensureEvidenceLinkedReport,
   getArtifactKeyForOwnedSession,
   getAgentContextForTurn,
   getV2ResumeState,
+  getOwnedEvidenceLinkedReport,
   markArtifactRetryableFailure,
   registerArtifactForUpload,
   persistAgentDecision,
@@ -19,7 +21,7 @@ import {
 import { rephraseInterviewQuestion } from "@/lib/interviews/rephrase";
 import { AGENT_PROMPT_VERSION, agentInputHash, decideNextTurn } from "@/lib/interviews/agent";
 import type { AgentDecision } from "@/lib/interviews/agent-contracts";
-import { getUploadedObjectMetadata, artifactClipKey, createUploadUrl } from "@/lib/storage/r2";
+import { getUploadedObjectMetadata, artifactClipKey, createPlaybackUrl, createUploadUrl } from "@/lib/storage/r2";
 
 async function requireOwnedV2Session(sessionId: string) {
   const { userId } = await auth();
@@ -56,9 +58,32 @@ export async function pausePersistedInterview(sessionId: string) {
 
 export async function completePersistedInterview(sessionId: string) {
   const { userId, state } = await requireOwnedV2Session(sessionId);
-  if (state.session.status === "completed") return true;
+  if (state.session.status === "completed") {
+    await ensureEvidenceLinkedReport(sessionId, userId).catch(() => {});
+    return true;
+  }
   if (state.session.status !== "in_progress") return false;
-  return transitionOwnedV2Session({ sessionId, clerkUserId: userId, from: "in_progress", to: "completed" });
+  const completed = await transitionOwnedV2Session({ sessionId, clerkUserId: userId, from: "in_progress", to: "completed" });
+  // Report work is recoverable and must never make a completed recording look
+  // unfinished. The report page retries this deterministic first pass.
+  if (completed) await ensureEvidenceLinkedReport(sessionId, userId).catch(() => {});
+  return completed;
+}
+
+export async function getPersistedInterviewReport(sessionId: string) {
+  const { userId } = await requireOwnedV2Session(sessionId);
+  try {
+    return await getOwnedEvidenceLinkedReport(sessionId, userId);
+  } catch {
+    return ensureEvidenceLinkedReport(sessionId, userId);
+  }
+}
+
+export async function getPersistedArtifactPlaybackUrl(sessionId: string, artifactId: string) {
+  const { userId } = await requireOwnedV2Session(sessionId);
+  const key = await getArtifactKeyForOwnedSession({ artifactId, sessionId, clerkUserId: userId });
+  if (!key) throw new Error("Recording is unavailable.");
+  return createPlaybackUrl(key);
 }
 
 export async function skipPersistedInterviewQuestion(sessionId: string, planQuestionId: string) {
