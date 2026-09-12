@@ -5,7 +5,7 @@ export function Hero() {
   return (
     <section id="top" className="overflow-hidden pt-20 sm:pt-28">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-        <h1 className="max-w-2xl text-5xl font-medium leading-[1.05] tracking-tight text-foreground sm:text-6xl">
+        <h1 className="max-w-2xl text-5xl font-normal leading-[1.05] tracking-tight text-foreground sm:text-6xl">
           Interview practice
           <br />
           <span className="text-accent">that knows your resume.</span>
@@ -32,7 +32,11 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="mx-auto mt-14 max-w-4xl px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
+      <div className="relative mx-auto mt-14 max-w-4xl px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
+        <div
+          className="pointer-events-none absolute -inset-x-10 -top-24 -bottom-10 -z-10 bg-[radial-gradient(ellipse_60%_60%_at_50%_20%,color-mix(in_srgb,var(--color-accent)_16%,transparent),transparent)] blur-2xl"
+          aria-hidden="true"
+        />
         <TiltCard>
           <ProductPreview />
         </TiltCard>
