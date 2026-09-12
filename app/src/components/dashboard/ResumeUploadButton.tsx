@@ -36,7 +36,7 @@ export function ResumeUploadButton({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col items-center gap-1.5">
       <input
         ref={inputRef}
         type="file"
@@ -60,7 +60,7 @@ export function ResumeUploadButton({
       >
         {status === "uploading" ? "Processing…" : label}
       </button>
-      {status === "error" && <p className="text-xs text-red-600">{error}</p>}
+      {status === "error" && <p className="max-w-xs text-center text-xs text-red-600">{error}</p>}
     </div>
   );
 }
