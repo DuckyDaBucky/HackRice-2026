@@ -1,5 +1,11 @@
 # Camera recorder component — spec
 
+## Current status — September 12, 2026
+
+This component design describes the original slice. Current wiring uses the R2 sink and authenticated session actions; read the source and current code map for implemented behavior. See [current codebase](14-current-codebase.md).
+
+## Historical design / checkpoint
+
 Implementation detail for [16-camera-recorder-build-slice.md](./16-camera-recorder-build-slice.md).
 
 ## Purpose

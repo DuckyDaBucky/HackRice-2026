@@ -39,15 +39,43 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
   MOOD_OPTIONS.map((option) => [option.id, option.label]),
 );
 
+/** Mirrors the durable-session/report lifecycle from src/components/Dashboard.tsx on main. */
 function actionFor(session: SessionRecord): { label: string; href: string } {
-  if (session.status === "in_progress") {
-    return { label: "Resume", href: `/interview/${session.mode}?session=${session.id}` };
+  if (session.status === "in_progress" || session.status === "paused" || session.status === "planned") {
+    return {
+      label: session.status === "planned" ? "Start" : "Resume",
+      href: session.isDurable
+        ? `/interview/session/${session.id}`
+        : `/interview/${session.mode}?session=${session.id}`,
+    };
   }
   if (session.status === "abandoned") {
     return { label: "Try again", href: "/interview/setup" };
   }
+  if (session.isDurable && session.reportStatus === "completed") {
+    return { label: "Review report", href: `/reports/${session.id}` };
+  }
+  if (session.isDurable && session.reportStatus === "processing") {
+    return { label: "Report preparing", href: `/reports/${session.id}` };
+  }
   return { label: "Practice again", href: "/interview/setup" };
 }
+
+const STATUS_LABEL: Record<SessionRecord["status"], string> = {
+  completed: "Completed",
+  in_progress: "In progress",
+  paused: "Paused",
+  planned: "Ready to start",
+  abandoned: "Abandoned",
+};
+
+const STATUS_STYLE: Record<SessionRecord["status"], string> = {
+  completed: "text-[#0f9d78]",
+  in_progress: "text-amber-600",
+  paused: "text-amber-600",
+  planned: "text-accent-deep",
+  abandoned: "text-[#93a1b5]",
+};
 
 function greeting(): string {
   const hour = new Date().getHours();
@@ -60,11 +88,13 @@ export function Dashboard({
   firstName,
   stats,
   sessions,
+  answeredCounts,
   hasResume,
 }: {
   firstName: string | null;
   stats: SessionStats;
   sessions: SessionRecord[];
+  answeredCounts: Record<string, number>;
   hasResume: boolean;
 }) {
   const hasCompleted = stats.completedSessions > 0;
@@ -189,6 +219,7 @@ export function Dashboard({
                   const Icon = MODE_ICON[session.mode];
                   const action = actionFor(session);
                   const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
+                  const answered = answeredCounts[session.id] ?? 0;
                   const isScored = session.status === "completed";
                   const score = isScored ? sessionScore(session.id) : null;
 
@@ -205,11 +236,15 @@ export function Dashboard({
                           </span>
                           <div className="mt-0.5 truncate text-xs text-[#93a1b5]">
                             {shortDate(session.createdAt)}
-                            {duration ? ` · ${duration} min` : ""} · {session.questionCount} questions
+                            {duration ? ` · ${duration} min` : ""} · {answered} of {session.questionCount}{" "}
+                            answered
                           </div>
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-4 pl-7 sm:pl-0">
+                        <span className={`text-xs font-medium ${STATUS_STYLE[session.status]}`}>
+                          {STATUS_LABEL[session.status]}
+                        </span>
                         {score !== null && (
                           <span className="text-sm font-semibold tabular-nums text-[#0b1120]">
                             {score}

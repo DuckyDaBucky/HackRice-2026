@@ -1,5 +1,14 @@
 # Documentation change log
 
+## September 12, 2026 — main documentation audit
+
+- Replaced scaffold-only code/setup references with the merged landing, dashboard, optional Clerk, workbench, recording, R2, voice and native Presage inventory.
+- Clarified separate Gemini keys, the question-pack handoff gap, automatic experience classification and prepared-only versus actual TTS paths.
+- Corrected obsolete authentication-loop and test-count statements; recorded 75 tests and builds with/without Clerk as the latest merge evidence, not new provider acceptance.
+- Marked initial media/data/Presage slice documents as historical and distinguished upload helpers from completed timestamped report playback.
+- No application code, credentials, corpus content, migrations or service configuration changed in this audit.
+
+
 ## September 12, 2026 — combine workbench and interview slices
 
 - Preserved main's recording, voice, captions, migrations and documentation alongside the development workbench and account profiles.

@@ -12,6 +12,8 @@ export interface UseLiveCaptions {
   lastSpeechAt: number | null;
   /** Resets any prior transcript and begins listening for a new answer. */
   start: () => void;
+  /** Restarts recognition after a recording pause without clearing saved text. */
+  resume: () => void;
   stop: () => void;
 }
 
@@ -104,5 +106,10 @@ export function useLiveCaptions(): UseLiveCaptions {
     recognition?.stop();
   }, []);
 
-  return { isSupported, interimText, finalText, lastFinalAt, lastSpeechAt, start, stop };
+  const resume = useCallback(() => {
+    if (!isSupported || recognitionRef.current) return;
+    beginListening();
+  }, [beginListening, isSupported]);
+
+  return { isSupported, interimText, finalText, lastFinalAt, lastSpeechAt, start, resume, stop };
 }

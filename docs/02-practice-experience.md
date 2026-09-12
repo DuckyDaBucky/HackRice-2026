@@ -2,11 +2,9 @@
 
 > Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
 
-## Implementation checkpoint
+## Current implementation
 
-Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
-
-Only home, sign-in and sign-up pages exist. Resume upload/parsing, target-role setup, camera/microphone capture, question generation, voice, live rooms and practice reports are not implemented in this snapshot. Future pages will live in the existing `app/src/app/` App Router structure. A signed-in user interface alone does not establish private ownership of sessions or media; that remains backend work.
+The workbench implements resume extraction, evidence-based experience classification, profile correction, project ranking and question/report generation. The separate interview flow implements capture, voice, captions and R2 upload wiring. Connecting these flows and completing aligned report playback remains work. See [current codebase](14-current-codebase.md).
 
 ## Setup and resume understanding
 
@@ -16,7 +14,7 @@ Only home, sign-in and sign-up pages exist. Resume upload/parsing, target-role s
 
 1. Accept a bounded set of resume formats, initially PDF and DOCX. Validate file type and size; treat scanned PDFs as unsupported until OCR is intentionally added.
 2. Extract roles, projects, skills, dates, claimed responsibilities, and evidence snippets. Keep missing facts explicitly unknown.
-3. Show the parsed profile for correction. An inferred experience level is editable, not an unquestionable label.
+3. Show the parsed profile for correction. Users correct supporting resume facts; the LLM reassesses experience under the documented criteria. There is no user-selected experience level.
 4. Ask for the target position and optionally a job description. Resume experience and target role jointly inform difficulty.
 5. Choose behavioral, technical-behavioral, or a mixture; show estimated duration and question count.
 6. Run a microphone/camera check and explain recording and report use before recording begins.

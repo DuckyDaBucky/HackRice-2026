@@ -2,15 +2,9 @@
 
 > Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
 
-## Implementation checkpoint
+## Current implementation
 
-Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
-
-The sole data-layer file is `app/src/lib/db.ts`: it creates and exports a node-postgres pool. There are no tables, migrations, SQL calls, ORM, validation schemas, server actions or `route.ts` handlers in the inspected tree. The `/api|trpc` proxy matcher does not mean those endpoints exist. All entities and routes in this document remain proposed contracts.
-
-Future handlers can use the `@/* → ./src/*` alias, but importing the pool does not implement user/organization scoping. Define schema ownership and migrations before introducing session persistence.
-
-Names below are conceptual; align them with the code after the first push. IDs should be opaque. Every access must be checked server-side, including storage access and asynchronous jobs.
+The app now has pg/Drizzle, migrations, session/attempt queries, Clerk-owned profiles, versioned research storage, server actions and API handlers. Entities below remain the broader product design; use `app/src/lib/db/schema.ts`, the SQL assets and [current codebase](14-current-codebase.md) for implemented names. Organization and invitation records remain future work.
 
 ## Core records
 

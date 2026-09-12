@@ -2,25 +2,32 @@
 
 > Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
 
-## Integrations observed in code
+## Current integration inventory
 
-Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
+Audited September 12, 2026 against main; see [code map](14-current-codebase.md).
 
-| Integration | Source evidence | Actual scope |
+| Integration | Implemented scope | Remaining verification / integration |
 | --- | --- | --- |
-| Clerk | `@clerk/nextjs: ^7.9.2`; provider/header in layout; sign-in/sign-up pages; proxy; env placeholders | Authentication wiring present; valid credentials, successful login and authorization unverified |
-| PostgreSQL / TigerData | `pg: ^8.23.0`; pool in `src/lib/db.ts`; TigerData comment in `.env.example` | Connection utility only; no query callers, schema or migrations |
-| Next.js / React | Exact manifest versions 16.3.5 / 19.2.8 | Application scaffold |
+| Clerk | Optional public rendering, signed-in dashboard, profile/session identity | Full production access review and corporate roles |
+| PostgreSQL / Drizzle | Profiles, sessions, answer attempts, migration assets and research | Deployment-specific migration reconciliation |
+| R2 | Signed media URLs and answer upload sink | Live bucket/CORS round trip and complete review UI |
+| Gemini / LangChain | Structured workbench parsing, packs and reports | Shared handoff to interview flow |
+| Gemini direct API | Interview next-question and follow-up routes | Separate provider configuration and session integration |
+| Backboard | User-approved learning-note operations | Durable shared ownership registry for production |
+| ElevenLabs | Interview TTS endpoint and browser playback hook | Live synthesis/voice availability verification |
+| Browser Web Speech | Live captions | Durable timestamp-aligned transcription |
+| SmartSpectra | Separate native HTTP/WebSocket wrapper in `presage-api/` | Provisioned native run, authentication gateway and app integration |
+| Vultr / Persona / avatars | Planned | No completed app deployment/avatar integration established |
 
-Backboard, Gemini, LangChain, ElevenLabs, Presage and Persona have no dependencies, adapters or environment variables in this source snapshot. Vultr has no infrastructure files. No transcription provider is configured. The original intended-provider register below is retained as a planning register, not an implementation inventory.
+The following register captures intended responsibilities, not additional verification evidence.
 
 The founder named Backboard, Vultr, Presage SmartSpectra SDK, LangChain, Gemini, ElevenLabs and possibly Persona. Provider names express intended choices, not proof that a feature is supported, licensed, configured or operational. No credentials are documented here.
 
 | Integration | Intended role | Status | Validate before implementation |
 | --- | --- | --- | --- |
-| Backboard | AI/context layer | Confirmed selection; exact responsibility unresolved | Context isolation, supported models, retention, deletion, streaming and SDK/API contract |
+| Backboard | User-approved practice memory | Implemented playground; production ownership persistence remains | Context isolation, supported models, retention, deletion, streaming and SDK/API contract |
 | Gemini | Question generation, follow-ups and evaluation candidate | Confirmed intended model family | Exact model, structured output, latency, cost, regional/data settings |
-| LangChain | Possible orchestration around generation/context/tools | Confirmed intended library | Necessary responsibilities versus direct Backboard calls; supported versions |
+| LangChain | Structured Gemini parsing, questions and reports | Confirmed intended library | Necessary responsibilities versus direct Backboard calls; supported versions |
 | ElevenLabs | Spoken question playback in practice and corporate screens | Confirmed | TTS versus conversational API, streaming, interruption, available voices, pricing and consent terms |
 | Vultr | Hosting/infrastructure | Confirmed | Region, compute, storage, database, networking, secrets and budget |
 | Presage SmartSpectra SDK | Camera-related service being ideated | Confirmed exploratory integration | SDK runtime/platform support, input requirements, supported outputs, limitations and permission to use |
@@ -40,7 +47,7 @@ Do not maintain two conflicting canonical conversation histories. Validate the c
 
 ## Presage service spike
 
-The SDK service is not yet designed. First establish where it can run, what camera inputs are supported, what outputs it actually provides, and what reliability/usage constraints apply. These documents make no promise of browser support, cheating detection, emotion recognition or physiological accuracy.
+A standalone native wrapper now exists; see [service README](../presage-api/README.md). Confirm its provisioned runtime, video inputs and measurement limitations before browser integration. These documents make no promise of browser support, cheating detection, emotion recognition or physiological accuracy.
 
 Proposed service result envelope: session-scoped consent reference, signal type, timestamp, value where supported, quality/availability status, SDK version and limitations. Missing or low-quality data must remain unavailable rather than imputed. Default the experiment off in corporate mode.
 

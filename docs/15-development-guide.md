@@ -1,89 +1,60 @@
 # Development setup and verification guide
 
-> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+Current reference: main `192feef234ca127f198eb4cece3a1ad376232e6f`, September 12, 2026. See [code map](14-current-codebase.md) for implementation and verification limits.
 
-Source baseline: `17f33a59747a1e251334b28e6019602593f35f83`. Commands below follow the committed manifest and configuration. They were not executed during this docs-only review.
+## Application setup
 
-## Work in the application directory
-
-The Git repository root holds `app/` and `docs/`; run application commands inside `app/`. The landing page is `app/src/app/page.tsx` relative to the repository root, not the generic scaffold README's `app/page.tsx`.
-
-Use pnpm 11.3.0 as declared by `packageManager`, preserving the committed pnpm lockfile. `app/package.json` declares `"engines": { "node": ">=22.12.0" }` — this is Vitest 5's own floor (`^22.12.0 || ^24.0.0 || >=26.0.0`), not an arbitrary choice; Next.js itself only requires `>=20.9.0`, but `pnpm test` will not run correctly below the Vitest-driven floor. `@types/node` is pinned to `^22` to match.
+Run in `app/`, using Node >=22.12.0 and pnpm (manifest declares 11.3.0):
 
 ```sh
-cd app
-pnpm --version
 pnpm install --frozen-lockfile
-cp .env.example .env.local
+pnpm dev --hostname localhost --port 3000
 ```
 
-Copy the environment example only for a new setup; do not overwrite an existing `.env.local`. Fill local values from the team's authorized services. Do not commit real keys or database credentials. The ignore file excludes environment files while explicitly allowing `.env.example`.
+For a new setup only, copy `.env.example` to `.env.local`; never overwrite existing credentials. Public pages can load without Clerk keys. The authenticated dashboard, profiles and workbench require configured Clerk, and database-backed behavior requires the appropriate schema and connection. Prefer one consistent localhost hostname when testing sign-in cookies.
 
-## Environment contract currently in source
+## Configuration
 
-| Variable | Current purpose | Visibility |
-| --- | --- | --- |
-| NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY | Clerk instance's publishable key | Browser-visible by design |
-| CLERK_SECRET_KEY | Clerk server credential | Server-only secret |
-| NEXT_PUBLIC_CLERK_SIGN_IN_URL | /sign-in | Public route configuration |
-| NEXT_PUBLIC_CLERK_SIGN_UP_URL | /sign-up | Public route configuration |
-| NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL | / | Public fallback route |
-| NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL | / | Public fallback route |
-| DATABASE_URL | Connection string consumed by pg.Pool | Server-only secret |
+| Variables | Consumer |
+| --- | --- |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` | Clerk client/server identity; only the publishable key is public. |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, fallback redirect variables | Clerk route configuration from the example. |
+| `DATABASE_URL` | pg/Drizzle, profiles, sessions, attempts and optionally research. |
+| `GOOGLE_API_KEY`, `GEMINI_MODEL` | Workbench LangChain provider; configured default is `gemini-3.6-flash`. |
+| `GEMINI_API_KEY` | Separate interview question/follow-up routes; they hardcode their model rather than reading `GEMINI_MODEL`. |
+| `BACKBOARD_API_KEY` | Explicitly approved practice memory notes. |
+| `GET_ME_HIRED_RESEARCH_DIR` | External corpus/archive and explicit exports; never source imports or public assets. |
+| `GET_ME_HIRED_RESEARCH_SOURCE`, `GET_ME_HIRED_RESEARCH_VERSION` | Local or versioned database corpus selection. |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` | Private media storage and signed URLs; bucket CORS must allow intended origins. |
+| `ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID` | Interview speech endpoint and optional default voice. |
 
-The example database string is a placeholder and includes `sslmode=no-verify`. Confirm the database service's appropriate TLS settings before deployment; do not treat the example as a verified production configuration.
+Keep secrets server-side and out of Git. The example database URL uses `sslmode=no-verify`; validate production TLS configuration with the service. Presence of a key does not prove provider availability.
 
-There are no committed variables or adapters for Backboard, Gemini, ElevenLabs, Presage, Persona, transcription or Vultr. Add their contracts with implementation rather than inventing required names in setup instructions.
-
-## Existing commands
-
-Run from `app/`:
+## Commands and data operations
 
 ```sh
-pnpm dev
+pnpm test
 pnpm lint
 pnpm build
 pnpm start
 ```
 
-These map to `next dev`, `eslint`, `next build` and `next start`. Start is the production-server command after a successful build. The scaffold README points to localhost:3000 for development; follow the server's printed address if that port is occupied.
+Stop development before building in the same directory to avoid sharing `.next` output. The test configuration includes both `tests/**/*.test.ts` and `src/**/*.test.ts` (75 tests at this checkpoint).
 
-No test, migration, seed, formatting or deployment script is defined. Do not claim any of those ran as part of a successful build. The build may require environmental/network resources such as configuration and font retrieval; record the actual failure rather than assuming code is faulty.
+Database scripts: `db:generate`, `db:migrate`, `db:push`, `db:studio`. Review `drizzle/` and `migrations/` against the database's actual applied history before any write; these commands are not interchangeable. Profile setup is in `scripts/setup-profiles.ts`. No migrations were executed in this docs audit.
 
-## Source-based verification checklist
+Research commands: `import:research`, `verify:research-db`, `check:corpus`. Imports validate version/hash/schema integrity and use a transaction; retain the external archive.
 
-After authorized local configuration:
+Provider checks: `check:gemini`, `check:ai`, `check:memory`; standalone pipeline/profile checks also exist under `scripts/`. These use configured services, may incur usage and are separate from unit tests. `setup:r2-cors` mutates bucket CORS; review intended origins first.
 
-1. Run lint and build and record command versions and output.
-2. Visit the home page; verify the placeholder content and signed-out controls.
-3. Complete sign-up/sign-in using a test account; verify the signed-in user control and sign-out behavior.
-4. Visit the dedicated sign-in/sign-up paths and verify redirects.
-5. Test database connectivity separately once a deliberate health check/query is implemented. A successful home-page render currently does not exercise `db.ts`.
-6. When private routes/data are introduced, test unauthenticated, wrong-user and wrong-organization access, not just whether buttons are hidden.
-7. Record results and unresolved environment issues in the handoff.
+## Verification checklist
 
-This is a checklist for future execution, not a passing test report.
+Check both anonymous landing and signed-in dashboard, sign-in/out, development-only gates, cross-user profile/session access, malformed inputs and provider failure states. Then separately test camera permissions, durable upload, session resume, speech, captions and report handoff. A successful build does not prove those service flows.
 
-## Adding the first interview slice
+The latest merge checks passed tests/lint and builds with and without Clerk. Full media/provider acceptance remains separate. The waitlist is a clearly labeled preview, not a subscription service.
 
-Proposed sequence compatible with the current structure:
+## Presage service and repository workflow
 
-- Keep the existing App Router and source alias; choose route names deliberately.
-- Define profile/session/answer ownership and a migration approach before persisting interview data.
-- Add explicit server authorization before exposing private resumes or recordings.
-- Build resume/profile confirmation and one recorded answer flow.
-- Implement transcription and AI adapters with validated schemas and visible job states.
-- Add evidence-linked feedback and only then reuse the flow for corporate screening.
-- Introduce workers/object storage/live transport only when the selected vertical slice needs them.
+Use the separate [Presage README](../presage-api/README.md) for npm commands, native runtime requirements, keys and Docker setup. It is not started by `pnpm dev` and has no end-user authentication of its own.
 
-These are future engineering recommendations. None of the listed routes or services was created in this documentation update.
-
-## Repository instructions
-
-`app/AGENTS.md` states that this Next.js version may differ from prior conventions and requires reading relevant installed guides in `node_modules/next/dist/docs/` before writing code. `app/CLAUDE.md` references that file. Preserve these instructions and consult them on future code edits.
-
-## Fetching and keeping docs current
-
-During this review local HTTPS Git authentication was unavailable. The authenticated GitHub connector retrieved source at the pinned commit and is used for publishing this docs-only change. That does not synchronize the original local Git checkout or configure Git credentials.
-
-When local authentication is available, inspect local status before fetching or pulling. The original local checkout may still have an unborn branch and untracked docs from the initial planning pass. Back up those files and reconcile collisions explicitly; do not force-reset or overwrite them as an automatic “sync.”
+Follow `app/AGENTS.md` and installed Next.js guides for code changes. Inspect local Git status before synchronization. Publishing through the GitHub connector does not update local branches or configure Git credentials; preserve local files when reconciling a checkout.

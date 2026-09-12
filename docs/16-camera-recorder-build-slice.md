@@ -1,5 +1,11 @@
 # Build slice: interview practice foundation + camera recorder
 
+## Current status — September 12, 2026
+
+This is the historical initial build slice. Main now has R2 upload wiring, session persistence/setup/resume, and dynamic Gemini question generation alongside the static source. The workbench resume-grounded pack is still a separate path. See [current codebase](14-current-codebase.md).
+
+## Historical design / checkpoint
+
 ## Status
 
 Adopts "Get Me Hired" as the product name and the milestone sequence in
