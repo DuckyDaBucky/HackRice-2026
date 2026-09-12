@@ -6,8 +6,8 @@ export function ProductPreview() {
       <Image
         src="/hero-preview.png"
         alt="GetMeHired practice interview in progress, with the current question, a live recording indicator, and a real-time transcription note"
-        width={745}
-        height={491}
+        width={1490}
+        height={982}
         priority
         className="h-auto w-full"
       />

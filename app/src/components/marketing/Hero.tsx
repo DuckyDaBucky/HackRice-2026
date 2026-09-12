@@ -1,5 +1,4 @@
 import { ProductPreview } from "./ProductPreview";
-import { TiltCard } from "./TiltCard";
 
 export function Hero() {
   return (
@@ -14,7 +13,7 @@ export function Hero() {
           Questions and follow-ups drawn from your actual projects. Feedback
           grounded in what you said, not a guess.
         </p>
-        <div className="mt-7 flex flex-wrap items-center gap-6">
+        <div className="mt-7 flex flex-wrap items-center justify-end gap-6">
           <a
             href="#waitlist"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-colors hover:text-accent"
@@ -37,9 +36,7 @@ export function Hero() {
           className="pointer-events-none absolute -inset-x-10 -top-24 -bottom-10 -z-10 bg-[radial-gradient(ellipse_60%_60%_at_50%_20%,color-mix(in_srgb,var(--color-accent)_16%,transparent),transparent)] blur-2xl"
           aria-hidden="true"
         />
-        <TiltCard>
-          <ProductPreview />
-        </TiltCard>
+        <ProductPreview />
       </div>
     </section>
   );
