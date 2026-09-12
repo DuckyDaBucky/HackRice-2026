@@ -1,24 +1,25 @@
+import Image from "next/image";
+
 const SIZES = {
   sm: { icon: 28, gap: "gap-2", wordmark: "text-lg" },
   md: { icon: 36, gap: "gap-2.5", wordmark: "text-xl" },
   lg: { icon: 72, gap: "gap-4", wordmark: "text-4xl" },
 } as const;
 
+// Source mark is 396x480 (w:h ratio 0.825), cropped from the brand logo.
+const MARK_RATIO = 396 / 480;
+
 export function LogoMark({ size = 28 }: { size?: number }) {
+  const width = Math.round(size * MARK_RATIO);
   return (
-    <svg
-      width={size}
+    <Image
+      src="/logo-mark.png"
+      alt=""
+      width={width}
       height={size}
-      viewBox="0 0 100 100"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M20,85 L38,85 L75,30 L83,22 L92,8 L49,34 L57,30 Z"
-        fill="var(--color-accent)"
-      />
-    </svg>
+      priority
+      className="shrink-0"
+    />
   );
 }
 
