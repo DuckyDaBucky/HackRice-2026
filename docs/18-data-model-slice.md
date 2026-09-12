@@ -1,0 +1,235 @@
+# Data model slice: interview practice foundation
+
+## Status
+
+Parallel-track piece referenced by
+[16-camera-recorder-build-slice.md](./16-camera-recorder-build-slice.md#parallel-track):
+the client-side recorder flow in that slice runs against in-memory state and
+does not call this schema yet. This document records the schema drafted and
+verified against the real DEV TigerData service for the eventual
+integration, plus what was deliberately left out.
+
+Verified against service `t75o4scmb8` ("HackRice-2026", environment `DEV`,
+Postgres 18.6 / TimescaleDB 2.30) on September 12, 2026. Not yet wired into
+any application code — `app/src/lib/db.ts` has no callers, and this remains
+true after this change.
+
+## Tables
+
+Full migration: [`app/migrations/0001_interview_practice_slice.sql`](../app/migrations/0001_interview_practice_slice.sql).
+
+### `interview_sessions`
+
+One row per practice run.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `clerk_user_id` | `text` | Clerk user id, not a foreign key — no local `users` table in this slice; Clerk is the identity source of truth |
+| `mode` | `text` | `CHECK` in `('technical', 'behavioral')` |
+| `status` | `text` | `CHECK` in `('in_progress', 'completed', 'abandoned')`, default `'in_progress'` |
+| `created_at`, `updated_at` | `timestamptz` | default `now()` |
+| `completed_at` | `timestamptz` | nullable |
+
+Indexed on `clerk_user_id` (a user's own session list/history).
+
+### `questions`
+
+Static/seeded question bank, one pack per mode. No AI generation, no
+resume personalization, no per-session copies — `answer_attempts` rows
+reference these directly. Seeding is left to application code or a
+follow-up `INSERT` script; this migration only creates the empty table.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `mode` | `text` | `CHECK` in `('technical', 'behavioral')` |
+| `prompt` | `text` | question text |
+| `sequence` | `integer` | order within a mode's pack, `>= 0` |
+| `is_active` | `boolean` | default `true`; lets a question be retired without deleting history that references it |
+| `created_at` | `timestamptz` | default `now()` |
+
+`(mode, sequence)` is a **unique constraint** (`questions_mode_sequence_key`,
+added in 0002 — see below), not just an index: two questions sharing a
+position would leave a pack with no defined order.
+
+### `answer_attempts`
+
+One row per recorded clip. Matches `RecordingArtifact` in
+[17-camera-recorder-component.md](./17-camera-recorder-component.md#interfaces):
+`mime_type` ↔ `mimeType`, `duration_ms` ↔ `durationMs`, `recorded_at` ↔
+`createdAt`. This slice models one attempt per `(session_id, question_id)`
+pair — no attempt-number/retry column, since neither docs/16 nor docs/17
+specifies retry semantics yet; add one later if re-recording a question
+becomes a real requirement.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` PK | `gen_random_uuid()` |
+| `session_id` | `uuid` | composite FK → `interview_sessions(id, mode)`, `ON DELETE CASCADE` |
+| `question_id` | `uuid` | composite FK → `questions(id, mode)` |
+| `mode` | `text` | added in 0002; denormalized from the session, `CHECK` in `('technical', 'behavioral')` — see "mode consistency" below |
+| `media_ref` | `text` | pointer to wherever the blob eventually lands (e.g. object storage key/URL); nullable — storage is out of scope for this slice, so there's nowhere for it to point yet |
+| `mime_type` | `text` | nullable |
+| `duration_ms` | `integer` | nullable, `CHECK (>= 0)` |
+| `recorded_at` | `timestamptz` | nullable — when the clip finished recording client-side |
+| `upload_status` | `text` | `CHECK` in `('pending', 'uploading', 'uploaded', 'failed')`, default `'pending'` |
+| `analysis_status` | `text` | `CHECK` in `('not_started', 'queued', 'processing', 'completed', 'failed')`, default `'not_started'` |
+| `created_at`, `updated_at` | `timestamptz` | default `now()`; `updated_at` advances on every `UPDATE` via a trigger (0002) |
+
+`upload_status` and `analysis_status` are separate columns, not one status
+field, because docs/16 makes analysis "per-answer, not real-time, not
+end-of-session" and stubbed out entirely in this slice — conflating "did
+the clip make it to storage" with "has it been analyzed" would make the
+stub's absence look like a broken upload. A `CHECK` enforces
+`upload_status <> 'uploaded' OR media_ref IS NOT NULL` so a row can't claim
+to be uploaded without something to point at.
+
+`(session_id, question_id)` is a **unique constraint**
+(`answer_attempts_session_question_key`, 0002), not just an index — this
+slice models exactly one attempt per question per session, and a plain
+index let duplicate or concurrent inserts silently violate that.
+`question_id` is separately indexed (`idx_answer_attempts_question_id`)
+for the reverse lookup.
+
+**Mode consistency (0002):** nothing before 0002 stopped an
+`answer_attempts` row from pairing a session and question with *different*
+`mode` values (a technical session referencing a behavioral question),
+since the two foreign keys were checked independently. Fixed by giving
+`answer_attempts` its own `mode` column and switching both foreign keys to
+composite `(id, mode)` references — `interview_sessions` and `questions`
+each got a `UNIQUE (id, mode)` constraint to make that referenceable.
+Postgres has no native cross-table `CHECK`, so this is the standard way to
+enforce it declaratively instead of trusting application code.
+
+## Design choices
+
+- **`uuid` primary keys** via `gen_random_uuid()`. Verified built in on this
+  server (Postgres 18.6) — no `pgcrypto`/`uuid-ossp` extension needed. The
+  migration file notes the `CREATE EXTENSION IF NOT EXISTS pgcrypto;` fallback
+  for a hypothetical pre-13 environment, commented out, since this one
+  doesn't need it.
+- **`CHECK` constraints instead of native `ENUM` types** for `mode`,
+  `status`, `upload_status`, `analysis_status`. Enum types need
+  `ALTER TYPE ... ADD VALUE` (non-transactional in older Postgres, and
+  fiddly generally) to add a state later; a `text` column with a `CHECK`
+  is a one-line migration to widen. Cheaper to change during a hackathon.
+- **No migration runner.** No Prisma/Drizzle/node-pg-migrate is installed
+  and this slice doesn't add one (out of scope per the task that produced
+  this document, and consistent with 15-development-guide.md's "No test,
+  migration, seed, formatting or deployment script is defined"). The file
+  is plain numbered SQL; a runner is a future decision, not made here.
+- **`clerk_user_id text`, no local `users` table.** Clerk already owns
+  identity (`app/src/proxy.ts`, `app/src/app/layout.tsx`). Adding a shadow
+  `users` table now would just be a foreign key with no columns of its own
+  to justify it.
+
+## Deliberately out of scope (see docs/07 for the long-term shape)
+
+Everything below is a named entity in
+[07-data-and-api-design.md](./07-data-and-api-design.md#core-records) that
+this slice does not build, and why:
+
+- **Organization / Membership** — no multi-tenant workspace concept yet;
+  this slice is single-user practice only.
+- **CandidateProfile, ResumeAsset** — resume upload/parsing/personalization
+  is explicitly out of scope for the camera-recorder slice this schema
+  supports (docs/16, "Explicitly out of scope").
+- **Requisition, InterviewTemplate, Invitation** — corporate/HR workflows
+  are not part of this slice.
+- **Question / QuestionPack as a versioned, provenance-tracked entity** —
+  collapsed here into a single flat `questions` table with a `mode` and
+  `sequence`, since content is static/seeded, not AI-generated yet.
+- **RubricVersion, EvaluationVersion, Report, Observation** — no analyzer
+  is wired up; `answer_attempts.analysis_status` is a stub state machine,
+  not a real pipeline.
+- **TranscriptVersion** — no transcription in this slice.
+- **PracticeContext, ConsentRecord, AuditEvent** — no persisted consent or
+  audit trail yet; docs/16 requires consent UI copy but explicitly does not
+  persist a `ConsentRecord` in this slice.
+
+## Verification performed
+
+No local `psql` binary or Postgres client library was available in the
+sandbox this work was done in, and the `mcp__tiger__db_query` /
+`mcp__tiger__db_schema` tools could not authenticate against the DEV
+service in this environment (`password authentication failed`; the
+`service_update_password` tool's response confirmed its keyring-based
+credential cache could not be written: `"Failed to save password to
+keyring: The name is not activatable"`). Rotating the service's master
+password did not fix the MCP tools' own cached credential.
+
+Given that, verification was done with a direct `pg` client connection
+(same DEV service, same connection string shape as `app/src/lib/db.ts`
+expects) from a scratch scripts directory outside the repo:
+
+1. Confirmed the target schema was empty before this change (only
+   TimescaleDB-internal schemas existed; no `public` tables).
+2. Confirmed `gen_random_uuid()` works with no extension installed
+   (`SELECT gen_random_uuid();` — Postgres 18.6 has it built in).
+3. Ran the full migration file end to end inside a transaction; it applied
+   without error.
+4. Inserted two seed questions, one session, and one answer attempt;
+   updated the attempt to `upload_status = 'uploaded'` with a `media_ref`;
+   ran the join query a review page would use
+   (`interview_sessions ⋈ answer_attempts ⋈ questions` filtered by
+   `session_id`, ordered by `sequence`) and got back the expected row.
+5. Confirmed constraints reject bad input: invalid `mode`/`status` enum
+   values, `upload_status = 'uploaded'` with a null `media_ref`, a
+   `question_id` that doesn't exist (FK violation), and a negative
+   `duration_ms`.
+6. Confirmed `ON DELETE CASCADE`: deleting the test session removed its
+   answer attempt.
+7. Deleted the two seed questions used for testing. Final row counts in
+   all three tables were confirmed at zero — the tables are left in place,
+   empty, as the actual deliverable; no test rows remain.
+
+**Operational note:** step 3 required rotating the DEV service's
+`tsdbadmin` master password (via `mcp__tiger__service_update_password`) to
+get any working credential at all, since the MCP query tools couldn't
+authenticate with whatever credential they had cached. Anyone who already
+has a `DATABASE_URL` pointed at this service in a local `.env.local` will
+need to fetch the current password again (`tiger service get t75o4scmb8
+--with-password`, or the Tiger Cloud console) before their existing
+connection string will work.
+
+## 0002: fixes from automated PR review
+
+[`app/migrations/0002_data_integrity_fixes.sql`](../app/migrations/0002_data_integrity_fixes.sql)
+addresses four gaps `qodo-code-review` found in PR #2 against 0001, all
+verified against the real DEV service (applied, then each constraint
+exercised to confirm it actually rejects the bad case, not just that the
+migration ran):
+
+- Duplicate `(session_id, question_id)` rows were possible → unique
+  constraint (see "Mode consistency" above for the FK-related fix, and the
+  `answer_attempts` table section above for the uniqueness one).
+- Duplicate `(mode, sequence)` questions were possible → unique constraint.
+- A session and question with different `mode` values could be paired on
+  one `answer_attempts` row → composite FKs, described above.
+- `updated_at` had a default but nothing advanced it on `UPDATE` → a
+  `BEFORE UPDATE` trigger on `interview_sessions` and `answer_attempts`.
+
+All four were confirmed live: a duplicate insert, a mode-mismatched
+insert, and a duplicate-sequence insert were each rejected with the
+expected constraint-violation error, and an `UPDATE` was confirmed to
+advance `updated_at` past its original value.
+
+0001's own tables were empty in the DEV environment this was applied
+against, so no backfill/dedup step was needed for the new `mode` column or
+the new unique constraints. A database with existing rows would need
+duplicates resolved (per an explicit policy) before 0002 can apply.
+
+## Applying these migrations in a fresh environment
+
+No migration runner is installed. Apply both files in order:
+
+```sh
+psql "$DATABASE_URL" -f app/migrations/0001_interview_practice_slice.sql
+psql "$DATABASE_URL" -f app/migrations/0002_data_integrity_fixes.sql
+```
+
+Each file wraps its statements in a single transaction. Neither is
+idempotent (no `IF NOT EXISTS` guards) and each will error if run twice
+against the same database; a future migration runner should track what's
+already applied rather than this file guessing.
