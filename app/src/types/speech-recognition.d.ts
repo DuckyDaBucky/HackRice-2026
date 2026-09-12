@@ -4,6 +4,7 @@
 
 interface SpeechRecognitionResultItem {
   transcript: string;
+  confidence: number;
 }
 
 interface SpeechRecognitionResult {

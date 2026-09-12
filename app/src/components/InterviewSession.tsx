@@ -212,24 +212,46 @@ function ActiveInterview({
           <CheckCircleIcon size={40} weight="fill" className="text-sky-400" />
           <h1 className="text-2xl font-semibold tracking-tight">Interview complete</h1>
           <p className="max-w-sm text-sm text-zinc-400">
-            {answers.length} answers uploaded in {formatDuration(totalMs)}. Analysis isn&apos;t
-            wired up yet, so no feedback is available for this session.
+            {answers.length} answers uploaded in {formatDuration(totalMs)}. Transcripts below
+            were refined from the recordings — fix anything misheard before review.
+            Analysis isn&apos;t wired up yet, so no feedback is available for this session.
           </p>
         </div>
 
         <ul className="flex w-full max-w-lg flex-col gap-2">
           {answers.map((answer, answerIndex) => (
-            <li key={answer.question.id} className="flex items-center justify-between gap-4 rounded-2xl bg-zinc-900 px-4 py-3 ring-1 ring-inset ring-zinc-800">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-xs text-zinc-500">Question {answerIndex + 1}</span>
-                <span className="text-sm text-zinc-200">{answer.question.prompt}</span>
+            <li key={answer.question.id} className="flex flex-col gap-2 rounded-2xl bg-zinc-900 px-4 py-3 ring-1 ring-inset ring-zinc-800">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-xs text-zinc-500">Question {answerIndex + 1}</span>
+                  <span className="text-sm text-zinc-200">{answer.question.prompt}</span>
+                </div>
+                <div className="flex shrink-0 items-center gap-2 text-xs text-zinc-500">
+                  <span>{formatDuration(answer.durationMs)}</span>
+                  <span className={`rounded-full px-2 py-0.5 font-medium ${answer.status === "uploaded" ? "bg-sky-500/10 text-sky-400" : "bg-red-500/10 text-red-400"}`}>
+                    {answer.status}
+                  </span>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2 text-xs text-zinc-500">
-                <span>{formatDuration(answer.durationMs)}</span>
-                <span className={`rounded-full px-2 py-0.5 font-medium ${answer.status === "uploaded" ? "bg-sky-500/10 text-sky-400" : "bg-red-500/10 text-red-400"}`}>
-                  {answer.status}
-                </span>
-              </div>
+              <label className="flex flex-col gap-1 text-xs text-zinc-500">
+                Transcript (editable)
+                <textarea
+                  rows={3}
+                  value={answer.transcript}
+                  onChange={(event) => {
+                    const next = event.target.value;
+                    setAnswers((previousAnswers) =>
+                      previousAnswers.map((previous, previousIndex) =>
+                        previousIndex === answerIndex
+                          ? { ...previous, transcript: next }
+                          : previous,
+                      ),
+                    );
+                  }}
+                  className="w-full resize-y rounded-xl bg-zinc-950 px-3 py-2 text-sm text-zinc-100 ring-1 ring-inset ring-zinc-800 placeholder:text-zinc-600 focus:outline-none focus:ring-sky-500"
+                  placeholder="No speech was transcribed for this answer."
+                />
+              </label>
             </li>
           ))}
         </ul>
