@@ -1,8 +1,8 @@
-import { WaitlistForm } from "./WaitlistForm";
+import Link from "next/link";
 
-export function WaitlistCta() {
+export function FinalCta() {
   return (
-    <section id="waitlist" className="scroll-mt-20 bg-[#fafbfc] py-16 sm:py-20">
+    <section className="bg-[#fafbfc] py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div
           className="rounded-3xl px-6 py-10 sm:px-10 sm:py-12"
@@ -20,10 +20,13 @@ export function WaitlistCta() {
               </h2>
             </div>
             <div>
-              <WaitlistForm />
-              <p className="mt-2 text-xs text-white/60">
-                Free during early access. No credit card required.
-              </p>
+              <Link
+                href="/sign-up"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-[#03231e] transition-colors duration-150 hover:bg-accent-hover"
+              >
+                Get started
+              </Link>
+              <p className="mt-2 text-xs text-white/60">Free to start. No credit card required.</p>
             </div>
           </div>
         </div>

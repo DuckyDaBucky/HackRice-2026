@@ -29,6 +29,7 @@ const validSetup = {
   timeBudgetSeconds: 600,
   voiceId: null,
   mood: "neutral",
+  biometricsEnabled: false,
 };
 
 beforeEach(() => {

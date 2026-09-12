@@ -65,3 +65,11 @@ export async function getUploadedObjectMetadata(key: string): Promise<{
     checksumSha256: result.ChecksumSHA256 ?? null,
   };
 }
+
+/** Reads a recorded clip fully into memory to relay it to a server-side analysis service. */
+export async function getObjectBuffer(key: string): Promise<{ buffer: Buffer; contentType: string | null }> {
+  const result = await client().send(new GetObjectCommand({ Bucket: bucket(), Key: key }));
+  const bytes = await result.Body?.transformToByteArray();
+  if (!bytes) throw new Error(`Object body was empty for key ${key}.`);
+  return { buffer: Buffer.from(bytes), contentType: result.ContentType ?? null };
+}

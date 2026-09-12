@@ -22,9 +22,10 @@ import { rephraseInterviewQuestion } from "@/lib/interviews/rephrase";
 import { AGENT_PROMPT_VERSION, agentInputHash, decideNextTurn } from "@/lib/interviews/agent";
 import type { AgentDecision } from "@/lib/interviews/agent-contracts";
 import { getUploadedObjectMetadata, artifactClipKey, createPlaybackUrl, createUploadUrl } from "@/lib/storage/r2";
-import { requireSessionPrincipal } from "@/lib/access/session-principal";
-import { isHiringSession } from "@/lib/access/session-principal";
+import { requireSessionPrincipal, isHiringSession } from "@/lib/access/session-principal";
 import { completeHiringInterview } from "@/lib/hiring/sessions";
+import { isBiometricsEnabledForSession, queueBiometricAnalysis } from "@/lib/biometrics/persistence";
+import { runBiometricAnalysesForSession } from "@/lib/biometrics/processor";
 
 async function requireOwnedV2Session(sessionId: string) {
   const principal = await requireSessionPrincipal(sessionId);
@@ -205,6 +206,14 @@ export async function confirmPersistedAnswerUpload(params: {
       artifactId: params.artifactId,
       turnId: params.turnId,
       text: params.transcript.trim(),
+    });
+  }
+  if (await isBiometricsEnabledForSession(params.sessionId)) {
+    await queueBiometricAnalysis({ sessionId: params.sessionId, artifactId: params.artifactId });
+    // Best-effort: the report page can also trigger/retry this. A failure here must never
+    // fail the upload confirmation the candidate is waiting on.
+    runBiometricAnalysesForSession(params.sessionId).catch((error) => {
+      console.error("Biometric analysis relay failed", error);
     });
   }
 }

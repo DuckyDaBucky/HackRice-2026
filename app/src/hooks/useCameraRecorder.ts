@@ -70,7 +70,14 @@ export function useCameraRecorder(): UseCameraRecorder {
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: true,
-        audio: true,
+        // Echo cancellation + noise suppression keep the interviewer's TTS
+        // playback and room noise out of the candidate's answer track, which
+        // directly improves both live captions and server-side transcription.
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       });
 
       // The component using this hook may have unmounted while permission

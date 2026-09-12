@@ -2,6 +2,9 @@
 .env.*
 !.env.example
 
+.env.local
+.env*.local
+
 # dependencies
 node_modules/
 
