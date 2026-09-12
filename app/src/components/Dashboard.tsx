@@ -10,7 +10,6 @@ import { SkillBars } from "@/components/dashboard/SkillBars";
 import { JoinInterview } from "@/components/dashboard/JoinInterview";
 import { WaveformAccent } from "@/components/dashboard/WaveformAccent";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-import { SAMPLE_EMPLOYER_INVITES } from "@/lib/dashboard/employer-invites";
 import {
   focusCopy,
   overallScore,
@@ -142,37 +141,6 @@ export function Dashboard({
             <WaveformAccent className="hidden shrink-0 sm:flex" />
           </div>
         </section>
-
-        {SAMPLE_EMPLOYER_INVITES.length > 0 && (
-          <section>
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
-              Employer interviews
-            </h2>
-            <div className="mt-3 divide-y divide-dash-border rounded-xl border border-dash-border bg-dash-surface">
-              {SAMPLE_EMPLOYER_INVITES.map((invite) => (
-                <div
-                  key={invite.id}
-                  className="flex items-center justify-between gap-4 px-4 py-3.5"
-                >
-                  <div>
-                    <div className="text-sm font-medium text-dash-text">
-                      {invite.role} · {invite.company}
-                    </div>
-                    <div className="mt-0.5 text-xs text-dash-text-faint">
-                      {invite.stage} · Due {invite.dueDate} · ~{invite.durationMinutes} minutes
-                    </div>
-                  </div>
-                  <Link
-                    href="/interview/setup"
-                    className="inline-flex h-8 shrink-0 items-center rounded-md border border-dash-border-strong px-3 text-sm font-medium text-dash-text transition-colors duration-150 hover:bg-dash-nav-hover"
-                  >
-                    Start interview
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {!hasCompleted ? (
           <EmptyState
