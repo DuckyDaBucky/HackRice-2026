@@ -27,6 +27,9 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 | [First-push handoff](13-first-push-handoff.md) | How to reconcile this baseline with the first code push |
 | [Current codebase](14-current-codebase.md) | Verified stack, routes, authentication, database utility and implementation gaps |
 | [Development guide](15-development-guide.md) | Source-backed setup commands, configuration and verification steps |
+| [Camera recorder build slice](16-camera-recorder-build-slice.md) | Reconciles this plan with the interview-practice foundation currently being implemented |
+| [Camera recorder component](17-camera-recorder-component.md) | Spec for the capture component: states, interfaces, testability boundary |
+| [Data model slice](18-data-model-slice.md) | Schema/migrations for the session-recording flow, drafted as a parallel track |
 | [Change log](CHANGELOG.md) | Documentation changes and future implementation reconciliation |
 
 ## Status conventions

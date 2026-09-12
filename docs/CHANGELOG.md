@@ -1,5 +1,24 @@
 # Documentation change log
 
+## 2026-09-12 — Camera recorder build slice
+
+- Adopted "Get Me Hired" naming and the Milestone 1/2 delivery sequence as
+  source of truth for the interview-practice foundation being implemented
+  now.
+- Recorded the decision to start with a static question bank per mode
+  (Technical/Behavioral) rather than resume-driven personalization, citing
+  the fallback path already documented in the practice-experience plan.
+- Recorded the per-answer (not real-time, not end-of-session) analysis
+  pipeline decision in this repo's entity names.
+- Added the camera recorder component spec, including the consent-notice
+  requirement from the trust-and-camera-features doc and the testability
+  boundary between pure logic (unit-tested) and browser-API code (manually
+  validated).
+- Data model work for this slice is tracked separately as a parallel track
+  so client-side recording and schema design aren't blocking each other.
+- Scope: documentation only in this entry; implementation follows in the
+  same working session.
+
 ## 2026-09-12 — First implementation reconciliation
 
 - Inspected immutable main snapshot `17f33a59747a1e251334b28e6019602593f35f83` through the authenticated GitHub connection.
