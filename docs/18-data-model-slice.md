@@ -1,5 +1,11 @@
 # Data model slice: interview practice foundation
 
+## Current status — September 12, 2026
+
+This is the original SQL slice and its recorded verification. Main additionally contains Drizzle schema/history, seed/setup SQL, session configuration and dynamic question generation. Reconcile existing database history before migration; this audit did not rerun migrations. See [current codebase](14-current-codebase.md).
+
+## Historical design / checkpoint
+
 ## Status
 
 Parallel-track piece referenced by

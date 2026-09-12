@@ -1,9 +1,9 @@
 "use client";
 
-import { ClerkProvider } from "@clerk/nextjs";
+import { AuthProvider } from "./auth-provider";
 import type { ReactNode } from "react";
 
 /** All persisted interview routes use Clerk-backed Server Actions. */
 export function AppProviders({ children }: { children: ReactNode }) {
-  return <ClerkProvider>{children}</ClerkProvider>;
+  return <AuthProvider>{children}</AuthProvider>;
 }

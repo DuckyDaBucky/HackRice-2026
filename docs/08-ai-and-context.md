@@ -2,11 +2,9 @@
 
 > Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
 
-## Implementation checkpoint
+## Current implementation
 
-Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
-
-There is no model invocation, prompt template, context store, AI SDK integration, transcription workflow or streaming handler in the codebase. The workflows below are intended application contracts. Choose the Backboard/Gemini/LangChain responsibility boundary before adding adapters; neither Clerk identities nor a PostgreSQL pool alone supplies application memory.
+Workbench LangChain/Gemini structured parsing, weighted question packs, submitted-answer reports and Backboard notes are implemented. The interview flow has separate direct Gemini question/follow-up calls. Those paths are not yet connected to one shared resume-grounded session pack. See [workbench contract](16-workbench-and-processing.md).
 
 ## Question generation
 

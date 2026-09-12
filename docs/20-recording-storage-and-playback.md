@@ -1,5 +1,11 @@
 # Recording storage and playback
 
+## Current status — September 12, 2026
+
+R2 signing, the upload sink and owner-checked confirmation actions are implemented. A playback signing helper exists, but the full timestamped report/review player is still proposed. Workbench text evaluation exists; durable transcript alignment with uploaded clips remains incomplete. The design below is the original implementation proposal. See [current codebase](14-current-codebase.md).
+
+## Historical design / checkpoint
+
 ## Status
 
 Expands on an idea already implicit in

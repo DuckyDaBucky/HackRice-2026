@@ -2,15 +2,9 @@
 
 > Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
 
-## Implementation checkpoint
+## Current implementation
 
-Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
-
-Clerk identity UI exists, but no explicit protected-route rules, application authorization, consent records, camera capture, private media storage or retention jobs have been added. No Presage signals or integrity flags are collected in the current application source. The requirements below describe work still to implement.
-
-The committed `.env.example` uses a placeholder database URL containing `sslmode=no-verify`. Record this as a configuration item to review against the chosen database service before deployment; it is not evidence that production certificate verification is configured. This documentation-only revision does not modify that configuration.
-
-These are proposed product requirements, not a jurisdiction-specific legal assessment or a claim of regulatory compliance.
+Clerk profile and session owner checks, camera capture and R2 upload wiring are implemented. Public interview routes are intentionally outside Clerk middleware; this does not grant anonymous storage access. Corporate isolation, comprehensive consent/retention policy and production security validation remain work. The standalone Presage wrapper has no end-user authentication and is not connected to candidate scoring. These are product requirements, not a compliance certification.
 
 ## Recording and ownership
 

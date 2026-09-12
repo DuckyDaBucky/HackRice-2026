@@ -2,11 +2,9 @@
 
 > Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
 
-## Implementation checkpoint
+## Current implementation
 
-Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
-
-Clerk is wired into the shared layout and request proxy. There are no organization memberships, HR roles, requisitions, invitation handlers, candidate screening routes or interviewer panels in the application source. The proxy calls `clerkMiddleware()` with no explicit protection callback; no role or resource-ownership checks are present. Do not describe corporate isolation as implemented. These workflows remain requirements for future work.
+Clerk-owned profiles and session/media ownership checks exist. Organization memberships, HR roles, requisitions, invitations and interviewer panels remain proposed. Marketing employer previews do not implement corporate authorization. See [current codebase](14-current-codebase.md).
 
 ## HR role setup
 

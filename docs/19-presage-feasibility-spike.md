@@ -1,5 +1,11 @@
 # Presage SmartSpectra feasibility spike
 
+## Current status — September 12, 2026
+
+The research below is historical. A native Node SmartSpectra wrapper now exists in `presage-api/`, exposing uploaded-video HTTP and live WebSocket analysis. It is not a browser SDK, has no end-user auth, and is not wired into the interview UI. See the service README for current contracts. Native processing was not exercised in this audit. See [current codebase](14-current-codebase.md).
+
+## Historical design / checkpoint
+
 ## Status
 
 Research only, done to scope work for whoever picks up the biometric
