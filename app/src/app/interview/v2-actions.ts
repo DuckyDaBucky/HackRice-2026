@@ -23,21 +23,30 @@ import { llmTextModel } from "@/lib/llm/provider";
 import { AGENT_PROMPT_VERSION, agentInputHash, decideNextTurn } from "@/lib/interviews/agent";
 import type { AgentDecision } from "@/lib/interviews/agent-contracts";
 import { getUploadedObjectMetadata, artifactClipKey, createPlaybackUrl, createUploadUrl } from "@/lib/storage/r2";
+import { requireSessionPrincipal, isHiringSession } from "@/lib/access/session-principal";
+import { completeHiringInterview } from "@/lib/hiring/sessions";
 import { isBiometricsEnabledForSession, queueBiometricAnalysis } from "@/lib/biometrics/persistence";
 import { runBiometricAnalysesForSession } from "@/lib/biometrics/processor";
 
 async function requireOwnedV2Session(sessionId: string) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Sign in to access this interview.");
-  const state = await getV2ResumeState(sessionId, userId);
+  const principal = await requireSessionPrincipal(sessionId);
+  if (principal.kind === "org_recruiter") throw new Error("Interview session not found.");
+  const state = await getV2ResumeState(sessionId, principal.clerkUserId);
   if (!state) throw new Error("Interview session not found.");
-  return { userId, state };
+  return { userId: principal.clerkUserId, state, principal };
 }
 
 export async function getPersistedInterviewState(sessionId: string) {
   const { userId } = await auth();
   if (!userId) return null;
-  return getV2ResumeState(sessionId, userId);
+  try {
+    const principal = await requireSessionPrincipal(sessionId);
+    if (principal.kind === "org_recruiter") return null;
+    if (principal.clerkUserId !== userId) return null;
+    return getV2ResumeState(sessionId, userId);
+  } catch {
+    return null;
+  }
 }
 
 export async function beginOrResumePersistedInterview(sessionId: string) {
@@ -67,9 +76,13 @@ export async function completePersistedInterview(sessionId: string) {
   }
   if (state.session.status !== "in_progress") return false;
   const completed = await transitionOwnedV2Session({ sessionId, clerkUserId: userId, from: "in_progress", to: "completed" });
-  // Report work is recoverable and must never make a completed recording look
-  // unfinished. The report page retries this deterministic first pass.
-  if (completed) await ensureEvidenceLinkedReport(sessionId, userId).catch(() => {});
+  if (completed) {
+    if (await isHiringSession(sessionId)) {
+      await completeHiringInterview(sessionId, userId).catch(() => {});
+    } else {
+      await ensureEvidenceLinkedReport(sessionId, userId).catch(() => {});
+    }
+  }
   return completed;
 }
 
@@ -110,7 +123,10 @@ export async function decidePersistedInterviewNextTurn(params: {
   planQuestionId: string;
   transcript: string;
 }): Promise<AgentDecision> {
-  await requireOwnedV2Session(params.sessionId);
+  const { principal } = await requireOwnedV2Session(params.sessionId);
+  if (principal.kind === "assigned_candidate") {
+    return { action: "move_to_next_question", rationale: "coverage_complete" };
+  }
   const baseContext = await getAgentContextForTurn(params);
   const context = { ...baseContext, transcript: params.transcript.slice(0, 12_000) };
   const inputHash = agentInputHash(context);

@@ -48,18 +48,26 @@ export async function generateQuestions(userId:string,input:z.infer<typeof gener
   const context=await resolveContext(userId,input.context,JSON.stringify(input.context.target??{}));
   const plan=planInterview(await loadCorpus(),input.context,input.count,input.selectionSeed??randomUUID(),input.excludedQuestionIds);
   const source={seeds:plan.seeds,version:plan.selection.datasetVersion};
-  const focus=plan.focus;
+  const projectFocus=plan.focus;
+  const categoryFocus=input.categoryFocus??"balanced";
+  const categoryRule=categoryFocus==="behavioral"
+    ?"Every question must use category behavioral only."
+    :categoryFocus==="technical-behavioral"
+      ?"Every question must use category technical-behavioral only."
+      :"Balance behavioral and technical-behavioral questions when count permits.";
   const effectiveContext={...input.context,target:{...input.context.target,level:effectiveLevel(input.context)}};
   try{
     const raw=await chatModel().withStructuredOutput(providerSchema(z.toJSONSchema(questionOutputSchema)) as Record<string,unknown>,{name:"interview_questions",method:"jsonSchema"}).invoke([
-      ["system",`${instructions} Generate exactly the requested number of distinct questions. Balance behavioral and technical-behavioral questions when count permits. Personalize only from the confirmed profile; profileEvidence must be verbatim strings from it. Use supplied project IDs or null. Cite sourceQuestionId only if adapting that supplied question, otherwise null. Keep hypothetical questions explicitly hypothetical. Return useful question-specific strong-answer indicators. Use saved notes to avoid repetition and target learning goals. Never imply a scenario actually happened when the profile does not say so.`],
+      ["system",`${instructions} Generate exactly the requested number of distinct questions. ${categoryRule} Personalize only from the confirmed profile; profileEvidence must be verbatim strings from it. Use supplied project IDs or null. Cite sourceQuestionId only if adapting that supplied question, otherwise null. Keep hypothetical questions explicitly hypothetical. Return useful question-specific strong-answer indicators. Use saved notes to avoid repetition and target learning goals. Never imply a scenario actually happened when the profile does not say so.`],
       ["human",JSON.stringify({count:input.count,context:effectiveContext,notes:context.memories,selection:plan.selection,
-        requiredProjectQuestion:focus?{projectId:focus.id,name:focus.name,evidence:focus.evidence,instruction:"Include at least one question explicitly naming this project and asking about the candidate's contribution, decisions or tradeoffs relevant to the target. Set its projectId and quote supporting project evidence verbatim. Do not invent metrics or responsibilities."}:null,
+        requiredProjectQuestion:projectFocus?{projectId:projectFocus.id,name:projectFocus.name,evidence:projectFocus.evidence,instruction:"Include at least one question explicitly naming this project and asking about the candidate's contribution, decisions or tradeoffs relevant to the target. Set its projectId and quote supporting project evidence verbatim. Do not invent metrics or responsibilities."}:null,
         seeds:source.seeds.map(q=>({id:q.id,prompt:q.prompt,intent:q.intent,strongAnswerIndicators:q.strongAnswerIndicators}))})],
     ],{signal:signal?AbortSignal.any([signal,AbortSignal.timeout(60000)]):AbortSignal.timeout(60000)});
     const pack=validateQuestions(raw,input.count,input.context.profile,source.seeds,source.version);
-    if(input.count>=2&&new Set(pack.questions.map(q=>q.category)).size!==2)throw new WorkbenchError("INVALID_OUTPUT","The question pack did not include both interview categories. Generate again.",502);
-    if(focus&&!pack.questions.some(q=>q.projectId===focus.id&&normalize(q.prompt).includes(normalize(focus.name))&&q.profileEvidence.length&&q.profileEvidence.every(e=>focus.evidence.some(f=>normalize(f).includes(normalize(e)))))) {
+    if(categoryFocus==="balanced"&&input.count>=2&&new Set(pack.questions.map(q=>q.category)).size!==2)throw new WorkbenchError("INVALID_OUTPUT","The question pack did not include both interview categories. Generate again.",502);
+    if(categoryFocus==="behavioral"&&pack.questions.some(q=>q.category!=="behavioral"))throw new WorkbenchError("INVALID_OUTPUT","The question pack included non-behavioral questions. Generate again.",502);
+    if(categoryFocus==="technical-behavioral"&&pack.questions.some(q=>q.category!=="technical-behavioral"))throw new WorkbenchError("INVALID_OUTPUT","The question pack included non-technical questions. Generate again.",502);
+    if(projectFocus&&!pack.questions.some(q=>q.projectId===projectFocus.id&&normalize(q.prompt).includes(normalize(projectFocus.name))&&q.profileEvidence.length&&q.profileEvidence.every(e=>projectFocus.evidence.some(f=>normalize(f).includes(normalize(e)))))) {
       throw new WorkbenchError("INVALID_PERSONALIZATION","The generated pack did not ground its project question in the selected resume evidence. Generate again.",502);
     }
     return {pack,selection:plan.selection,usedContext:{...context,warnings:[...context.warnings,...plan.selection.warnings]}};
