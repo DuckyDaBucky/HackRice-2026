@@ -31,19 +31,34 @@ export async function parseResume(text:string) {
   const apiKey=process.env.GOOGLE_API_KEY;
   if(!apiKey) throw new WorkbenchError("MISSING_KEY", "Configure GOOGLE_API_KEY in the local server environment.",503);
   const model=process.env.GEMINI_MODEL||"gemini-3.6-flash";
-  try {
-    const llm=new ChatGoogle({model,apiKey,maxRetries:0});
-    const raw=await llm.withStructuredOutput(providerSchema(z.toJSONSchema(resumeSchema)) as Record<string, unknown>,{name:"resume_profile",method:"jsonSchema"}).invoke([
-      ["system",parserInstructions],["human",JSON.stringify({resumeText:text})],
-    ],{signal:AbortSignal.timeout(45000)});
-    return {profile:verifyResumeOutput(raw,text),model,parsedAt:new Date().toISOString()};
-  } catch(error) {
-    if(error instanceof WorkbenchError) throw error;
-    const message=error instanceof Error?error.message:"";
-    if(/429|quota|resource.exhausted/i.test(message)) throw new WorkbenchError("QUOTA", "Gemini quota or rate limit reached. Check your account and retry later.",429);
-    if(/401|403|api.key|permission|unauthenticated/i.test(message)) throw new WorkbenchError("PROVIDER_AUTH", "Gemini rejected the configured key or access. Check the Google AI Studio API key and model permissions.",503);
-    if(/abort|timeout/i.test(message)) throw new WorkbenchError("TIMEOUT", "Gemini timed out. Your text is still available to retry.",504);
-    if(/404|not.found|not supported|no longer available/i.test(message)) throw new WorkbenchError("MODEL_UNAVAILABLE", "The selected Gemini model is unavailable for this account. Check GEMINI_MODEL.",503);
-    throw new WorkbenchError("PROVIDER_FAILED", "Gemini could not produce a valid profile. Check provider access or edit the profile manually.",502);
+  const currentDate=new Date().toISOString().slice(0,10);
+  const llm=new ChatGoogle({model,apiKey,maxRetries:0});
+  const structured=llm.withStructuredOutput(providerSchema(z.toJSONSchema(resumeSchema)) as Record<string, unknown>,{name:"resume_profile",method:"jsonSchema"});
+  let lastError:unknown;
+  for(let attempt=1;attempt<=2;attempt++) {
+    const started=Date.now();
+    try {
+      const raw=await structured.invoke([
+        ["system",`${parserInstructions} The server date is ${currentDate}; interpret past, current and future dates relative to it.${attempt===2?" A previous attempt failed validation or the provider interrupted it. Return only a complete object matching every requested field; use empty arrays and null for unknowns.":""}`],
+        ["human",JSON.stringify({resumeText:text})],
+      ],{signal:AbortSignal.timeout(45000)});
+      const profile=verifyResumeOutput(raw,text);
+      console.info("[resume-parser] success",{model,attempt,durationMs:Date.now()-started});
+      return {profile,model,parsedAt:new Date().toISOString()};
+    } catch(error) {
+      lastError=error;
+      const message=error instanceof Error?error.message:"";
+      const terminal=error instanceof WorkbenchError&&error.code!=="INVALID_OUTPUT"
+        || /429|quota|resource.exhausted|401|403|api.key|permission|unauthenticated|404|not.found|not supported|no longer available|abort|timeout/i.test(message);
+      console.warn("[resume-parser] attempt failed",{model,attempt,durationMs:Date.now()-started,category:error instanceof WorkbenchError?error.code:terminal?"provider-terminal":"provider-retryable"});
+      if(terminal||attempt===2) break;
+    }
   }
+  if(lastError instanceof WorkbenchError) throw lastError;
+  const message=lastError instanceof Error?lastError.message:"";
+  if(/429|quota|resource.exhausted/i.test(message)) throw new WorkbenchError("QUOTA", "Gemini quota or rate limit reached. Check your account and retry later.",429);
+  if(/401|403|api.key|permission|unauthenticated/i.test(message)) throw new WorkbenchError("PROVIDER_AUTH", "Gemini rejected the configured key or access. Check the Google AI Studio API key and model permissions.",503);
+  if(/abort|timeout/i.test(message)) throw new WorkbenchError("TIMEOUT", "Gemini timed out. Your text is still available to retry.",504);
+  if(/404|not.found|not supported|no longer available/i.test(message)) throw new WorkbenchError("MODEL_UNAVAILABLE", "The selected Gemini model is unavailable for this account. Check GEMINI_MODEL.",503);
+  throw new WorkbenchError("PROVIDER_FAILED", "Gemini failed twice while structuring this resume. Your extracted text is still available; retry or edit the profile manually.",502);
 }
