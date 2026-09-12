@@ -5,7 +5,7 @@ import {rankProjects} from "../ranking";
 import {WorkbenchError} from "../errors";
 
 export function effectiveLevel(context:AiContext):Resume["experienceLevel"] {
-  return context.target?.level && context.target.level!=="unknown" ? context.target.level : context.profile?.experienceLevel??"unknown";
+  return context.profile?.experienceLevel??"unknown";
 }
 // Stable selection for replay; Gemini wording is deliberately not deterministic.
 const draw=(seed:string,id:string)=> (parseInt(createHash("sha256").update(seed+":"+id).digest("hex").slice(0,8),16)+1)/4294967297;
@@ -42,7 +42,7 @@ export function planInterview(corpus:Corpus,context:AiContext,count:number,seed:
   const focusPool=eligible.filter(r=>(r.score??0)>=best-15).slice(0,3);
   const focus=focusPool.map(r=>({r,key:-Math.log(draw(seed,r.project.id))/Math.max(1,(r.score??0)*r.coverage/100)})).sort((a,b)=>a.key-b.key)[0]?.r;
   return {seeds:selected.map(s=>s.question),focus:focus?.project,projects,
-    selection:{seed,level,levelSource:target?.level&&target.level!=="unknown"?"target":"parsed-profile",datasetVersion:corpus.manifest.version,
+    selection:{seed,level,levelSource:"llm-profile",datasetVersion:corpus.manifest.version,
       selectedQuestionIds:selected.map(s=>s.question.id),focusProjectId:focus?.project.id??null,
       candidates:pool.length,questionFactors:selected.map(s=>({id:s.question.id,weight:s.weight,factors:s.factors})),
       projectScores:projects.map(p=>({id:p.project.id,score:p.score,coverage:p.coverage,components:p.components,missing:p.missing})),

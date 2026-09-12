@@ -1,5 +1,7 @@
 # Workbench and processing contract
 
+> Current revision: [account profiles and automatic experience](17-profiles-and-invitations.md) supersedes the earlier editable-experience, target-level override and temporary-profile statements below. [ElevenLabs handoff](18-elevenlabs-handoff.md) documents the implemented speech preparation boundary. Blockchain invitations remain documentation only.
+
 ## Product decision
 
 All interview analyses are delivered after submission as reports with recording playback. No live candidate feedback, streaming score, live coaching or live camera interpretation is promised. The report should contain a transcript, question-level rubric evidence, limitations and timestamped replay where alignment is available. Failed processing must remain visibly incomplete.

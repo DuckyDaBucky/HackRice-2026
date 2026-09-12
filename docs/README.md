@@ -1,5 +1,8 @@
 # Get Me Hired — project documentation
 
+- [Account profiles and invitation roadmap](17-profiles-and-invitations.md): Clerk-linked persistence, automatic experience criteria, UTC date handling and proposed blockchain invitations.
+- [ElevenLabs handoff](18-elevenlabs-handoff.md): prepared question text and the boundary with the audio/video implementation.
+
 **HackRice 2026 · CS interview preparation and employer interviews**
 
 Initial planning baseline: September 12, 2026. Updated after static inspection of main at `17f33a59747a1e251334b28e6019602593f35f83`. The repository now has a Next.js/Clerk/PostgreSQL scaffold. Interview features remain planned. Source presence is distinguished from runtime verification; no app build, provider call or deployment was tested in this documentation update.

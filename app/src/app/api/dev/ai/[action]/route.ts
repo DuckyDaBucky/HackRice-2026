@@ -5,6 +5,7 @@ import {chatSchema,generationSchema,evaluationRequestSchema,memoryMutationSchema
 import {generateQuestions,evaluateAnswer,startChat} from "@/lib/workbench/ai/service";
 import {gemini,geminiModel,providerError} from "@/lib/workbench/ai/gemini";
 import {practiceMemory} from "@/lib/workbench/ai/backboard";
+import {prepareSpeech,speechRequestSchema} from "@/lib/workbench/ai/speech";
 export const runtime="nodejs";
 export const dynamic="force-dynamic";
 type Context={params:Promise<{action:string}>};
@@ -33,6 +34,7 @@ export async function POST(request:Request,context:Context){
   try{
     const user=await requireDevUser();checkOrigin(request);const {action}=await context.params;
     const input=await readBody(request);
+    if(action==="speech-plan")return json(prepareSpeech(speechRequestSchema.parse(input)));
     if(action==="questions")return json(await generateQuestions(user,generationSchema.parse(input),request.signal));
     if(action==="evaluate")return json(await evaluateAnswer(user,evaluationRequestSchema.parse(input),request.signal));
     if(action==="memory"){

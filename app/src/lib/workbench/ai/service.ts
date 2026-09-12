@@ -6,6 +6,7 @@ import {gemini,geminiModel,instructions,providerError} from "./gemini";
 import {practiceMemory} from "./backboard";
 import {loadCorpus} from "../corpus";
 import {planInterview,effectiveLevel} from "./planner";
+import {classifyExperience} from "../experience";
 import {WorkbenchError} from "../errors";
 import {questionOutputSchema,evaluationSchema,dimensions,type AiContext,type UsedContext,type QuestionPack,type generationSchema,type evaluationRequestSchema,type chatSchema} from "./contracts";
 import type {Corpus,Resume} from "../schemas";
@@ -42,6 +43,7 @@ export function validateEvaluation(raw:unknown,answer:string) {
   return {evaluation:result,warnings};
 }
 export async function generateQuestions(userId:string,input:z.infer<typeof generationSchema>,signal?:AbortSignal){
+  if(input.context.profile)input={...input,context:{...input.context,profile:{...input.context.profile,...await classifyExperience(input.context.profile)}}};
   const context=await resolveContext(userId,input.context,JSON.stringify(input.context.target??{}));
   const plan=planInterview(await loadCorpus(),input.context,input.count,input.selectionSeed??randomUUID(),input.excludedQuestionIds);
   const source={seeds:plan.seeds,version:plan.selection.datasetVersion};
