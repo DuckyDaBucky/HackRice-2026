@@ -78,7 +78,6 @@ acknowledges the notice.
 
 - Resume upload/parsing and personalization
 - Presage biometric/facial analysis, and any `Observation` records
-- ElevenLabs voice (questions are shown as text for now)
 - Transcription and evaluation (`TranscriptVersion`, `EvaluationVersion`)
 - Corporate/HR workflows, requisitions, invitations
 - Live practice, meeting-bot integrations
@@ -94,6 +93,9 @@ acknowledges the notice.
 2. **Interview practice flow (client-only)** — mode select → consent/device
    check → per-question recording → review, wired to the static question
    bank and a mock analysis sink.
+3. **Live interviewer voice + live follow-ups** — superseded the original
+   "ElevenLabs deferred" line above; this is now built. See
+   [21-live-interview-voice.md](./21-live-interview-voice.md).
 
 ## Parallel track
 

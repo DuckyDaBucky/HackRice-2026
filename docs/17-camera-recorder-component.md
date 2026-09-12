@@ -59,13 +59,23 @@ touch those APIs:
   fully unit-testable.
 - `recorder-state.ts` — a pure reducer (`recorderReducer(state, event)`)
   implementing the state machine above: fully unit-testable, no DOM.
+- `format-duration.ts` — `formatDuration(ms)` for the on-call recording
+  timer: pure function, unit-tested.
 - `useCameraRecorder.ts` — the hook that wires the reducer to real
   `getUserMedia`/`MediaRecorder` calls. Not unit-tested (would require
   mocking browser media APIs so heavily the test stops proving anything);
   validated by hand in the browser instead.
-- `<CameraRecorder />` — thin UI wrapper around the hook. Validated by hand
-  in the browser (`pnpm dev`), not via Vitest — visual/interaction
-  correctness (does the preview look right, do controls feel responsive)
+- `<InterviewSession />` — owns the single `useCameraRecorder` instance for
+  the whole session (one `getUserMedia` call, reused across every
+  question) and switches between the three screens below based on
+  `recorder.stream`/`state` and local session state (current question
+  index, collected answers, done).
+- `<InterviewLobby />` — pre-join screen shown before `recorder.stream`
+  exists: consent copy, then "Join interview" triggers `recorder.start()`.
+- `<CameraRecorder />` — the in-call screen once the stream is live.
+  Receives the shared `recorder` as a prop rather than creating its own, so
+  switching questions never reopens the camera. Validated by hand in the
+  browser (`pnpm dev`), not via Vitest — visual/interaction correctness
   isn't something a DOM-diffing test meaningfully proves.
 
 ## Interfaces
