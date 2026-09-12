@@ -19,6 +19,7 @@ import {
   transitionOwnedV2Session,
 } from "@/lib/interviews/persistence";
 import { rephraseInterviewQuestion } from "@/lib/interviews/rephrase";
+import { llmTextModel } from "@/lib/llm/provider";
 import { AGENT_PROMPT_VERSION, agentInputHash, decideNextTurn } from "@/lib/interviews/agent";
 import type { AgentDecision } from "@/lib/interviews/agent-contracts";
 import { getUploadedObjectMetadata, artifactClipKey, createPlaybackUrl, createUploadUrl } from "@/lib/storage/r2";
@@ -29,7 +30,6 @@ import { biometricNoteFor } from "@/lib/biometrics/contracts";
 import { getBiometricAnalysesForSession } from "@/lib/biometrics/persistence";
 import { runBiometricAnalysesForSession } from "@/lib/biometrics/processor";
 import { saveIncrementalFinding } from "@/lib/reports/incremental";
-import { llmTextModel } from "@/lib/llm/provider";
 
 async function requireOwnedV2Session(sessionId: string) {
   const principal = await requireSessionPrincipal(sessionId);

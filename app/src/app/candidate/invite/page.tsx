@@ -8,13 +8,13 @@ import { candidateExchangeInvitation, candidateBindEmail } from "../actions";
 export default function CandidateInvitePage() {
   const router = useRouter();
   const { isSignedIn } = useAuth();
-  const missingHash =
-    typeof window !== "undefined" && window.location.hash.slice(1) === "";
-  const [status, setStatus] = useState<"loading" | "ready" | "error" | "redirecting">(
-    missingHash ? "error" : "loading",
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "redirecting">(() =>
+    typeof window !== "undefined" && window.location.hash ? "loading" : "error",
   );
   const [details, setDetails] = useState<{ invitationId: string; candidacyId: string; jobTitle: string; orgName: string; sandboxLabel: string } | null>(null);
-  const [error, setError] = useState<string | null>(missingHash ? "Missing invitation link." : null);
+  const [error, setError] = useState<string | null>(() =>
+    typeof window !== "undefined" && window.location.hash ? null : "Missing invitation link.",
+  );
 
   useEffect(() => {
     const hash = window.location.hash.slice(1);
