@@ -1,5 +1,7 @@
 # Practice experience
 
+> Current scope (September 12, 2026): interview analysis is asynchronous. Feedback appears only in completed reports with recording playback; live analysis and live candidate feedback are out of scope. HR may have a private question-specific answer guide during an interview. See [current workbench and processing contract](16-workbench-and-processing.md). Historical implementation checkpoints below describe the earlier scaffold.
+
 ## Implementation checkpoint
 
 Reviewed source: `17f33a59747a1e251334b28e6019602593f35f83` on September 12, 2026. Static source inspection only; runtime behavior has not been tested.
@@ -8,7 +10,7 @@ Only home, sign-in and sign-up pages exist. Resume upload/parsing, target-role s
 
 ## Setup and resume understanding
 
-**Confirmed flow:** upload resume → identify experience and individual projects → specify target role → generate appropriate questions → choose recorded or live practice → receive feedback.
+**Confirmed flow:** upload resume → identify experience and individual projects → specify target role → generate appropriate questions → record and submit answers → processing → report with playback.
 
 **Proposed details:**
 
@@ -29,13 +31,9 @@ Show microphone status, camera preview, recording indicator, elapsed time, uploa
 
 Recorded questions need not adapt mid-answer. A follow-up can be generated after submission, but the UI must make clear when it is an additional question.
 
-## Live practice
+## Analysis timing
 
-The candidate joins a dedicated Zoom-like interview page inside Get Me Hired. The AI interviewer speaks, listens, and asks context-aware follow-ups. Text captions and a visible current question provide alternatives to voice. Optional avatars are presentation only and should not be required to participate.
-
-**Proposed controls:** mute, camera toggle, pause, end, reconnect, and interviewer volume. Pausing practice stops questioning; it must make recording behavior explicit. Microphone capture must not accidentally transcribe the interviewer's own speech as the candidate's answer.
-
-Live interaction requires a separate technical spike for latency, interruption, turn detection and streaming transcription. If that spike fails, ship recorded practice first and label live practice unavailable instead of simulating a live feature with undisclosed playback.
+Live practice and live analytical feedback are not part of the current product scope. Capture and submission happen first. Transcription and evaluation run afterward; the completed report combines analysis, transcript and answer playback. A processing state is not a provisional score. Optional voice or avatars present questions and do not imply live evaluation.
 
 ## Report and next session
 

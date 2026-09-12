@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AuthControls } from "@/components/auth-controls";
-import { AuthProvider } from "@/components/auth-provider";
+import { AppProviders } from "@/components/AppProviders";
+import { SiteHeader } from "@/components/SiteHeader";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,12 +26,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <AuthProvider>
-          <header className="flex items-center justify-end gap-4 p-4">
-            <AuthControls />
-          </header>
+        <AppProviders>
+          <SiteHeader />
           {children}
-        </AuthProvider>
+        </AppProviders>
       </body>
     </html>
   );

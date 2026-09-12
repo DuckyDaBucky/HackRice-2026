@@ -1,0 +1,10 @@
+import {it,expect,vi} from "vitest";
+const mocks=vi.hoisted(()=>({auth:vi.fn(),query:vi.fn()}));
+vi.mock("@clerk/nextjs/server",()=>({auth:mocks.auth}));
+vi.mock("../src/lib/db",()=>({db:{query:mocks.query}}));
+import {GET,PUT} from "../src/app/api/profile/route";
+import {getProfile,saveProfile} from "../src/lib/profiles";
+import {emptyResume} from "../src/lib/workbench/schemas";
+it("requires authentication for profile reads and writes",async()=>{mocks.auth.mockResolvedValue({userId:null});expect((await GET()).status).toBe(401);expect((await PUT(new Request("http://localhost/api/profile",{method:"PUT"}))).status).toBe(401);expect(mocks.query).not.toHaveBeenCalled();});
+it("scopes database reads to Clerk instance and user",async()=>{vi.stubEnv("NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY","synthetic-instance");mocks.query.mockResolvedValue({rows:[]});await getProfile("user-a");expect(mocks.query.mock.lastCall?.[1][1]).toBe("user-a");expect(mocks.query.mock.lastCall?.[0]).toContain("clerk_instance=$1 AND clerk_user_id=$2");});
+it("rejects stale profile writes instead of overwriting",async()=>{mocks.query.mockResolvedValue({rows:[],rowCount:0});await expect(saveProfile("user-a",emptyResume,2)).rejects.toMatchObject({code:"PROFILE_CONFLICT"});});
