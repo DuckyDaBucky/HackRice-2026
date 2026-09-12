@@ -41,6 +41,7 @@ export default async function Home() {
       firstName={user.firstName}
       stats={stats}
       sessions={sessions}
+      answeredCounts={{}}
       hasResume={profile !== null}
     />
   );

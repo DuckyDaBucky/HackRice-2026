@@ -20,14 +20,18 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
 );
 
 const STATUS_LABEL: Record<SessionRecord["status"], string> = {
-  completed: "Completed",
+  planned: "Planned",
   in_progress: "Incomplete",
+  paused: "Paused",
+  completed: "Completed",
   abandoned: "Abandoned",
 };
 
 const STATUS_STYLE: Record<SessionRecord["status"], string> = {
-  completed: "text-[#0f9d78]",
+  planned: "text-zinc-500",
   in_progress: "text-amber-600",
+  paused: "text-amber-600",
+  completed: "text-[#0f9d78]",
   abandoned: "text-[#93a1b5]",
 };
 
