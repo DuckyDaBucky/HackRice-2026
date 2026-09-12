@@ -4,12 +4,21 @@ import { clerkEnabled } from "@/lib/clerk";
 import { usePathname } from "next/navigation";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
 
+// Routes that own their full chrome (the marketing nav, or DashboardShell's
+// sidebar + user menu) and therefore don't need this generic top bar.
+const OWN_HEADER_ROUTES = ["/", "/interviews", "/resume", "/analytics", "/resources"];
+
 /** Hidden on /interview routes: the call UI is full-bleed and owns its own header. */
 export function SiteHeader() {
   const pathname = usePathname();
-  if (!clerkEnabled || pathname.startsWith("/interview")) return null;
+  if (
+    !clerkEnabled ||
+    pathname.startsWith("/interview") ||
+    OWN_HEADER_ROUTES.includes(pathname)
+  )
+    return null;
 
-  const header = (
+  return (
     <header className="flex items-center justify-between gap-4 px-6 py-4">
       <span className="text-sm font-medium tracking-tight text-zinc-100">HackRice</span>
       <div className="flex items-center gap-3">
@@ -37,5 +46,4 @@ export function SiteHeader() {
       </div>
     </header>
   );
-  return pathname === "/" ? <Show when="signed-in">{header}</Show> : header;
 }
