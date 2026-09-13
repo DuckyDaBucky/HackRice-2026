@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { clerkEnabled } from "@/lib/clerk";
 import { Logo } from "./Logo";
 
@@ -14,9 +14,23 @@ const LINKS = [
 
 export function Nav() {
   const [open, setOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+    <header
+      className={`sticky top-0 z-40 border-b transition-colors duration-300 ${
+        scrolled || open
+          ? "border-border bg-background/90 backdrop-blur"
+          : "border-transparent bg-transparent"
+      }`}
+    >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <a href="#top" className="shrink-0">
           <Logo size="sm" />

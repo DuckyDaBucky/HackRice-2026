@@ -1,6 +1,7 @@
 import { Nav } from "@/components/marketing/Nav";
 import { Footer } from "@/components/marketing/Footer";
 import { Hero } from "@/components/marketing/Hero";
+import Aurora from "@/components/marketing/Aurora";
 import { TwoAudienceCards } from "@/components/marketing/TwoAudienceCards";
 import { EmployerShowcase } from "@/components/marketing/EmployerShowcase";
 import { TrustSection } from "@/components/marketing/TrustSection";
@@ -24,7 +25,13 @@ export default async function Home() {
 
   if (!user) {
     return (
-      <div className="marketing">
+      <div className="marketing relative isolate">
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[860px] opacity-70 blur-2xl"
+          aria-hidden="true"
+        >
+          <Aurora colorStops={["#27e1ff", "#67a3ff", "#5227FF"]} amplitude={0.4} blend={1} />
+        </div>
         <Nav />
         <Hero />
         <TwoAudienceCards />

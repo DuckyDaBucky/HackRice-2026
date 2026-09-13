@@ -33,10 +33,6 @@ export function Hero() {
       </div>
 
       <div className="relative mx-auto mt-14 max-w-6xl px-4 pb-20 sm:px-6 sm:pb-28 lg:px-8">
-        <div
-          className="pointer-events-none absolute -inset-x-10 -top-24 -bottom-10 -z-10 bg-[radial-gradient(ellipse_60%_60%_at_50%_20%,color-mix(in_srgb,var(--color-accent)_16%,transparent),transparent)] blur-2xl"
-          aria-hidden="true"
-        />
         <ProductPreview />
       </div>
     </section>

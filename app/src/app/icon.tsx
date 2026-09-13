@@ -1,9 +1,20 @@
 import { ImageResponse } from "next/og";
+import { readFileSync } from "fs";
+import { join } from "path";
 
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
+// Source mark is 396x480 (w:h ratio 0.825), same asset the site's own <Logo />
+// renders from /logo-mark.png — keeps the favicon and on-page mark in sync.
+const MARK_RATIO = 396 / 480;
+
 export default function Icon() {
+  const logoPath = join(process.cwd(), "public", "logo-mark.png");
+  const logoSrc = `data:image/png;base64,${readFileSync(logoPath).toString("base64")}`;
+  const markHeight = 20;
+  const markWidth = Math.round(markHeight * MARK_RATIO);
+
   return new ImageResponse(
     (
       <div
@@ -17,15 +28,7 @@ export default function Icon() {
           borderRadius: 7,
         }}
       >
-        <div
-          style={{
-            width: 16,
-            height: 16,
-            background: "#1ec9b3",
-            transform: "rotate(45deg)",
-            clipPath: "polygon(0% 100%, 0% 40%, 60% 40%, 60% 0%, 100% 0%, 100% 100%)",
-          }}
-        />
+        <img src={logoSrc} width={markWidth} height={markHeight} alt="" />
       </div>
     ),
     { ...size },
