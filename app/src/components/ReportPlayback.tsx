@@ -18,14 +18,14 @@ export function ReportPlayback({ sessionId, artifactId }: { sessionId: string; a
   };
 
   if (url) {
-    return <video controls preload="metadata" className="mt-3 w-full rounded-lg bg-black" src={url} />;
+    return <video controls preload="metadata" className="mt-4 aspect-video w-full rounded-lg bg-black" src={url} />;
   }
   return (
     <div className="mt-3 flex items-center gap-3">
       <button
         type="button"
         onClick={() => void openPlayback()}
-        className="inline-flex items-center gap-2 rounded-full border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent-deep transition-colors duration-150 hover:bg-accent/10"
+        className="inline-flex h-8 items-center gap-2 rounded-md border border-accent/35 px-3 text-xs font-semibold text-accent-deep transition-colors duration-150 hover:bg-accent/10"
       >
         <PlayIcon size={14} weight="fill" /> Play recording
       </button>

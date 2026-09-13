@@ -31,8 +31,7 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
   MOOD_OPTIONS.map((option) => [option.id, option.label]),
 );
 
-/** Canonical report route is the chess-style answer review.
- *  Evidence-only /reports/:id remains available as a secondary link. */
+/** Canonical report route combines strict coaching with saved session evidence. */
 function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "in_progress" || session.status === "paused" || session.status === "planned") {
     return {
@@ -49,12 +48,6 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
     return { label: session.score === null ? "Open report" : "View report", href: `/interview/session/${session.id}/report` };
   }
   return { label: "Practice again", href: "/interview/setup" };
-}
-
-/** Evidence-only report (clips + captions), secondary to the canonical review. */
-function evidenceHrefFor(session: SessionRecord): string | null {
-  if (session.status !== "completed" || !session.isDurable) return null;
-  return `/reports/${session.id}`;
 }
 
 const STATUS_LABEL: Record<SessionRecord["status"] | "deleted", string> = {
@@ -205,7 +198,6 @@ export function Dashboard({
                 {sessions.slice(0, 4).map((session) => {
                   const Icon = MODE_ICON[session.mode];
                   const action = actionFor(session);
-                  const evidenceHref = evidenceHrefFor(session);
                   const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
                   const answered = session.answeredCount;
                   const isScored = session.status === "completed";
@@ -252,14 +244,6 @@ export function Dashboard({
                             className="px-2 text-xs font-medium text-dash-text-muted transition-colors duration-200 hover:text-accent-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                           >
                             Practice again
-                          </Link>
-                        )}
-                        {evidenceHref && (
-                          <Link
-                            href={evidenceHref}
-                            className="text-xs text-dash-text-faint transition-colors duration-150 hover:text-accent"
-                          >
-                            Evidence
                           </Link>
                         )}
                       </div>

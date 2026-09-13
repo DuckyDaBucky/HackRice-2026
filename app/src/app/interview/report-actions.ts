@@ -20,18 +20,20 @@ import { buildSessionReview } from "@/lib/reports/timeline";
 import { getBiometricAnalysesForSession } from "@/lib/biometrics/persistence";
 import { biometricContextForPrompt } from "@/lib/biometrics/contracts";
 import { runBiometricAnalysesForSession } from "@/lib/biometrics/processor";
+import { getOwnedEvidenceLinkedReport } from "@/lib/interviews/persistence";
 
 /** Everything the report page renders for an owned session; null when it isn't found. */
 export async function getReportPageData(sessionId: string) {
   const { userId } = await auth();
   if (!userId) return null;
   const report = await getLatestReport(sessionId, userId);
-  const [review, biometrics] = await Promise.all([
+  const [review, biometrics, evidence] = await Promise.all([
     buildSessionReview({ sessionId, clerkUserId: userId, findings: report?.findings ?? [] }),
     getBiometricAnalysesForSession(sessionId, userId),
+    getOwnedEvidenceLinkedReport(sessionId, userId).catch(() => null),
   ]);
   if (!review) return null;
-  return { report, review, biometrics };
+  return { report, review, biometrics, evidence };
 }
 
 /** Retries any queued/failed biometric analyses for an owned session. */
