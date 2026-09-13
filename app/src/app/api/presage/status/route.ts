@@ -28,33 +28,62 @@ async function fetchJson(url: string, timeoutMs: number): Promise<{ ok: boolean;
   }
 }
 
+function countMetrics(data: {
+  metricTypes?: unknown;
+  metricBundles?: unknown;
+  defaultRequestedMetrics?: unknown;
+}): number | null {
+  if (data.metricTypes && typeof data.metricTypes === "object") {
+    return Object.keys(data.metricTypes).length;
+  }
+  if (data.metricBundles && typeof data.metricBundles === "object") {
+    let total: number | null = null;
+    for (const bundle of Object.values(data.metricBundles as Record<string, unknown>)) {
+      if (Array.isArray(bundle)) total = (total ?? 0) + bundle.length;
+    }
+    if (total !== null) return total;
+  }
+  if (Array.isArray(data.defaultRequestedMetrics)) return data.defaultRequestedMetrics.length;
+  return null;
+}
+
 /**
  * Authenticated-gateway status for the vendor-keyed presage-api service
  * (see presage-api/README.md and openapi.yaml). Exposes reachability, the
- * runtime SDK version, and whether a native session is active so the
+ * runtime SDK version, the native session slot, and the metric count so the
  * interview UI and LLM prompts can describe what the camera pipeline sees.
  * Never exposes the SmartSpectra API key, which stays in presage-api.
  */
 export async function GET() {
   const base = presageBaseUrl();
   const health = await fetchJson(`${base}/health`, 5_000);
-  const healthData = (health.data ?? {}) as { sdkVersion?: unknown; sessionActive?: unknown };
+  const healthData = (health.data ?? {}) as { sdkVersion?: unknown; activeSessionId?: unknown };
   let capabilities = capabilitiesCache;
   if (!capabilities || Date.now() - capabilities.at > CACHE_TTL_MS) {
     const result = await fetchJson(`${base}/v1/capabilities`, 8_000);
-    const data = (result.data ?? {}) as { sdkVersion?: unknown; metrics?: unknown };
+    const data = (result.data ?? {}) as {
+      sdkVersion?: unknown;
+      metricTypes?: unknown;
+      metricBundles?: unknown;
+      defaultRequestedMetrics?: unknown;
+    };
     capabilities = {
       at: Date.now(),
       sdkVersion: typeof data.sdkVersion === "string" ? data.sdkVersion : null,
-      metricCount: Array.isArray(data.metrics) ? data.metrics.length : null,
+      metricCount: countMetrics(data),
     };
     if (result.ok) capabilitiesCache = capabilities;
   }
+  const activeSessionId =
+    typeof healthData.activeSessionId === "string" && healthData.activeSessionId.length > 0
+      ? healthData.activeSessionId
+      : null;
   return NextResponse.json({
     reachable: health.ok,
     sdkVersion:
       typeof healthData.sdkVersion === "string" ? healthData.sdkVersion : capabilities.sdkVersion,
-    sessionActive: healthData.sessionActive === true,
+    sessionActive: activeSessionId !== null,
+    activeSessionId,
     metricCount: capabilities.metricCount,
   });
 }
