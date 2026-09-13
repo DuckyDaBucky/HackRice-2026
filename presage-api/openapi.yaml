@@ -35,6 +35,20 @@ paths:
             application/json:
               schema:
                 type: object
+                required: [sdkVersion, concurrencyPerInstance, endpoints, metricBundles, metricTypes, defaultRequestedMetrics, enums, outputEvents]
+                properties:
+                  sdkVersion: { type: string }
+                  concurrencyPerInstance: { type: integer }
+                  endpoints:
+                    type: object
+                    properties:
+                      liveWebSocket: { type: string }
+                      videoUpload: { type: string }
+                  metricBundles: { type: object, additionalProperties: true }
+                  metricTypes: { type: object, additionalProperties: { type: integer } }
+                  defaultRequestedMetrics: { type: array, items: { type: integer } }
+                  enums: { type: object, additionalProperties: true }
+                  outputEvents: { type: array, items: { type: string } }
                 additionalProperties: true
   /v1/videos/analyze:
     post:
@@ -49,13 +63,16 @@ paths:
         - $ref: "#/components/parameters/IncludeVideoOutput"
         - name: interframeDelayMs
           in: query
-          schema: { type: integer, minimum: 0, default: 0 }
+          description: Omit for no limit (SDK default). Explicit 0 means no delay.
+          schema: { type: integer, minimum: 0 }
         - name: startOffsetMs
           in: query
-          schema: { type: integer, minimum: 0, default: 0 }
+          description: Omit for no offset.
+          schema: { type: integer, minimum: 0 }
         - name: maxDurationMs
           in: query
-          schema: { type: integer, minimum: 0, default: 0 }
+          description: Omit for no limit.
+          schema: { type: integer, minimum: 0 }
         - name: frameTransform
           in: query
           schema:
@@ -73,6 +90,10 @@ paths:
                 video:
                   type: string
                   format: binary
+              description: The server accepts any single file field (any field name); `video` is the documented name.
+              additionalProperties:
+                type: string
+                format: binary
       responses:
         "200":
           description: Completed aggregate JSON or an incremental NDJSON event stream.
@@ -83,11 +104,17 @@ paths:
             application/x-ndjson:
               schema:
                 type: string
+                description: Newline-delimited events — analysis_started, SDK ApiEvents, then analysis_complete or analysis_failed.
+        "400":
+          description: No multipart file was provided.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
         "409":
           description: Another native SDK session is active in this process.
           headers:
             Retry-After:
-              schema: { type: integer }
+              schema: { type: string, example: "1" }
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -98,6 +125,11 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "422":
           description: The file or SDK configuration could not be processed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500":
+          description: Unexpected server error.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -170,3 +202,9 @@ components:
             message: { type: string }
             retryable: { type: boolean }
             requestId: { type: string }
+        sdk:
+          type: object
+          description: Vendor SDK error details, present on video-analysis failures.
+          properties:
+            code: { type: ["integer", "null"] }
+            name: { type: ["string", "null"] }

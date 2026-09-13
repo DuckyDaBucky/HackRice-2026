@@ -18,6 +18,7 @@ import {
 } from "@/lib/reports/persistence";
 import { buildSessionReview } from "@/lib/reports/timeline";
 import { getBiometricAnalysesForSession } from "@/lib/biometrics/persistence";
+import { biometricContextForPrompt } from "@/lib/biometrics/contracts";
 import { runBiometricAnalysesForSession } from "@/lib/biometrics/processor";
 
 /** Everything the report page renders for an owned session; null when it isn't found. */
@@ -62,6 +63,21 @@ export async function generateSessionReport(sessionId: string) {
   if (!eligible) throw new Error("A report is only available once this interview is completed.");
 
   const turns = await getReportTranscript(sessionId);
+  // Best-effort: attach biometric delivery notes so verdicts can reference them.
+  // Biometrics never decide a verdict — they only add a supporting sentence.
+  let biometricContext: string | null = null;
+  try {
+    const existing = await getBiometricAnalysesForSession(sessionId, userId);
+    const turnByArtifact = new Map<string, string>();
+    const timeline = await buildSessionReview({ sessionId, clerkUserId: userId, findings: [] }).catch(() => null);
+    void turnByArtifact;
+    void timeline;
+    biometricContext = biometricContextForPrompt(
+      existing.map((a) => ({ turnId: a.turnId, metrics: a.metrics, status: a.status })),
+    );
+  } catch {
+    biometricContext = null;
+  }
   const generationId = await beginReportGeneration({
     sessionId,
     model: reportModel(),
@@ -71,7 +87,7 @@ export async function generateSessionReport(sessionId: string) {
 
   const startedAt = Date.now();
   try {
-    const generated = await generateReport(turns);
+    const generated = await generateReport(turns, biometricContext);
     await completeReportGeneration({
       sessionId,
       generationId,

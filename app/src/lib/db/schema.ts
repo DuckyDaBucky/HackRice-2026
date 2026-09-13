@@ -215,7 +215,7 @@ export const interviewSessionConfigs = pgTable(
     check("interview_session_configs_revision_check", sql`${table.revision} >= 1`),
     check(
       "interview_session_configs_duration_check",
-      sql`${table.timeBudgetSeconds} in (600, 1200, 1800)`,
+      sql`${table.timeBudgetSeconds} in (180, 600, 1200, 1800)`,
     ),
   ],
 );
@@ -620,6 +620,15 @@ export const solanaOutbox = pgTable("solana_outbox", {
   finalizedAt: timestamp("finalized_at", { withTimezone: true }),
 });
 
+/** Persona webhook dedupe log. Mirrors migrations/0011_hiring_flow.sql. */
+export const personaWebhookEvents = pgTable("persona_webhook_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventId: text("event_id").notNull().unique(),
+  inquiryRef: text("inquiry_ref").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+});
+
 /** Chess.com-style move review, applied to answers: a verdict per answered turn. */
 export const reportVerdicts = ["blunder", "mistake", "inaccuracy", "good", "best", "insufficient_evidence"] as const;
 
@@ -701,9 +710,10 @@ export type NewMediaArtifact = typeof mediaArtifacts.$inferInsert;
 export type AudioTranscript = typeof audioTranscripts.$inferSelect;
 export type NewAudioTranscript = typeof audioTranscripts.$inferInsert;
 
-// Workbench schemas (gmh_accounts, gmh_research) are provisioned outside the
-// migrations/ series. Models below mirror the live tables column-for-column
-// so application queries stay typed; DDL changes there must update both.
+// Workbench schemas (gmh_accounts, gmh_research) are created by
+// migrations/0011_gmh_accounts_research.sql. Models below mirror the live tables
+// column-for-column so application queries stay typed; DDL changes there must
+// update both.
 export const gmhAccounts = pgSchema("gmh_accounts");
 
 export const accountProfiles = gmhAccounts.table("profiles", {

@@ -8,6 +8,7 @@ import {
   type InterviewSetup,
 } from "./contracts";
 import type { PlannedQuestionInput } from "./persistence";
+import { completeJsonText } from "@/lib/llm/provider";
 
 const planQuestionSchema = z.object({
   position: z.number().int().min(1),
@@ -29,7 +30,7 @@ export interface GeneratedInterviewPlan {
   result: Record<string, unknown>;
   usage: Record<string, number>;
   model: string;
-  source: "gemini" | "fallback";
+  source: "meta" | "gemini" | "fallback";
 }
 
 const FALLBACK_QUESTIONS: Record<InterviewContentType, Array<{
@@ -79,7 +80,7 @@ export function buildPlanPrompt(setup: InterviewSetup) {
 
 The candidate selected these content types: ${selectedTypes}.
 ${focus}
-The session lasts ${setup.timeBudgetSeconds / 60} minutes. Plan exactly ${length.target} numbered questions. Choose a useful mix and ordering from the selected types; do not require every selected type when there are more types than questions.
+The session lasts ${setup.timeBudgetSeconds / 60} minutes. Plan exactly ${length.target} numbered question${length.target === 1 ? "" : "s"}. Choose a useful mix and ordering from the selected types; do not require every selected type when there are more types than questions.
 
 Definitions:
 - behavioral: a concrete experience, ownership, conflict, learning or outcome story;
@@ -140,59 +141,18 @@ function parseModelText(raw: string, setup: InterviewSetup): PlannedQuestionInpu
     }));
 }
 
-function usageFrom(data: unknown): Record<string, number> {
-  const usage = (data as { usageMetadata?: Record<string, unknown> })?.usageMetadata;
-  if (!usage) return {};
-  const fields: Record<string, unknown> = {
-    promptTokens: usage.promptTokenCount,
-    candidateTokens: usage.candidatesTokenCount,
-    totalTokens: usage.totalTokenCount,
-  };
-  return Object.fromEntries(
-    Object.entries(fields).filter((entry): entry is [string, number] => typeof entry[1] === "number"),
-  );
-}
-
-/** Calls Gemini once for the plan; persistence happens in the owning action/service. */
+/** Calls the active LLM once for the plan; persistence happens in the owning action/service. */
 export async function generateInterviewPlan(setup: InterviewSetup): Promise<GeneratedInterviewPlan> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("Interview planning is unavailable because Gemini is not configured.");
-  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25_000);
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildPlanPrompt(setup) }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            thinkingConfig: { thinkingBudget: 128 },
-          },
-        }),
-      },
-    );
-    if (!response.ok) throw new Error(`Gemini planner failed with status ${response.status}.`);
-    const data: unknown = await response.json();
-    const text = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })
-      ?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("Gemini planner returned no text.");
-    const questions = parseModelText(text, setup);
-    return {
-      questions,
-      inputHash: planInputHash(setup),
-      result: { questions },
-      usage: usageFrom(data),
-      model,
-      source: "gemini",
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
+  const { text, model, provider, usage } = await completeJsonText(buildPlanPrompt(setup), { timeoutMs: 25_000 });
+  const questions = parseModelText(text, setup);
+  return {
+    questions,
+    inputHash: planInputHash(setup),
+    result: { questions },
+    usage,
+    model,
+    source: provider,
+  };
 }
 
 export const interviewPlanParser = {

@@ -3,7 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getDashboardShellContext } from "@/lib/dashboard/shell-props";
-import { SetupForm } from "@/components/interview/SetupForm";
+import { InterviewSetupForm } from "@/components/dashboard/InterviewSetupForm";
 
 export default async function InterviewSetupPage() {
   if (!clerkEnabled) redirect("/");
@@ -14,7 +14,7 @@ export default async function InterviewSetupPage() {
 
   return (
     <DashboardShell active="Practice" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
-      <SetupForm />
+      <InterviewSetupForm />
     </DashboardShell>
   );
 }

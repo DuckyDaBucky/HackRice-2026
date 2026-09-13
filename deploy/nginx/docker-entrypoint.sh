@@ -1,10 +1,17 @@
 #!/bin/sh
 set -eu
 
-domain="getmehired.today"
+domain="${DOMAIN:-getmehired.today}"
 live_dir="/etc/letsencrypt/live/$domain"
 active_dir="/etc/nginx/active-certs"
 fallback_dir="/etc/nginx/fallback-certs"
+
+# Allow staging on another hostname: rewrite the baked server_name when DOMAIN differs.
+if [ "$domain" != "getmehired.today" ]; then
+    sed -i "s/getmehired.today/$domain/g" /etc/nginx/conf.d/default.conf
+    # Keep www alias working for the custom domain too.
+    sed -i "s/server_name $domain;/server_name $domain www.$domain;/" /etc/nginx/conf.d/default.conf || true
+fi
 
 mkdir -p "$active_dir" "$fallback_dir"
 

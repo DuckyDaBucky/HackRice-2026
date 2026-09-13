@@ -1,4 +1,4 @@
-/** Tolerant parse of a Gemini text response into a follow-up question, or null. */
+/** Tolerant parse of a provider text response into a follow-up question, or null. */
 export function parseFollowUpResponse(raw: string): string | null {
   const stripped = raw
     .trim()

@@ -1,9 +1,10 @@
 /**
- * Placeholder scoring. Rubric-based evaluation (docs/04) isn't wired up yet —
+ * Preview scoring (placeholder). Rubric-based evaluation (docs/04) isn't wired up yet —
  * these are deterministic stand-in numbers derived from each session id, so
- * they're stable across reloads instead of a live rubric score. Swap this
- * module out once scored transcripts exist; nothing else should need to
- * change since callers only see the shape below.
+ * they're stable across reloads instead of a live rubric score. Every caller
+ * must label these as "preview" in the UI. Swap this module out once scored
+ * transcripts exist; nothing else should need to change since callers only
+ * see the shape below.
  */
 
 export const SKILL_CATEGORIES = ["Technical", "Communication", "Confidence", "Structure"] as const;
@@ -19,6 +20,34 @@ function hash(input: string): number {
 /** Stable 70-92 score for a given session id. */
 export function sessionScore(seed: string): number {
   return 70 + (hash(seed) % 23);
+}
+
+/**
+ * Skip penalty: every skipped question scores 0 and drags the average down
+ * proportionally — i.e. each question is worth an equal share. Skipping 1 of 4
+ * with an 80 base yields 60. Floor at 5 so a session never reads as literally
+ * unscored when something was answered.
+ */
+export const SKIPPED_QUESTION_SCORE = 0;
+export const MIN_ADJUSTED_SCORE = 5;
+
+export function skippedCountFor(answered: number, total: number): number {
+  if (!Number.isFinite(answered) || !Number.isFinite(total) || total <= 0) return 0;
+  return Math.max(0, Math.min(total, total - Math.max(0, answered)));
+}
+
+/** Proportionally penalizes a 0-100 base score by unanswered share. */
+export function applySkipPenalty(base: number, answered: number, total: number): number {
+  if (!Number.isFinite(base) || total <= 0) return Math.round(base);
+  const clampedAnswered = Math.max(0, Math.min(total, answered));
+  if (clampedAnswered >= total) return Math.round(base);
+  if (clampedAnswered <= 0) return MIN_ADJUSTED_SCORE;
+  return Math.max(MIN_ADJUSTED_SCORE, Math.round((base * clampedAnswered) / total));
+}
+
+/** Skip-aware session score: base preview score penalized per skipped question. */
+export function sessionScoreWithSkips(seed: string, answered: number, total: number): number {
+  return applySkipPenalty(sessionScore(seed), answered, total);
 }
 
 const OFFSETS: Record<SkillCategory, number> = {
@@ -37,6 +66,33 @@ export function skillBreakdown(seed: string): SkillScores {
       return [label, value];
     }),
   ) as SkillScores;
+}
+
+/** Skip-aware skill breakdown: each category scaled by answered/total share. */
+export function skillBreakdownWithSkips(seed: string, answered: number, total: number): SkillScores {
+  const base = skillBreakdown(seed);
+  if (total <= 0 || answered >= total) return base;
+  const clampedAnswered = Math.max(0, Math.min(total, answered));
+  if (clampedAnswered <= 0) {
+    return Object.fromEntries(SKILL_CATEGORIES.map((label) => [label, MIN_ADJUSTED_SCORE])) as SkillScores;
+  }
+  return Object.fromEntries(
+    SKILL_CATEGORIES.map((label) => [label, applySkipPenalty(base[label], clampedAnswered, total)]),
+  ) as SkillScores;
+}
+
+/**
+ * Review accuracy with skips: scored answers averaged with every skipped
+ * question counting as SKIPPED_QUESTION_SCORE (0). Unscored/null answers are
+ * still excluded — only real verdicts + skips count.
+ */
+export function accuracyWithSkips(scores: number[], skippedCount: number): number | null {
+  const valid = scores.filter((s) => Number.isFinite(s));
+  const skipped = Math.max(0, Math.floor(skippedCount));
+  const denominator = valid.length + skipped;
+  if (denominator === 0) return null;
+  const numerator = valid.reduce((sum, s) => sum + s, 0) + skipped * SKIPPED_QUESTION_SCORE;
+  return Math.round(numerator / denominator);
 }
 
 export function overallScore(scores: SkillScores): number {

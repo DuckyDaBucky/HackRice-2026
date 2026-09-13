@@ -17,11 +17,11 @@ const turns: ReportTranscriptTurn[] = [
 ];
 
 describe("report fallback", () => {
-  it("never fabricates a verdict when the generator is unavailable", () => {
+  it("produces an instant heuristic verdict when the generator is unavailable", () => {
     const fallback = createFallbackReport(turns);
     expect(fallback.source).toBe("fallback");
     expect(fallback.findings).toHaveLength(1);
-    expect(fallback.findings[0].verdict).toBe("insufficient_evidence");
+    expect(REPORT_VERDICTS).toContain(fallback.findings[0].verdict);
     expect(fallback.findings[0].turnId).toBe(turns[0].turnId);
     expect(fallback.overview.keyProblems.length).toBeGreaterThan(0);
   });

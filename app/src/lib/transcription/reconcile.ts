@@ -5,7 +5,7 @@ import type { ReconciledTranscript } from "./types";
  *
  * The browser's Web Speech live captions are provisional — they drop words
  * on pauses, mis-hear domain terms, and revise interim segments. The batch
- * transcript (Deepgram / Gemini over the recorded blob) hears the full clip
+ * transcript (Deepgram / provider audio over the recorded blob) hears the full clip
  * with punctuation and smart-formatting, so it wins whenever it is
  * non-empty. Live text is kept as the fallback when batch fails or is empty.
  *

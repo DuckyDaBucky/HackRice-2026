@@ -11,6 +11,7 @@ import {
   SpeakerHighIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react";
+import { LogoMark } from "@/components/marketing/Logo";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
 import { useLiveCaptions } from "@/hooks/useLiveCaptions";
 import { SUBTITLE_SIZE_CLASS, useSubtitleSize } from "@/hooks/useSubtitleSize";
@@ -109,6 +110,8 @@ interface CameraRecorderProps {
   timeBudgetSeconds?: number;
   onTimeBudgetReached?: () => void;
   onLeave: () => void;
+  /** Spoken once before the first question so the session opens like a conversation. */
+  introLine?: string | null;
 }
 
 export function CameraRecorder({
@@ -128,6 +131,7 @@ export function CameraRecorder({
   timeBudgetSeconds,
   onTimeBudgetReached,
   onLeave,
+  introLine,
 }: CameraRecorderProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captions = useLiveCaptions();
@@ -155,6 +159,7 @@ export function CameraRecorder({
   const [skipConfirmationVisible, setSkipConfirmationVisible] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
   const [refiningTranscript, setRefiningTranscript] = useState(false);
+  const [transcriptNotice, setTranscriptNotice] = useState<string | null>(null);
   const transcriptPanelRef = useRef<HTMLDivElement | null>(null);
   const currentQuestionRef = useRef<string | null>(null);
   const isRecording = recorderState === "recording";
@@ -180,6 +185,7 @@ export function CameraRecorder({
   const completeAnswer = useCallback(async () => {
     if (saving) return;
     setSaving(true);
+    setTranscriptNotice(null);
     stopCaptions();
     try {
       const artifact = await stop();
@@ -213,9 +219,12 @@ export function CameraRecorder({
           if (reconciled.source === "batch" && reconciled.text) {
             correctTranscript(reconciled.text);
           }
+        } else {
+          setTranscriptNotice("Batch transcription was unavailable — saved live captions instead (lower accuracy).");
         }
       } catch {
         // Batch correction is best-effort — fall back to live finals.
+        setTranscriptNotice("Batch transcription was unavailable — saved live captions instead (lower accuracy).");
       } finally {
         setRefiningTranscript(false);
       }
@@ -268,6 +277,13 @@ export function CameraRecorder({
           window.setTimeout(resolve, INTER_QUESTION_BUFFER_MS);
         });
       }
+      if (cancelled) return;
+      // The interviewer opens with a greeting before the first question so
+      // the session feels like a conversation, not a recording widget.
+      if (questionNumber === 1 && introLine) {
+        await speak(introLine, voiceId, mood);
+        if (cancelled) return;
+      }
       await speak(questionPrompt, voiceId, mood);
       if (cancelled) return;
       currentQuestionRef.current = questionKey;
@@ -279,7 +295,7 @@ export function CameraRecorder({
     return () => {
       cancelled = true;
     };
-  }, [mood, questionNumber, questionPrompt, record, recorderState, speak, startCaptions, voiceId]);
+  }, [introLine, mood, questionNumber, questionPrompt, record, recorderState, speak, startCaptions, voiceId]);
 
   // Silence is a gentle prompt, not permission for the interviewer to submit
   // or advance the candidate's answer. The candidate explicitly finishes.
@@ -396,6 +412,7 @@ export function CameraRecorder({
     <div className="flex h-[100dvh] min-h-[600px] flex-col overflow-hidden bg-[#151515] text-[#f5f5f5]">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-[#2d2d2d] px-4 sm:px-6">
         <div className="flex items-center gap-3 text-sm">
+          <LogoMark size={22} />
           <span className="font-medium">Practice interview</span>
           <span className="hidden text-zinc-400 sm:inline">
             {mode} · Question {questionNumber} of {totalQuestions}
@@ -435,8 +452,8 @@ export function CameraRecorder({
         </section>
 
         <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_30%,#33385d,transparent_42%),linear-gradient(135deg,#16182a,#0e1018)] p-6 text-center">
-          <div className={`flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 via-sky-400 to-indigo-500 shadow-[0_0_0_10px_rgba(255,255,255,0.05)] transition ${tts.isSpeaking ? "scale-105 shadow-[0_0_0_10px_rgba(255,255,255,0.05),0_0_45px_rgba(95,186,255,0.35)]" : ""}`}><RobotIcon size={60} weight="duotone" className="text-white" /></div>
-          <div className="mt-5 flex items-center gap-2 text-sm font-medium">GetMeHired interviewer {tts.isSpeaking && <SpeakerHighIcon size={16} className="animate-pulse text-sky-300" />}</div>
+          <div className={`flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-deep shadow-[0_0_0_10px_rgba(255,255,255,0.05)] transition ${tts.isSpeaking ? "scale-105 shadow-[0_0_0_10px_rgba(255,255,255,0.05),0_0_45px_rgba(30,201,179,0.35)]" : ""}`}><RobotIcon size={60} weight="duotone" className="text-[#03231e]" /></div>
+          <div className="mt-5 flex items-center gap-2 text-sm font-medium">GetMeHired interviewer {tts.isSpeaking && <SpeakerHighIcon size={16} className="animate-pulse text-accent" />}</div>
           {questionVisible && <div className="absolute bottom-5 left-5 right-5 rounded-xl bg-[#20222b]/90 p-4 text-left shadow-lg backdrop-blur-sm">
             <div className="mb-2 flex items-center justify-between gap-4 text-xs text-zinc-400"><span className="capitalize">{mode} question</span><span>{questionNumber} / {totalQuestions}</span></div>
             <p className="text-base font-medium leading-6 text-zinc-50 sm:text-lg">{followUp ?? rephrasedQuestion ?? questionPrompt}</p>
@@ -447,7 +464,7 @@ export function CameraRecorder({
       <footer className="flex h-[92px] shrink-0 items-center justify-start gap-3 overflow-x-auto bg-[#171717] px-4 sm:justify-center">
         <button type="button" onClick={() => toggleTrack("audio")} aria-label="Toggle microphone" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${micEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><MicrophoneIcon size={21} weight="fill" /></button>
         <button type="button" onClick={() => toggleTrack("video")} aria-label="Toggle camera" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${cameraEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><VideoCameraIcon size={21} weight="fill" /></button>
-        <div aria-live="polite" className="min-w-32 text-center text-sm text-zinc-300">{controlError ?? (saving || finishRequested ? (refiningTranscript ? "Refining transcript…" : "Interviewer is reviewing…") : recorderState === "paused" ? "Interview paused" : tts.isSpeaking ? "Interviewer is asking…" : finishSuggestionVisible ? "Finished answering?" : isRecording ? "Listening…" : "Preparing next question…")}</div>
+        <div aria-live="polite" className="min-w-32 text-center text-sm text-zinc-300">{controlError ?? transcriptNotice ?? (saving || finishRequested ? (refiningTranscript ? "Refining transcript…" : "Interviewer is reviewing…") : recorderState === "paused" ? "Interview paused" : tts.isSpeaking ? "Interviewer is asking…" : finishSuggestionVisible ? "Finished answering?" : isRecording ? "Listening…" : "Preparing next question…")}</div>
         {controlError && <button type="button" onClick={() => window.location.reload()} className="h-12 rounded-full border border-amber-400/50 px-4 text-sm font-medium text-amber-100 transition hover:bg-amber-400/10">Reload</button>}
         <button type="button" onClick={() => void togglePause()} disabled={saving || tts.isSpeaking || (!isRecording && recorderState !== "paused")} className="h-12 rounded-full border border-white/15 px-4 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">{recorderState === "paused" ? "Resume" : "Pause"}</button>
         <button type="button" onClick={() => void replayQuestion(followUp ?? rephrasedQuestion ?? questionPrompt)} disabled={!isRecording || saving || tts.isSpeaking} className="h-12 rounded-full border border-white/15 px-4 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">Repeat</button>

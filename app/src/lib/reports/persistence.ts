@@ -1,17 +1,35 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { db } from "@/lib/db";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { orm } from "@/lib/db";
+import {
+  aiGenerations,
+  audioTranscripts,
+  interviewPlanQuestions,
+  interviewSessionConfigs,
+  interviewSessions,
+  interviewTurns,
+  mediaArtifacts,
+  reportFindings,
+} from "@/lib/db/schema";
 import type { TranscriptSegment } from "@/lib/interviews/contracts";
 import type { ReportFindingInput, ReportOverview, ReportTranscriptTurn } from "./contracts";
 
 /** True only for a session the caller owns and that has finished. */
 export async function isOwnedCompletedSession(sessionId: string, clerkUserId: string): Promise<boolean> {
-  const result = await db.query<{ id: string }>(
-    `SELECT id FROM interview_sessions
-     WHERE id = $1 AND clerk_user_id = $2 AND status = 'completed' AND deleted_at IS NULL`,
-    [sessionId, clerkUserId],
-  );
-  return result.rowCount === 1;
+  const rows = await orm
+    .select({ id: interviewSessions.id })
+    .from(interviewSessions)
+    .where(
+      and(
+        eq(interviewSessions.id, sessionId),
+        eq(interviewSessions.clerkUserId, clerkUserId),
+        eq(interviewSessions.status, "completed"),
+        isNull(interviewSessions.deletedAt),
+      ),
+    )
+    .limit(1);
+  return rows.length === 1;
 }
 
 export interface SessionTimelineContext {
@@ -33,88 +51,110 @@ export async function getSessionTimelineContext(
   sessionId: string,
   clerkUserId: string,
 ): Promise<SessionTimelineContext | null> {
-  const sessionResult = await db.query<{
-    id: string;
-    elapsed_active_ms: number;
-    time_budget_seconds: number;
-  }>(
-    `SELECT s.id, s.elapsed_active_ms,
-            coalesce(c.time_budget_seconds, 600) AS time_budget_seconds
-     FROM interview_sessions s
-     LEFT JOIN interview_session_configs c
-       ON c.session_id = s.id AND c.revision = s.active_config_revision
-     WHERE s.id = $1 AND s.clerk_user_id = $2 AND s.deleted_at IS NULL`,
-    [sessionId, clerkUserId],
-  );
-  const session = sessionResult.rows[0];
+  const sessionRows = await orm
+    .select({
+      id: interviewSessions.id,
+      elapsedActiveMs: interviewSessions.elapsedActiveMs,
+      timeBudgetSeconds: interviewSessionConfigs.timeBudgetSeconds,
+    })
+    .from(interviewSessions)
+    .leftJoin(
+      interviewSessionConfigs,
+      and(
+        eq(interviewSessionConfigs.sessionId, interviewSessions.id),
+        eq(interviewSessionConfigs.revision, interviewSessions.activeConfigRevision),
+      ),
+    )
+    .where(
+      and(
+        eq(interviewSessions.id, sessionId),
+        eq(interviewSessions.clerkUserId, clerkUserId),
+        isNull(interviewSessions.deletedAt),
+      ),
+    )
+    .limit(1);
+  const session = sessionRows[0];
   if (!session) return null;
 
-  const planQuestions = await db.query<{ id: string; position: number; prompt: string; status: string }>(
-    `SELECT id, position, prompt, status FROM interview_plan_questions
-     WHERE session_id = $1 AND deleted_at IS NULL
-     ORDER BY position ASC`,
-    [sessionId],
-  );
+  const planQuestions = await orm
+    .select({
+      id: interviewPlanQuestions.id,
+      position: interviewPlanQuestions.position,
+      prompt: interviewPlanQuestions.prompt,
+      status: interviewPlanQuestions.status,
+    })
+    .from(interviewPlanQuestions)
+    .where(and(eq(interviewPlanQuestions.sessionId, sessionId), isNull(interviewPlanQuestions.deletedAt)))
+    .orderBy(asc(interviewPlanQuestions.position));
 
-  const turns = await db.query<{
-    id: string;
-    plan_question_id: string | null;
-    kind: string;
-    sequence: number;
-    text: string | null;
-  }>(
-    `SELECT id, plan_question_id, kind, sequence, text FROM interview_turns
-     WHERE session_id = $1 AND deleted_at IS NULL
-     ORDER BY sequence ASC`,
-    [sessionId],
-  );
+  const turns = await orm
+    .select({
+      id: interviewTurns.id,
+      planQuestionId: interviewTurns.planQuestionId,
+      kind: interviewTurns.kind,
+      sequence: interviewTurns.sequence,
+      text: interviewTurns.text,
+    })
+    .from(interviewTurns)
+    .where(and(eq(interviewTurns.sessionId, sessionId), isNull(interviewTurns.deletedAt)))
+    .orderBy(asc(interviewTurns.sequence));
 
-  const artifacts = await db.query<{
-    id: string;
-    turn_id: string | null;
-    upload_status: string;
-    r2_key: string;
-    duration_ms: number | null;
-  }>(
-    `SELECT id, turn_id, upload_status, r2_key, duration_ms FROM media_artifacts
-     WHERE session_id = $1 AND deleted_at IS NULL
-     ORDER BY created_at ASC`,
-    [sessionId],
-  );
+  const artifacts = await orm
+    .select({
+      id: mediaArtifacts.id,
+      turnId: mediaArtifacts.turnId,
+      uploadStatus: mediaArtifacts.uploadStatus,
+      r2Key: mediaArtifacts.r2Key,
+      durationMs: mediaArtifacts.durationMs,
+    })
+    .from(mediaArtifacts)
+    .where(and(eq(mediaArtifacts.sessionId, sessionId), isNull(mediaArtifacts.deletedAt)))
+    .orderBy(asc(mediaArtifacts.createdAt));
 
-  const transcripts = await db.query<{ turn_id: string; segments: TranscriptSegment[] }>(
-    `SELECT tr.turn_id, tr.segments
-     FROM audio_transcripts tr
-     JOIN media_artifacts ma ON ma.id = tr.artifact_id
-     WHERE ma.session_id = $1 AND tr.deleted_at IS NULL AND tr.status = 'completed' AND tr.turn_id IS NOT NULL`,
-    [sessionId],
-  );
+  const transcripts = await orm
+    .select({ turnId: audioTranscripts.turnId, segments: audioTranscripts.segments })
+    .from(audioTranscripts)
+    .innerJoin(mediaArtifacts, eq(mediaArtifacts.id, audioTranscripts.artifactId))
+    .where(
+      and(
+        eq(mediaArtifacts.sessionId, sessionId),
+        isNull(audioTranscripts.deletedAt),
+        eq(audioTranscripts.status, "completed"),
+        // Only turn-linked transcripts feed the timeline.
+        isNotNull(audioTranscripts.turnId),
+      ),
+    );
 
   const transcriptsByTurnId = new Map<string, TranscriptSegment[]>();
-  for (const row of transcripts.rows) {
-    transcriptsByTurnId.set(row.turn_id, row.segments);
+  for (const row of transcripts) {
+    if (row.turnId) transcriptsByTurnId.set(row.turnId, row.segments);
   }
 
   return {
     session: {
       id: session.id,
-      elapsedActiveMs: Number(session.elapsed_active_ms),
-      timeBudgetSeconds: session.time_budget_seconds,
+      elapsedActiveMs: Number(session.elapsedActiveMs),
+      timeBudgetSeconds: session.timeBudgetSeconds ?? 600,
     },
-    planQuestions: planQuestions.rows,
-    turns: turns.rows.map((turn) => ({
+    planQuestions: planQuestions.map((question) => ({
+      id: question.id,
+      position: question.position,
+      prompt: question.prompt,
+      status: question.status,
+    })),
+    turns: turns.map((turn) => ({
       id: turn.id,
-      planQuestionId: turn.plan_question_id,
+      planQuestionId: turn.planQuestionId,
       kind: turn.kind,
       sequence: turn.sequence,
       text: turn.text,
     })),
-    artifacts: artifacts.rows.map((artifact) => ({
+    artifacts: artifacts.map((artifact) => ({
       id: artifact.id,
-      turnId: artifact.turn_id,
-      uploadStatus: artifact.upload_status,
-      r2Key: artifact.r2_key,
-      durationMs: artifact.duration_ms,
+      turnId: artifact.turnId,
+      uploadStatus: artifact.uploadStatus,
+      r2Key: artifact.r2Key,
+      durationMs: artifact.durationMs,
     })),
     transcriptsByTurnId,
   };
@@ -122,45 +162,43 @@ export async function getSessionTimelineContext(
 
 /** Flattens turns, plan questions and completed transcripts into evaluator input, in order. */
 export async function getReportTranscript(sessionId: string): Promise<ReportTranscriptTurn[]> {
-  const result = await db.query<{
-    turn_id: string;
-    plan_question_id: string | null;
-    kind: string;
-    position: number | null;
-    prompt: string | null;
-    turn_text: string | null;
-    transcript_text: string | null;
-    start_ms: number | null;
-    end_ms: number | null;
-  }>(
-    `SELECT
-       t.id AS turn_id,
-       t.plan_question_id,
-       t.kind,
-       pq.position,
-       pq.prompt,
-       t.text AS turn_text,
-       tr.full_text AS transcript_text,
-       (SELECT min((segment->>'startMs')::int) FROM jsonb_array_elements(tr.segments) AS segment) AS start_ms,
-       (SELECT max((segment->>'endMs')::int) FROM jsonb_array_elements(tr.segments) AS segment) AS end_ms
-     FROM interview_turns t
-     LEFT JOIN interview_plan_questions pq ON pq.id = t.plan_question_id
-     LEFT JOIN media_artifacts ma ON ma.turn_id = t.id AND ma.deleted_at IS NULL
-     LEFT JOIN audio_transcripts tr
-       ON tr.artifact_id = ma.id AND tr.deleted_at IS NULL AND tr.status = 'completed'
-     WHERE t.session_id = $1 AND t.deleted_at IS NULL
-     ORDER BY t.sequence ASC`,
-    [sessionId],
-  );
-  return result.rows.map((row) => ({
-    turnId: row.turn_id,
-    planQuestionId: row.plan_question_id,
+  const rows = await orm
+    .select({
+      turnId: interviewTurns.id,
+      planQuestionId: interviewTurns.planQuestionId,
+      kind: interviewTurns.kind,
+      position: interviewPlanQuestions.position,
+      prompt: interviewPlanQuestions.prompt,
+      turnText: interviewTurns.text,
+      transcriptText: audioTranscripts.fullText,
+      startMs: sql<number | null>`(SELECT min((segment->>'startMs')::int) FROM jsonb_array_elements(${audioTranscripts.segments}) AS segment)`,
+      endMs: sql<number | null>`(SELECT max((segment->>'endMs')::int) FROM jsonb_array_elements(${audioTranscripts.segments}) AS segment)`,
+    })
+    .from(interviewTurns)
+    .leftJoin(interviewPlanQuestions, eq(interviewPlanQuestions.id, interviewTurns.planQuestionId))
+    .leftJoin(
+      mediaArtifacts,
+      and(eq(mediaArtifacts.turnId, interviewTurns.id), isNull(mediaArtifacts.deletedAt)),
+    )
+    .leftJoin(
+      audioTranscripts,
+      and(
+        eq(audioTranscripts.artifactId, mediaArtifacts.id),
+        isNull(audioTranscripts.deletedAt),
+        eq(audioTranscripts.status, "completed"),
+      ),
+    )
+    .where(and(eq(interviewTurns.sessionId, sessionId), isNull(interviewTurns.deletedAt)))
+    .orderBy(asc(interviewTurns.sequence));
+  return rows.map((row) => ({
+    turnId: row.turnId,
+    planQuestionId: row.planQuestionId,
     kind: row.kind,
     position: row.position,
     prompt: row.prompt,
-    text: row.transcript_text ?? row.turn_text,
-    startMs: row.start_ms,
-    endMs: row.end_ms,
+    text: row.transcriptText ?? row.turnText,
+    startMs: row.startMs,
+    endMs: row.endMs,
   }));
 }
 
@@ -172,12 +210,16 @@ export async function beginReportGeneration(params: {
   inputHash: string;
 }): Promise<string> {
   const generationId = randomUUID();
-  await db.query(
-    `INSERT INTO ai_generations
-       (id, session_id, purpose, status, model, prompt_version, input_hash, input_summary)
-     VALUES ($1, $2, 'report', 'pending', $3, $4, $5, '{}'::jsonb)`,
-    [generationId, params.sessionId, params.model, params.promptVersion, params.inputHash],
-  );
+  await orm.insert(aiGenerations).values({
+    id: generationId,
+    sessionId: params.sessionId,
+    purpose: "report",
+    status: "pending",
+    model: params.model,
+    promptVersion: params.promptVersion,
+    inputHash: params.inputHash,
+    inputSummary: {},
+  });
   return generationId;
 }
 
@@ -191,64 +233,50 @@ export async function completeReportGeneration(params: {
   latencyMs?: number;
   model?: string;
 }) {
-  const client = await db.connect();
-  try {
-    await client.query("BEGIN");
-    const generation = await client.query<{ status: string }>(
-      `SELECT status FROM ai_generations WHERE id = $1 AND session_id = $2 FOR UPDATE`,
-      [params.generationId, params.sessionId],
-    );
-    if (generation.rowCount !== 1) throw new Error("Report generation not found.");
-    if (generation.rows[0].status === "completed") {
-      await client.query("ROLLBACK");
-      return;
-    }
+  await orm.transaction(async (tx) => {
+    const generations = await tx
+      .select({ status: aiGenerations.status })
+      .from(aiGenerations)
+      .where(and(eq(aiGenerations.id, params.generationId), eq(aiGenerations.sessionId, params.sessionId)))
+      .for("update");
+    if (generations.length !== 1) throw new Error("Report generation not found.");
+    if (generations[0].status === "completed") return;
     for (const finding of params.findings) {
-      await client.query(
-        `INSERT INTO report_findings
-           (id, session_id, generation_id, turn_id, verdict, explanation, improvement)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [
-          randomUUID(),
-          params.sessionId,
-          params.generationId,
-          finding.turnId,
-          finding.verdict,
-          finding.explanation,
-          finding.improvement,
-        ],
-      );
+      await tx.insert(reportFindings).values({
+        id: randomUUID(),
+        sessionId: params.sessionId,
+        generationId: params.generationId,
+        turnId: finding.turnId,
+        verdict: finding.verdict,
+        explanation: finding.explanation,
+        improvement: finding.improvement,
+      });
     }
-    await client.query(
-      `UPDATE ai_generations
-       SET status = 'completed', result = $3::jsonb, usage = $4::jsonb, latency_ms = $5,
-           model = coalesce($6, model), completed_at = now()
-       WHERE id = $1 AND session_id = $2`,
-      [
-        params.generationId,
-        params.sessionId,
-        JSON.stringify(params.result),
-        JSON.stringify(params.usage ?? {}),
-        params.latencyMs ?? null,
-        params.model ?? null,
-      ],
-    );
-    await client.query("COMMIT");
-  } catch (error) {
-    await client.query("ROLLBACK").catch(() => {});
-    throw error;
-  } finally {
-    client.release();
-  }
+    await tx
+      .update(aiGenerations)
+      .set({
+        status: "completed",
+        result: params.result,
+        usage: params.usage ?? {},
+        latencyMs: params.latencyMs ?? null,
+        model: params.model ?? undefined,
+        completedAt: new Date(),
+      })
+      .where(and(eq(aiGenerations.id, params.generationId), eq(aiGenerations.sessionId, params.sessionId)));
+  });
 }
 
 export async function failReportGeneration(params: { sessionId: string; generationId: string; errorCode: string }) {
-  await db.query(
-    `UPDATE ai_generations
-     SET status = 'failed', error_code = $3, completed_at = now()
-     WHERE id = $1 AND session_id = $2 AND status IN ('pending', 'running')`,
-    [params.generationId, params.sessionId, params.errorCode],
-  );
+  await orm
+    .update(aiGenerations)
+    .set({ status: "failed", errorCode: params.errorCode, completedAt: new Date() })
+    .where(
+      and(
+        eq(aiGenerations.id, params.generationId),
+        eq(aiGenerations.sessionId, params.sessionId),
+        inArray(aiGenerations.status, ["pending", "running"]),
+      ),
+    );
 }
 
 export interface StoredReportFinding {
@@ -272,49 +300,57 @@ export interface StoredReport {
 
 /** Returns the latest report generation (any status) for an owned session, or null if none exists. */
 export async function getLatestReport(sessionId: string, clerkUserId: string): Promise<StoredReport | null> {
-  const generation = await db.query<{
-    id: string;
-    status: string;
-    error_code: string | null;
-    completed_at: Date | null;
-    result: { overview?: ReportOverview; source?: string; providerError?: string } | null;
-  }>(
-    `SELECT g.id, g.status, g.error_code, g.completed_at, g.result
-     FROM ai_generations g
-     JOIN interview_sessions s ON s.id = g.session_id
-     WHERE g.session_id = $1 AND s.clerk_user_id = $2 AND g.purpose = 'report' AND g.deleted_at IS NULL
-     ORDER BY g.created_at DESC
-     LIMIT 1`,
-    [sessionId, clerkUserId],
-  );
-  const row = generation.rows[0];
+  const generations = await orm
+    .select({
+      id: aiGenerations.id,
+      status: aiGenerations.status,
+      errorCode: aiGenerations.errorCode,
+      completedAt: aiGenerations.completedAt,
+      result: aiGenerations.result,
+    })
+    .from(aiGenerations)
+    .innerJoin(interviewSessions, eq(interviewSessions.id, aiGenerations.sessionId))
+    .where(
+      and(
+        eq(aiGenerations.sessionId, sessionId),
+        eq(interviewSessions.clerkUserId, clerkUserId),
+        eq(aiGenerations.purpose, "report"),
+        isNull(aiGenerations.deletedAt),
+      ),
+    )
+    .orderBy(desc(aiGenerations.createdAt))
+    .limit(1);
+  const row = generations[0];
   if (!row) return null;
 
-  const findings = await db.query<{
-    id: string;
-    turn_id: string;
-    verdict: string;
-    explanation: string;
-    improvement: string | null;
-  }>(
-    `SELECT id, turn_id, verdict, explanation, improvement
-     FROM report_findings
-     WHERE generation_id = $1
-     ORDER BY created_at ASC`,
-    [row.id],
-  );
+  const findings = await orm
+    .select({
+      id: reportFindings.id,
+      turnId: reportFindings.turnId,
+      verdict: reportFindings.verdict,
+      explanation: reportFindings.explanation,
+      improvement: reportFindings.improvement,
+    })
+    .from(reportFindings)
+    .where(eq(reportFindings.generationId, row.id))
+    .orderBy(asc(reportFindings.createdAt));
 
+  const result = row.result as {
+    overview?: ReportOverview;
+    source?: string;
+    providerError?: string;
+  } | null;
   return {
     generationId: row.id,
     status: row.status,
-    errorCode: row.error_code,
-    generatedAt: row.completed_at?.toISOString() ?? null,
-    overview: row.result?.overview ?? null,
-    usedFallback: row.result?.source === "fallback",
-    providerError: row.result?.providerError ?? null,
-    findings: findings.rows.map((finding) => ({
+    errorCode: row.errorCode,
+    generatedAt: row.completedAt?.toISOString() ?? null,
+    overview: result?.overview ?? null,
+    usedFallback: result?.source === "fallback",
+    providerError: result?.providerError ?? null,
+    findings: findings.map((finding) => ({
       id: finding.id,
-      turnId: finding.turn_id,
+      turnId: finding.turnId,
       verdict: finding.verdict,
       explanation: finding.explanation,
       improvement: finding.improvement,
