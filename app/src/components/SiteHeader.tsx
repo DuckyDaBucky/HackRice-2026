@@ -17,6 +17,7 @@ export function SiteHeader() {
     !clerkEnabled ||
     pathname === "/interview" ||
     pathname.startsWith("/interview/") ||
+    pathname.startsWith("/reports/") ||
     OWN_HEADER_ROUTES.includes(pathname)
   )
     return null;

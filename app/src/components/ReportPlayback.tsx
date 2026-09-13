@@ -22,10 +22,14 @@ export function ReportPlayback({ sessionId, artifactId }: { sessionId: string; a
   }
   return (
     <div className="mt-3 flex items-center gap-3">
-      <button type="button" onClick={() => void openPlayback()} className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 px-3 py-1.5 text-xs font-medium text-sky-200 transition hover:bg-sky-500/10">
+      <button
+        type="button"
+        onClick={() => void openPlayback()}
+        className="inline-flex items-center gap-2 rounded-full border border-accent/40 px-3 py-1.5 text-xs font-medium text-accent-deep transition-colors duration-150 hover:bg-accent/10"
+      >
         <PlayIcon size={14} weight="fill" /> Play recording
       </button>
-      {error && <span role="status" className="text-xs text-amber-200">{error}</span>}
+      {error && <span role="status" className="text-xs text-amber-600">{error}</span>}
     </div>
   );
 }
