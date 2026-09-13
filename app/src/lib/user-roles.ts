@@ -6,11 +6,27 @@ import { type AppUserRole, roleHasHrAccess } from "@/lib/user-roles.shared";
 export type { AppUserRole } from "@/lib/user-roles.shared";
 export { roleLabel, roleHasHrAccess } from "@/lib/user-roles.shared";
 
+function isUndefinedTable(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "42P01";
+}
+
 export async function resolveAppUserRole(userId: string): Promise<AppUserRole> {
-  const byUser = await db.query<{ role: AppUserRole }>(
-    `SELECT role FROM app_user_roles WHERE clerk_user_id = $1 LIMIT 1`,
-    [userId],
-  );
+  let byUser;
+  try {
+    byUser = await db.query<{ role: AppUserRole }>(
+      `SELECT role FROM app_user_roles WHERE clerk_user_id = $1 LIMIT 1`,
+      [userId],
+    );
+  } catch (error) {
+    // During rolling deploys the application can briefly start before the
+    // optional role migration. Candidate practice must remain available;
+    // authorization checks still default to no HR access.
+    if (isUndefinedTable(error)) {
+      console.warn("app_user_roles is unavailable; defaulting to candidate access");
+      return "candidate";
+    }
+    throw error;
+  }
   if (byUser.rows[0]) return byUser.rows[0].role;
 
   const emails = await verifiedEmailsForUser(userId);

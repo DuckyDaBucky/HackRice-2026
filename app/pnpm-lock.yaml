@@ -26,6 +26,9 @@ importers:
       '@langchain/openai':
         specifier: ^1.5.12
         version: 1.5.12(@aws-sdk/credential-provider-node@3.972.83)(@langchain/core@1.2.10(openai@7.15.0(@aws-sdk/credential-provider-node@3.972.83)(@smithy/signature-v4@5.7.3)(ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.2))(ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@6.0.6)))(@smithy/signature-v4@5.7.3)(ws@7.5.13(bufferutil@4.1.0)(utf-8-validate@6.0.6))
+      '@napi-rs/canvas':
+        specifier: 0.1.80
+        version: 0.1.80
       '@phosphor-icons/react':
         specifier: ^2.1.10
         version: 2.1.10(react-dom@19.2.8(react@19.2.8))(react@19.2.8)

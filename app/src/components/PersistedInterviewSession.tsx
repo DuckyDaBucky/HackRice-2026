@@ -152,7 +152,7 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
           </button>
           <button
             type="button"
-            onClick={() => router.push(`/reports/${initialState.session.id}`)}
+            onClick={() => router.push(`/interview/session/${initialState.session.id}/report`)}
             className="rounded-full border border-zinc-700 bg-zinc-900/60 px-7 py-3.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.98]"
           >
             Evidence

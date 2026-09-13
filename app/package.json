@@ -39,6 +39,7 @@
     "@langchain/core": "^1.2.10",
     "@langchain/google": "^0.2.5",
     "@langchain/openai": "^1.5.12",
+    "@napi-rs/canvas": "0.1.80",
     "@phosphor-icons/react": "^2.1.10",
     "@solana/web3.js": "1.98.4",
     "drizzle-orm": "^0.45.2",

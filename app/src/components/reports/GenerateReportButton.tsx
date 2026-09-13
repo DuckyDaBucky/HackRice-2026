@@ -25,11 +25,11 @@ export function GenerateReportButton({ sessionId, label }: { sessionId: string; 
             }
           });
         }}
-        className="w-fit rounded-full bg-sky-500 px-4 py-2 text-sm font-medium text-white hover:bg-sky-400 disabled:opacity-60"
+        className="inline-flex h-10 w-fit items-center rounded-lg border border-dash-border-strong bg-dash-surface px-4 text-sm font-semibold text-dash-text transition-colors duration-150 hover:bg-dash-surface-muted disabled:opacity-60"
       >
         {isPending ? "Generating…" : label}
       </button>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   );
 }

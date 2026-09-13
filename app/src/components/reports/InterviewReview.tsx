@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import Link from "next/link";
+import { ArrowRightIcon, FileTextIcon } from "@phosphor-icons/react";
 import type { ProcessMistake } from "@/lib/analytics/process-events";
 import type { ReportOverview } from "@/lib/reports/contracts";
 import { REPORT_VERDICT_SCORES, reportScoreFromVerdicts } from "@/lib/reports/scoring";
@@ -28,7 +30,13 @@ const VERDICTS: Record<string, VerdictMeta> = {
 const NOT_REVIEWED: VerdictMeta = { label: "Not reviewed", glyph: "·", color: "#52514e", score: null };
 const SUMMARY_ORDER = ["best", "good", "inaccuracy", "mistake", "blunder", "insufficient_evidence"];
 
-const CHART = { surface: "#111113", grid: "#2c2c2a", axis: "#383835", muted: "#898781", line: "#3987e5" };
+const CHART = {
+  surface: "var(--dash-surface)",
+  grid: "var(--dash-border)",
+  axis: "var(--dash-border-strong)",
+  muted: "var(--dash-text-faint)",
+  line: "var(--color-accent-deep)",
+};
 const GRAPH = { width: 640, height: 200, left: 40, right: 16, top: 16, bottom: 30 };
 
 const PROCESS_MISTAKE_LABEL: Record<ProcessMistake["kind"], string> = {
@@ -36,6 +44,12 @@ const PROCESS_MISTAKE_LABEL: Record<ProcessMistake["kind"], string> = {
   time_overrun: "Over time",
   upload_failed: "Upload failed",
 };
+
+const EMPTY_REPORT_NEXT_STEPS = [
+  ["Submit every answer", "Even a short, specific response gives the reviewer evidence to coach."],
+  ["Use a simple structure", "State the situation, your action, and the measurable result."],
+  ["Keep recording enabled", "Recordings unlock playback, captions, and optional delivery signals."],
+] as const;
 
 function verdictOf(answer: ReviewAnswer): VerdictMeta {
   return answer.finding ? VERDICTS[answer.finding.verdict] ?? NOT_REVIEWED : NOT_REVIEWED;
@@ -66,10 +80,10 @@ function VerdictGlyph({ meta, size = "md" }: { meta: VerdictMeta; size?: "sm" | 
 
 function Card({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
+    <section className="flex flex-col gap-3 rounded-xl border border-dash-border bg-dash-surface p-5">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="text-sm font-medium text-zinc-400">{title}</h2>
-        {hint && <span className="text-xs text-zinc-500">{hint}</span>}
+        <h2 className="text-sm font-semibold text-dash-text">{title}</h2>
+        {hint && <span className="text-xs text-dash-text-faint">{hint}</span>}
       </div>
       {children}
     </section>
@@ -88,7 +102,7 @@ function StepButton({ label, disabled, onClick, children }: {
       aria-label={label}
       disabled={disabled}
       onClick={onClick}
-      className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-300 transition hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-sky-400 disabled:opacity-30 disabled:hover:bg-transparent"
+      className="flex h-8 w-8 items-center justify-center rounded-full text-dash-text-muted transition hover:bg-dash-surface-muted focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-30 disabled:hover:bg-transparent"
     >
       {children}
     </button>
@@ -109,14 +123,14 @@ function AnswerDetail({ answer, total, answers, selected, sessionId, onStep, onS
   const weights = answers.map((a) => a.clip?.durationMs ?? 1);
   const weightTotal = weights.reduce((s, w) => s + w, 0) || 1;
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
+    <section className="flex flex-col gap-4 rounded-xl border border-dash-border bg-dash-surface p-5">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm text-zinc-400">
+        <div className="flex items-center gap-2 text-sm text-dash-text-muted">
           <span>
             Answer {answer.number} of {total}
           </span>
           {answer.isFollowUp && (
-            <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">Follow-up</span>
+            <span className="rounded-md bg-dash-surface-muted px-2 py-0.5 text-xs text-dash-text-muted">Follow-up</span>
           )}
         </div>
         <div className="flex items-center gap-1">
@@ -146,7 +160,7 @@ function AnswerDetail({ answer, total, answers, selected, sessionId, onStep, onS
           className="aspect-video w-full rounded-xl bg-black"
         />
       ) : (
-        <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500">
+        <div className="flex aspect-video w-full items-center justify-center rounded-lg bg-dash-surface-muted text-sm text-dash-text-muted">
           No recording was saved for this answer
         </div>
       )}
@@ -174,7 +188,7 @@ function AnswerDetail({ answer, total, answers, selected, sessionId, onStep, onS
                 backgroundColor: itemMeta.color,
                 color: inkOn(itemMeta.color),
               }}
-              className={`min-w-6 rounded text-[10px] font-bold transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-sky-400 ${isCurrent ? "outline-2 outline-offset-2 outline-zinc-100" : "opacity-80"}`}
+              className={`min-w-6 rounded text-[10px] font-bold transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-accent ${isCurrent ? "outline-2 outline-offset-2 outline-dash-text" : "opacity-80"}`}
             >
               {weights[index] / weightTotal >= 0.06 ? itemMeta.glyph : <span aria-hidden="true">·</span>}
             </button>
@@ -182,35 +196,35 @@ function AnswerDetail({ answer, total, answers, selected, sessionId, onStep, onS
         })}
       </div>
 
-      {answer.question && <h2 className="text-base font-medium text-zinc-50">{answer.question}</h2>}
+      {answer.question && <h2 className="text-base font-semibold text-dash-text">{answer.question}</h2>}
 
-      <div className="flex flex-col gap-2 rounded-xl bg-zinc-950/60 p-4">
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-zinc-100">
+      <div className="flex flex-col gap-2 rounded-lg bg-dash-surface-muted p-4">
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-dash-text">
           <VerdictGlyph meta={meta} />
           {meta.label}
         </span>
         {answer.finding ? (
           <>
-            <p className="text-sm leading-relaxed text-zinc-300">
-              <span className="text-zinc-500">Why: </span>
+            <p className="text-sm leading-relaxed text-dash-text-muted">
+              <span className="text-dash-text-faint">Why: </span>
               {answer.finding.explanation}
             </p>
             {answer.finding.improvement && (
-              <p className="text-sm leading-relaxed text-zinc-300">
-                <span className="text-zinc-500">Try instead: </span>
+              <p className="text-sm leading-relaxed text-dash-text-muted">
+                <span className="text-dash-text-faint">Try instead: </span>
                 {answer.finding.improvement}
               </p>
             )}
           </>
         ) : (
-          <p className="text-sm text-zinc-500">Generate the review to get a verdict for this answer.</p>
+          <p className="text-sm text-dash-text-muted">Generate the review to get a verdict for this answer.</p>
         )}
       </div>
 
       {answer.transcript && (
         <details className="text-sm">
-          <summary className="cursor-pointer text-zinc-400 hover:text-zinc-200">Transcript</summary>
-          <p className="mt-2 leading-relaxed text-zinc-400">{answer.transcript}</p>
+          <summary className="cursor-pointer text-dash-text-muted hover:text-dash-text">Transcript</summary>
+          <p className="mt-2 leading-relaxed text-dash-text-muted">{answer.transcript}</p>
         </details>
       )}
     </section>
@@ -294,7 +308,7 @@ function SessionTimelineStrip({ answers, selected, onSelect }: {
             );
           })}
         </div>
-        <div className="mt-2 flex justify-between text-[11px] text-zinc-500 tabular-nums">
+        <div className="mt-2 flex justify-between text-[11px] text-dash-text-faint tabular-nums">
           <span>{hasAnyDuration ? "0:00" : "Start"}</span>
           <span>{hasAnyDuration ? formatDuration(total) : "End"}</span>
         </div>
@@ -337,7 +351,7 @@ function EvaluationGraph({ answers, selected, onSelect }: {
   if (runs.length === 0) {
     return (
       <Card title="Answer quality across the interview">
-        <p className="py-6 text-center text-sm text-zinc-500">The quality graph appears once answers are reviewed.</p>
+        <p className="py-6 text-center text-sm text-dash-text-muted">The quality graph appears once answers are reviewed.</p>
       </Card>
     );
   }
@@ -475,7 +489,7 @@ function EvaluationGraph({ answers, selected, onSelect }: {
                 title={answer.finding ? `Answer ${answer.number} — ${meta.label}: ${answer.finding.explanation}` : `Answer ${answer.number} — ${meta.label}`}
                 aria-label={`Go to answer ${answer.number}, ${meta.label}`}
                 aria-current={index === selected ? "true" : undefined}
-                className={`rounded-full border px-2.5 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-sky-400 ${index === selected ? "border-zinc-100 text-zinc-50" : "border-zinc-800 text-zinc-400 hover:text-zinc-200"}`}
+                className={`rounded-md border px-2.5 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-accent ${index === selected ? "border-accent bg-accent/10 text-accent-deep" : "border-dash-border-strong text-dash-text-muted hover:text-dash-text"}`}
               >
                 {answer.number} · {meta.label}
               </button>
@@ -502,11 +516,12 @@ function AccuracySummary({ answers, skippedCount = 0 }: { answers: ReviewAnswer[
   })).filter((row) => row.verdict !== "insufficient_evidence" || row.count > 0);
 
   return (
-    <section className="flex flex-col gap-5 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
+    <section className="relative flex flex-col gap-5 overflow-hidden rounded-xl bg-[#101817] p-6 text-white shadow-[0_18px_45px_rgba(18,55,50,0.14)]">
+      <div className="pointer-events-none absolute -right-14 -top-20 h-48 w-48 rounded-full bg-accent/10 blur-3xl" aria-hidden="true" />
       <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-medium text-zinc-400">Answer accuracy</h2>
-        <p className="text-5xl font-semibold text-zinc-50">{accuracy === null ? "—" : `${accuracy}%`}</p>
-        <p className="text-xs text-zinc-500">
+        <h2 className="relative text-sm font-medium text-white/55">Interview accuracy</h2>
+        <p className="relative text-5xl font-semibold tracking-[-0.05em] text-white tabular-nums">{accuracy === null ? "—" : `${accuracy}/100`}</p>
+        <p className="relative text-xs text-white/45">
           {denominator === 0
             ? "No answers have been reviewed yet"
             : skipped > 0
@@ -514,26 +529,26 @@ function AccuracySummary({ answers, skippedCount = 0 }: { answers: ReviewAnswer[
               : `Across ${scoredAnswers.length} scored ${scoredAnswers.length === 1 ? "answer" : "answers"}`}
         </p>
       </div>
-      <ul className="flex flex-col gap-2">
+      {answers.length > 0 && <ul className="relative flex flex-col gap-2 border-t border-white/10 pt-4">
         {rows.map((row) => (
           <li key={row.verdict} className="flex items-center justify-between text-sm">
-            <span className="inline-flex items-center gap-2 text-zinc-300">
+            <span className="inline-flex items-center gap-2 text-white/70">
               <VerdictGlyph meta={row.meta} size="sm" />
               {row.meta.label}
             </span>
-            <span className="text-zinc-100 tabular-nums">{row.count}</span>
+            <span className="text-white tabular-nums">{row.count}</span>
           </li>
         ))}
         {skipped > 0 && (
           <li className="flex items-center justify-between text-sm">
-            <span className="inline-flex items-center gap-2 text-zinc-300">
+            <span className="inline-flex items-center gap-2 text-white/70">
               <VerdictGlyph meta={{ label: "Skipped", glyph: "✕", color: "#52514e", score: 0 }} size="sm" />
               Skipped (0 pts)
             </span>
-            <span className="text-zinc-100 tabular-nums">{skipped}</span>
+            <span className="text-white tabular-nums">{skipped}</span>
           </li>
         )}
-      </ul>
+      </ul>}
     </section>
   );
 }
@@ -541,11 +556,11 @@ function AccuracySummary({ answers, skippedCount = 0 }: { answers: ReviewAnswer[
 function KeyProblems({ overview }: { overview: ReportOverview }) {
   return (
     <Card title="Key problems to fix">
-      <p className="text-sm leading-relaxed text-zinc-300">{overview.summary}</p>
+      <p className="text-sm leading-relaxed text-dash-text-muted">{overview.summary}</p>
       <ol className="flex flex-col gap-2">
         {overview.keyProblems.map((problem, index) => (
-          <li key={index} className="flex gap-2 text-sm text-zinc-200">
-            <span className="text-zinc-500 tabular-nums">{index + 1}.</span>
+          <li key={index} className="flex gap-2 text-sm text-dash-text">
+            <span className="text-dash-text-faint tabular-nums">{index + 1}.</span>
             {problem}
           </li>
         ))}
@@ -572,12 +587,12 @@ function MoveList({ answers, selected, onSelect }: {
                 aria-current={isSelected ? "true" : undefined}
                 title={answer.finding ? `${meta.label}: ${answer.finding.explanation}` : meta.label}
                 onClick={() => onSelect(index)}
-                className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-sky-400 ${isSelected ? "bg-zinc-800" : "hover:bg-zinc-800/50"}`}
+                className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-accent ${isSelected ? "bg-dash-surface-muted" : "hover:bg-dash-surface-hover"}`}
               >
-                <span className="w-5 shrink-0 text-right text-zinc-500 tabular-nums">{answer.number}.</span>
+                <span className="w-5 shrink-0 text-right text-dash-text-faint tabular-nums">{answer.number}.</span>
                 <VerdictGlyph meta={meta} size="sm" />
-                <span className="min-w-0 flex-1 truncate text-zinc-200">{answer.question ?? "Answer"}</span>
-                <span className="shrink-0 text-xs text-zinc-500">{meta.label}</span>
+                <span className="min-w-0 flex-1 truncate text-dash-text">{answer.question ?? "Answer"}</span>
+                <span className="shrink-0 text-xs text-dash-text-faint">{meta.label}</span>
               </button>
             </li>
           );
@@ -589,26 +604,52 @@ function MoveList({ answers, selected, onSelect }: {
 
 function SessionIssues({ mistakes }: { mistakes: ProcessMistake[] }) {
   return (
-    <Card title="Session issues">
-      <ul className="flex flex-col gap-2">
+    <section className="rounded-xl border border-dash-border bg-dash-surface px-5 py-5">
+      <h2 className="text-lg font-semibold tracking-tight text-dash-text">Session events</h2>
+      <p className="mt-1 text-sm text-dash-text-muted">A timeline of anything that affected this report.</p>
+      <ul className="mt-4 divide-y divide-dash-border border-y border-dash-border">
         {mistakes.map((mistake, index) => (
-          <li key={index} className="flex gap-2 text-sm text-zinc-300">
+          <li key={index} className="flex gap-3 py-3 text-sm text-dash-text-muted">
             <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#d03b3b]" />
             <span>
-              <span className="font-medium text-zinc-100">{PROCESS_MISTAKE_LABEL[mistake.kind]}</span> — {mistake.detail}
+              <span className="font-semibold text-dash-text">{PROCESS_MISTAKE_LABEL[mistake.kind]}</span> — {mistake.detail}
             </span>
           </li>
         ))}
       </ul>
-    </Card>
+    </section>
+  );
+}
+
+function NextSteps() {
+  return (
+    <section className="rounded-xl border border-accent/20 bg-accent/5 px-5 py-5 sm:px-6">
+      <h2 className="text-lg font-semibold tracking-tight text-dash-text">What to do next</h2>
+      <p className="mt-1 text-sm text-dash-text-muted">Try again with one complete response and this report will become much more useful.</p>
+      <ol className="mt-5 grid gap-5 sm:grid-cols-3">
+        {EMPTY_REPORT_NEXT_STEPS.map(([title, body], index) => (
+          <li key={title} className="flex gap-3">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent-deep">{index + 1}</span>
+            <span>
+              <span className="block text-sm font-semibold text-dash-text">{title}</span>
+              <span className="mt-1 block text-sm leading-5 text-dash-text-muted">{body}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <Link href="/interview/setup" className="mt-5 inline-flex h-9 items-center gap-2 rounded-md bg-accent px-4 text-sm font-semibold text-dash-on-accent transition duration-200 hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.98]">
+        Start another practice <ArrowRightIcon size={14} weight="bold" />
+      </Link>
+    </section>
   );
 }
 
 /** Chess.com-style game review for an interview: step through answers, see verdicts and why. */
-export function InterviewReview({ review, overview, aside, sessionId }: {
+export function InterviewReview({ review, overview, aside, evidence, sessionId }: {
   review: SessionReview;
   overview: ReportOverview | null;
   aside?: ReactNode;
+  evidence?: ReactNode;
   sessionId?: string | null;
 }) {
   const [selected, setSelected] = useState(0);
@@ -628,17 +669,31 @@ export function InterviewReview({ review, overview, aside, sessionId }: {
 
   if (count === 0) {
     return (
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <p className="rounded-2xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
-          {skippedTotal > 0
-            ? `All ${skippedTotal} question${skippedTotal === 1 ? " was" : "s were"} skipped — each skip scores 0.`
-            : "No answers were recorded in this session, so there is nothing to review yet."}
-        </p>
-        <aside className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6">
+        <div className="grid gap-5 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
           <AccuracySummary answers={[]} skippedCount={skippedTotal} />
+          <section className="flex min-h-52 items-center rounded-xl border border-dash-border bg-dash-surface p-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+            <div className="flex items-start gap-4">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-dash-surface-muted text-dash-text-muted ring-1 ring-dash-border">
+                <FileTextIcon size={20} />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight text-dash-text">No answer was submitted</h2>
+                <p className="mt-2 max-w-md text-sm leading-6 text-dash-text-muted">
+                  {skippedTotal > 0
+                    ? `${skippedTotal} skipped ${skippedTotal === 1 ? "answer was" : "answers were"} counted as 0. Detailed coaching needs at least one recorded response.`
+                    : "No responses were recorded in this session, so detailed answer coaching is unavailable."}
+                </p>
+              </div>
+            </div>
+          </section>
+        </div>
+        {evidence}
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
           {review.processMistakes.length > 0 && <SessionIssues mistakes={review.processMistakes} />}
           {aside}
-        </aside>
+        </div>
+        <NextSteps />
       </div>
     );
   }
@@ -662,6 +717,7 @@ export function InterviewReview({ review, overview, aside, sessionId }: {
         />
         <SessionTimelineStrip answers={review.answers} selected={current} onSelect={setSelected} />
         <EvaluationGraph answers={review.answers} selected={current} onSelect={setSelected} />
+        {evidence}
       </div>
       <aside className="flex flex-col gap-6">
         <AccuracySummary answers={review.answers} skippedCount={skippedCount} />

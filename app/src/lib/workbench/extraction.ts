@@ -1,6 +1,5 @@
 import "server-only";
 import mammoth from "mammoth";
-import { PDFParse } from "pdf-parse";
 import { WorkbenchError } from "./errors";
 export const MAX_UPLOAD = 10*1024*1024;
 export const MAX_TEXT = 60000;
@@ -14,6 +13,11 @@ export async function extractResume(buffer:Buffer, filename:string) {
   try {
     let text:string;
     if (/\.pdf$/i.test(filename) && buffer.subarray(0,5).toString()==="%PDF-") {
+      // Keep PDF.js and its native canvas runtime out of unrelated routes.
+      // A static import here made the homepage load PDF.js during startup,
+      // causing the Docker health probe to fail before any PDF was uploaded.
+      await import("@napi-rs/canvas");
+      const { PDFParse } = await import("pdf-parse");
       const parser=new PDFParse({data:new Uint8Array(buffer),verbosity:0});
       try { const result=await parser.getText(); text=result.pages.map(p=>p.text).join("\n"); } finally {await parser.destroy();}
     } else if (/\.docx$/i.test(filename) && buffer[0]===0x50 && buffer[1]===0x4b) {
