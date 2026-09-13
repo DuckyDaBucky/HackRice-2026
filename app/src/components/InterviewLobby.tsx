@@ -302,7 +302,7 @@ export function InterviewLobby({
             )}
           </div>
 
-          <aside className="flex flex-col gap-5">
+          <aside className="flex flex-col gap-4">
             <MicCheck stream={previewStream} />
             <SpeakerCheck outputDeviceId={outputId} />
             <SubtitlePicker />
@@ -320,6 +320,21 @@ export function InterviewLobby({
             </span>
           </div>
         )}
+
+        <footer className="flex flex-col items-center gap-2 border-t border-zinc-900 pt-5 pb-2">
+          <button
+            type="button"
+            onClick={() => void handleJoin()}
+            disabled={isJoining}
+            className="inline-flex items-center gap-2.5 rounded-full bg-sky-500 px-10 py-3.5 text-base font-semibold text-zinc-950 shadow-[0_12px_40px_-12px_rgba(14,165,233,0.55)] transition hover:bg-sky-400 active:scale-[0.98] disabled:opacity-60"
+          >
+            <VideoCameraIcon size={20} weight="fill" />
+            {isJoining ? "Joining…" : joinError ? "Try again" : "Enter call and start"}
+          </button>
+          {!previewStream && !previewError && (
+            <p className="text-sm text-zinc-500">You can join directly — checks are optional but recommended.</p>
+          )}
+        </footer>
       </div>
     </div>
   );
