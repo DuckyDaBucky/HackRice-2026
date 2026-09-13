@@ -4,7 +4,9 @@
   "private": true,
   "description": "Language-agnostic HTTP and WebSocket wrapper for the SmartSpectra Node SDK",
   "type": "module",
-  "engines": { "node": ">=20.12.0" },
+  "engines": {
+    "node": ">=20.12.0"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/server.ts",
@@ -14,6 +16,7 @@
     "openapi:lint": "npx --yes @redocly/cli@latest lint openapi.yaml"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1131.0",
     "@fastify/multipart": "10.1.1",
     "@fastify/websocket": "11.3.0",
     "@smartspectra/node-sdk": "3.3.0",

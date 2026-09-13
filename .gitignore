@@ -29,3 +29,7 @@ pnpm-debug.log*
 # Solana / Anchor
 **/.anchor/
 **/test-ledger/
+
+deploy/**/secrets/*
+!deploy/**/secrets/.gitkeep
+

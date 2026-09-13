@@ -1,5 +1,13 @@
 export type LogLevelName = "debug" | "info" | "warning" | "error" | "none";
 
+export interface R2Config {
+  accountId: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+  keyPrefix: string;
+}
+
 export interface AppConfig {
   host: string;
   port: number;
@@ -9,6 +17,7 @@ export interface AppConfig {
   maxVideoBytes: number;
   videoAnalysisTimeoutMs: number;
   maxFrameBytes: number;
+  r2?: R2Config | undefined;
 }
 
 function integerFromEnv(
@@ -52,5 +61,34 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     maxVideoBytes: integerFromEnv(env, "MAX_VIDEO_BYTES", 1024 * 1024 * 1024, 1),
     videoAnalysisTimeoutMs: integerFromEnv(env, "VIDEO_ANALYSIS_TIMEOUT_MS", 21_600_000, 1),
     maxFrameBytes: integerFromEnv(env, "MAX_FRAME_BYTES", 16 * 1024 * 1024, 1024),
+    r2: r2ConfigFromEnv(env),
+  };
+}
+
+function optionalEnv(env: NodeJS.ProcessEnv, name: string): string | undefined {
+  const value = env[name]?.trim();
+  return value ? value : undefined;
+}
+
+function r2ConfigFromEnv(env: NodeJS.ProcessEnv): R2Config | undefined {
+  const accountId = optionalEnv(env, "R2_ACCOUNT_ID");
+  const accessKeyId = optionalEnv(env, "R2_ACCESS_KEY_ID");
+  const secretAccessKey = optionalEnv(env, "R2_SECRET_ACCESS_KEY");
+  const bucket = optionalEnv(env, "R2_BUCKET");
+  const present = [accountId, accessKeyId, secretAccessKey, bucket].filter(
+    (value) => value !== undefined,
+  ).length;
+  if (present === 0) return undefined;
+  if (present < 4 || !accountId || !accessKeyId || !secretAccessKey || !bucket) {
+    throw new Error(
+      "R2 configuration is incomplete: set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET together",
+    );
+  }
+  return {
+    accountId,
+    accessKeyId,
+    secretAccessKey,
+    bucket,
+    keyPrefix: optionalEnv(env, "R2_KEY_PREFIX") ?? "",
   };
 }

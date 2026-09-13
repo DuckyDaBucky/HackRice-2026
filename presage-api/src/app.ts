@@ -8,6 +8,8 @@ import type { AppConfig } from "./config.js";
 import { errorBody } from "./errors.js";
 import { registerLiveRoute } from "./routes/live.js";
 import { registerVideoAnalysisRoute } from "./routes/video-analysis.js";
+import { registerR2VideoRoute } from "./routes/video-r2.js";
+import type { R2Fetcher } from "./r2.js";
 import { SessionCoordinator } from "./session-coordinator.js";
 import type { SdkRuntime } from "./sdk/contracts.js";
 import { allMetricCodes } from "./sdk/events.js";
@@ -16,6 +18,7 @@ export interface AppDependencies {
   config: AppConfig;
   runtime: SdkRuntime;
   logger?: boolean;
+  r2Fetcher?: R2Fetcher;
 }
 
 export async function buildApp(dependencies: AppDependencies): Promise<FastifyInstance> {
@@ -47,6 +50,7 @@ export async function buildApp(dependencies: AppDependencies): Promise<FastifyIn
     endpoints: {
       liveWebSocket: "/v1/live",
       videoUpload: "/v1/videos/analyze",
+      videoR2Upload: "/v1/videos/analyze-r2",
     },
     metricBundles: runtime.metricBundles,
     metricTypes: runtime.metricTypes,
@@ -72,6 +76,12 @@ export async function buildApp(dependencies: AppDependencies): Promise<FastifyIn
 
   await registerLiveRoute(app, { config, coordinator, runtime });
   await registerVideoAnalysisRoute(app, { config, coordinator, runtime });
+  await registerR2VideoRoute(app, {
+    config,
+    coordinator,
+    runtime,
+    r2Fetcher: dependencies.r2Fetcher,
+  });
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error({ err: error }, "request failed");

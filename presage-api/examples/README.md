@@ -1,4 +1,46 @@
-# Camera debug example
+# Presage API examples
+
+## HTTPS deployment smoke test
+
+`https_smoke_test.py` checks the public deployment without requiring any extra
+Python packages. By default it validates the certificate chain, hostname,
+expiration date, TLS 1.2+ connection, HTTP-to-HTTPS redirect, Presage health and
+capabilities responses, and the secure WebSocket upgrade plus server `hello`.
+It does not start an SDK session or consume Presage credits.
+
+```sh
+cd presage-api
+python examples/https_smoke_test.py
+```
+
+Or run it with the repository's pinned Python environment:
+
+```sh
+nix run path:. -- examples/https_smoke_test.py
+```
+
+The default origin is `https://getmehired.today`. Use `--base-url` for another
+deployment. No video file or webcam is needed: the test performs a real WSS
+upgrade, validates the WebSocket handshake, and waits for the API's `hello`
+message.
+
+The default health path is `/presage-health` (nginx alias on Vultr). For the
+direct Cloudflare Tunnel deployment on `root@dev`, pass `--health-path /health`:
+
+```sh
+cd presage-api
+python examples/https_smoke_test.py \
+  --base-url https://presage.getmehired.today \
+  --health-path /health
+```
+
+
+The script prints one `PASS` or `FAIL` line per check and exits with status 1 if
+anything fails, so it can also be used in a deployment job or uptime check. Run
+`python examples/https_smoke_test.py --help` for timeout, certificate-expiry,
+custom-CA, and selective-check options.
+
+## Webcam client
 
 This Python client captures a local webcam with OpenCV, displays its optional
 preview with pygame/SDL, sends BGR frames to the Presage API's live WebSocket
@@ -7,6 +49,21 @@ The SmartSpectra API key remains in the Node service; this client does not need
 or accept it.
 
 The example requires Python 3.11 or newer.
+
+To exercise a complete live WebSocket session against the public deployment,
+including SDK startup and webcam frames, run:
+
+```sh
+nix run path:. -- examples/camera_debug.py \
+  --url wss://getmehired.today/v1/live \
+  --no-probe \
+  --preview \
+  --duration 30
+```
+
+The separate HTTPS smoke test already covers the public health and capabilities
+routes; `--no-probe` prevents the webcam client from probing the internal
+`/health` path used by local deployments.
 
 Start the API in one terminal as described in the parent
 [`README.md`](../README.md), then enter the pinned Nix Python environment in

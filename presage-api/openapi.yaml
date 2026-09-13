@@ -59,6 +59,7 @@ paths:
       operationId: analyzeVideo
       parameters:
         - $ref: "#/components/parameters/Stream"
+        - $ref: "#/components/parameters/Brief"
         - $ref: "#/components/parameters/IncludeRawProtobuf"
         - $ref: "#/components/parameters/IncludeVideoOutput"
         - name: interframeDelayMs
@@ -138,6 +139,101 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
+  /v1/videos/analyze-r2:
+    post:
+      summary: Analyze a prerecorded video fetched from R2
+      description: >-
+        Accepts JSON with an R2 object key, fetches the object server-side
+        (so no video payload crosses the client request path), then runs the
+        same file-analysis pipeline as the multipart route. Holds the request
+        until analysis completes; set stream=true for an incremental NDJSON
+        response, which is recommended for long videos.
+      operationId: analyzeR2Video
+      parameters:
+        - $ref: "#/components/parameters/Stream"
+        - $ref: "#/components/parameters/Brief"
+        - $ref: "#/components/parameters/IncludeRawProtobuf"
+        - $ref: "#/components/parameters/IncludeVideoOutput"
+        - name: interframeDelayMs
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: startOffsetMs
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: maxDurationMs
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: frameTransform
+          in: query
+          schema:
+            oneOf:
+              - { type: integer, minimum: 0, maximum: 5 }
+              - { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                  description: R2 object key, e.g. interviews/<session>/<question>.mp4
+                  maxLength: 1024
+      responses:
+        "200":
+          description: Completed aggregate JSON or an incremental NDJSON event stream.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VideoAnalysis"
+            application/x-ndjson:
+              schema:
+                type: string
+        "400":
+          description: The R2 object key is missing or not allowed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: The R2 object does not exist.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: Another native SDK session is active in this process.
+          headers:
+            Retry-After:
+              schema: { type: integer }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "413":
+          description: R2 object exceeds MAX_VIDEO_BYTES.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "422":
+          description: The file or SDK configuration could not be processed.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "502":
+          description: The R2 object could not be fetched.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "503":
+          description: The service has no R2 bucket configured.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "504":
+          description: Analysis exceeded VIDEO_ANALYSIS_TIMEOUT_MS.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
   /v1/live:
     get:
       summary: Upgrade to a live-analysis WebSocket
@@ -157,6 +253,11 @@ components:
     Stream:
       name: stream
       in: query
+      schema: { type: boolean, default: false }
+    Brief:
+      name: brief
+      in: query
+      description: Drop per-frame (frame_sent_through, validation_status) and processing_status events; keep physiology and terminal markers.
       schema: { type: boolean, default: false }
     IncludeRawProtobuf:
       name: includeRawProtobuf

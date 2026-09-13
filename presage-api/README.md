@@ -4,6 +4,12 @@ A small TypeScript service that exposes the Presage SmartSpectra Node SDK throug
 
 The implementation targets `@smartspectra/node-sdk` 3.3.0. The service requires Node.js 20.12 or newer, a supported 64-bit platform, glibc 2.35 or newer on Linux, network access for authentication, and a SmartSpectra API key with permission for every requested metric. Linux also needs a functioning Vulkan driver for the SDK's inference backend. Headless Linux additionally needs D-Bus plus a Secret Service backend so SmartSpectra can persist its device identity. The included image installs Mesa's software Vulkan driver, D-Bus, and GNOME Keyring and starts an isolated session bus/keyring before the API process.
 
+The included Compose files persist GNOME Keyring data in a named
+`presage-keyring` volume and use a stable container hostname. Keep this volume
+across rebuilds so the deployment retains the SmartSpectra device identity that
+Presage pairs with the API key. Removing the volume forces the deployment to
+register as a new device on its next SDK session.
+
 ## Run locally
 
 ```sh
@@ -37,6 +43,32 @@ curl --fail-with-body \
   'http://localhost:8080/v1/videos/analyze' \
   -o result.json
 ```
+
+### Prerecorded video from R2
+
+`POST /v1/videos/analyze-r2` accepts JSON `{ "key": "interviews/<session>/<question>.mp4" }`
+and fetches the object server-side from the configured R2 bucket, so large
+recordings never cross the client request path (which Cloudflare caps well
+below the service's own `MAX_VIDEO_BYTES`). The browser flow stays the same:
+upload the clip straight to R2 with a presigned URL, then submit its key here.
+Analysis options and the `?stream=true` NDJSON mode match the multipart route.
+Both video routes accept `?brief=true`, which drops per-frame
+(`frame_sent_through`, `validation_status`) and `processing_status` events
+and returns only physiology (`metrics`, `accumulated_metrics`) plus the
+terminal markers. Recommended when forwarding results to an LLM.
+
+```sh
+curl --fail-with-body \
+  -H 'Content-Type: application/json' \
+  -d '{"key":"interviews/abc123/q1.mp4"}' \
+  'http://localhost:8080/v1/videos/analyze-r2?stream=true' \
+  -o result.ndjson
+```
+
+The service needs `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, and `R2_BUCKET` (see `.env.example`). Optional
+`R2_KEY_PREFIX` (e.g. `interviews/`) restricts which keys clients may
+request. Without R2 configuration the endpoint returns 503.
 
 For long recordings, add `?stream=true` to receive newline-delimited JSON as events are produced. The first line is `analysis_started`, followed by SDK events, and the last line is `analysis_complete` or `analysis_failed`. This avoids retaining the entire result in the service's event array:
 
