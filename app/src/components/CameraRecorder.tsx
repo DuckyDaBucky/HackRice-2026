@@ -11,6 +11,7 @@ import {
   SpeakerHighIcon,
   VideoCameraIcon,
 } from "@phosphor-icons/react";
+import { LogoMark } from "@/components/marketing/Logo";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
 import { useLiveCaptions } from "@/hooks/useLiveCaptions";
 import type { UseTextToSpeech } from "@/hooks/useTextToSpeech";
@@ -345,6 +346,7 @@ export function CameraRecorder({
     <div className="flex h-[100dvh] min-h-[600px] flex-col overflow-hidden bg-[#151515] text-[#f5f5f5]">
       <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-[#2d2d2d] px-4 sm:px-6">
         <div className="flex items-center gap-3 text-sm">
+          <LogoMark size={22} />
           <span className="font-medium">Practice interview</span>
           <span className="hidden text-zinc-400 sm:inline">
             {mode} · Question {questionNumber} of {totalQuestions}
@@ -384,8 +386,8 @@ export function CameraRecorder({
         </section>
 
         <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_30%,#33385d,transparent_42%),linear-gradient(135deg,#16182a,#0e1018)] p-6 text-center">
-          <div className={`flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-violet-400 via-sky-400 to-indigo-500 shadow-[0_0_0_10px_rgba(255,255,255,0.05)] transition ${tts.isSpeaking ? "scale-105 shadow-[0_0_0_10px_rgba(255,255,255,0.05),0_0_45px_rgba(95,186,255,0.35)]" : ""}`}><RobotIcon size={60} weight="duotone" className="text-white" /></div>
-          <div className="mt-5 flex items-center gap-2 text-sm font-medium">GetMeHired interviewer {tts.isSpeaking && <SpeakerHighIcon size={16} className="animate-pulse text-sky-300" />}</div>
+          <div className={`flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-deep shadow-[0_0_0_10px_rgba(255,255,255,0.05)] transition ${tts.isSpeaking ? "scale-105 shadow-[0_0_0_10px_rgba(255,255,255,0.05),0_0_45px_rgba(30,201,179,0.35)]" : ""}`}><RobotIcon size={60} weight="duotone" className="text-[#03231e]" /></div>
+          <div className="mt-5 flex items-center gap-2 text-sm font-medium">GetMeHired interviewer {tts.isSpeaking && <SpeakerHighIcon size={16} className="animate-pulse text-accent" />}</div>
           {questionVisible && <div className="absolute bottom-5 left-5 right-5 rounded-xl bg-[#20222b]/90 p-4 text-left shadow-lg backdrop-blur-sm">
             <div className="mb-2 flex items-center justify-between gap-4 text-xs text-zinc-400"><span className="capitalize">{mode} question</span><span>{questionNumber} / {totalQuestions}</span></div>
             <p className="text-base font-medium leading-6 text-zinc-50 sm:text-lg">{followUp ?? rephrasedQuestion ?? questionPrompt}</p>
