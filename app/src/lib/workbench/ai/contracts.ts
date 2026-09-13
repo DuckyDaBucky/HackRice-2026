@@ -17,6 +17,7 @@ export const chatSchema = z.object({
 }).strict().refine(v => v.messages.at(-1)?.role === "user", "End with a user message");
 export const generationSchema = z.object({context:contextSchema, count:z.number().int().min(1).max(10).default(5),
   selectionSeed:z.string().min(1).max(100).optional(), excludedQuestionIds:z.array(z.string().max(150)).max(200).optional(),
+  categoryFocus:z.enum(["balanced","behavioral","technical-behavioral"]).optional(),
 }).strict();
 export const generatedQuestionSchema = z.object({
   prompt: short, category:z.enum(["behavioral","technical-behavioral"]), competency:short,
@@ -26,7 +27,7 @@ export const generatedQuestionSchema = z.object({
 export const questionOutputSchema=z.object({questions:z.array(generatedQuestionSchema).min(1).max(10)}).strict();
 export const questionPackSchema=z.object({
   id:z.uuid(), version:z.literal("1"), model:short, createdAt:z.iso.datetime(),
-  questions:z.array(generatedQuestionSchema.extend({id:z.uuid(),origin:z.enum(["corpus-personalized","gemini-generated"]),sourceIds:z.array(z.string()),datasetVersion:z.string().nullable()})).min(1).max(10),
+  questions:z.array(generatedQuestionSchema.extend({id:z.uuid(),origin:z.enum(["corpus-personalized","gemini-generated","meta-generated"]),sourceIds:z.array(z.string()),datasetVersion:z.string().nullable()})).min(1).max(10),
 });
 export type QuestionPack=z.infer<typeof questionPackSchema>;
 export const evaluationRequestSchema=z.object({question:questionPackSchema.shape.questions.element,answer:z.string().trim().min(1).max(20000),context:contextSchema}).strict();

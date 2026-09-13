@@ -1,6 +1,6 @@
 import "server-only";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-3.6-flash";
+import { completeJsonText, isLlmConfigured } from "@/lib/llm/provider";
 
 function fallbackRephrase(prompt: string) {
   return `Let me rephrase that: ${prompt}`;
@@ -13,35 +13,17 @@ function fallbackRephrase(prompt: string) {
  * fallback based on the exact saved wording.
  */
 export async function rephraseInterviewQuestion(prompt: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return fallbackRephrase(prompt);
+  if (!isLlmConfigured()) return fallbackRephrase(prompt);
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `Rephrase this interview question in one concise spoken sentence. Preserve its exact intent and scope. Do not add hints, a second question, evaluation, or an answer. Return JSON only: {"wording":"..."}\n\nQuestion: ${prompt}` }] }],
-          generationConfig: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 128 } },
-        }),
-      },
+    const { text: raw } = await completeJsonText(
+      `Rephrase this interview question in one concise spoken sentence. Preserve its exact intent and scope. Do not add hints, a second question, evaluation, or an answer. Return JSON only: {"wording":"..."}\n\nQuestion: ${prompt}`,
+      { timeoutMs: 8_000 },
     );
-    if (!response.ok) return fallbackRephrase(prompt);
-    const data: unknown = await response.json();
-    const raw = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })
-      ?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!raw) return fallbackRephrase(prompt);
     const parsed = JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "")) as { wording?: unknown };
     const wording = typeof parsed.wording === "string" ? parsed.wording.trim() : "";
     return wording.length >= 8 && wording.length <= 650 ? wording : fallbackRephrase(prompt);
   } catch {
     return fallbackRephrase(prompt);
-  } finally {
-    clearTimeout(timeout);
   }
 }

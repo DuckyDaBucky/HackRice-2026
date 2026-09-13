@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { agentDecisionSchema, type AgentContext, type AgentDecision } from "./agent-contracts";
 import { fallbackAgentDecision, validateAgentDecision } from "./agent-policy";
+import { completeJsonText, isLlmConfigured } from "@/lib/llm/provider";
 
 export const AGENT_PROMPT_VERSION = "interview-next-turn-v1";
 
@@ -42,41 +43,13 @@ export async function decideNextTurn(context: AgentContext): Promise<{ decision:
   if (context.elapsedActiveMs >= context.timeBudgetSeconds * 1_000) {
     return { decision: fallbackAgentDecision(context, "time_budget_reached"), model: "policy-time-cap", usage: {} };
   }
-  const apiKey = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
-  if (!apiKey) return { decision: fallbackAgentDecision(context), model: "planned-only-no-provider", usage: {} };
+  if (!isLlmConfigured()) return { decision: fallbackAgentDecision(context), model: "planned-only-no-provider", usage: {} };
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildNextTurnPrompt(context) }] }],
-          generationConfig: { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 128 } },
-        }),
-      },
-    );
-    if (!response.ok) return { decision: fallbackAgentDecision(context), model, usage: {} };
-    const data: unknown = await response.json();
-    const raw = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>; usageMetadata?: Record<string, unknown> })
-      ?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!raw) return { decision: fallbackAgentDecision(context), model, usage: {} };
+    const { text: raw, model, usage } = await completeJsonText(buildNextTurnPrompt(context), { timeoutMs: 10_000 });
     const parsed = agentDecisionSchema.parse(JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "")));
-    const usageMetadata = (data as { usageMetadata?: Record<string, unknown> }).usageMetadata;
-    const usage = Object.fromEntries(Object.entries({
-      promptTokens: usageMetadata?.promptTokenCount,
-      candidateTokens: usageMetadata?.candidatesTokenCount,
-      totalTokens: usageMetadata?.totalTokenCount,
-    }).filter((entry): entry is [string, number] => typeof entry[1] === "number"));
     return { decision: validateAgentDecision(context, parsed), model, usage };
   } catch {
-    return { decision: fallbackAgentDecision(context), model, usage: {} };
-  } finally {
-    clearTimeout(timeout);
+    return { decision: fallbackAgentDecision(context), model: "planned-only-provider-failed", usage: {} };
   }
 }

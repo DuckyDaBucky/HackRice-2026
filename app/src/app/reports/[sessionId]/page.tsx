@@ -30,6 +30,16 @@ export default async function InterviewReportPage({ params }: PageProps<"/report
           <ArrowLeftIcon size={15} /> Back to interviews
         </Link>
 
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent/25 bg-accent/5 px-4 py-3 text-sm text-dash-text">
+          <span>Looking for verdicts and what to say instead?</span>
+          <Link
+            href={`/interview/session/${sessionId}/report`}
+            className="font-medium text-accent-deep underline underline-offset-4 hover:text-accent"
+          >
+            Open answer review (canonical)
+          </Link>
+        </div>
+
         <div>
           <p className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
             Practice report

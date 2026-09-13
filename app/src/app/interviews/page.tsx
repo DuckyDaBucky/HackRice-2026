@@ -6,7 +6,8 @@ import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { listRecentSessions } from "@/lib/sessions";
-import { sessionDurationMinutes, sessionScore, shortDate } from "@/lib/dashboard/performance";
+import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
+import { sessionDurationMinutes, sessionScoreWithSkips, shortDate } from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord } from "@/lib/sessions";
 
@@ -19,23 +20,25 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
   MOOD_OPTIONS.map((option) => [option.id, option.label]),
 );
 
-const STATUS_LABEL: Record<SessionRecord["status"], string> = {
+const STATUS_LABEL: Record<SessionRecord["status"] | "deleted", string> = {
   completed: "Completed",
   in_progress: "In progress",
   paused: "Paused",
   planned: "Ready to start",
   abandoned: "Abandoned",
+  deleted: "Deleted",
 };
 
-const STATUS_STYLE: Record<SessionRecord["status"], string> = {
+const STATUS_STYLE: Record<SessionRecord["status"] | "deleted", string> = {
   completed: "text-dash-success",
   in_progress: "text-amber-600",
   paused: "text-amber-600",
   planned: "text-dash-blue",
   abandoned: "text-dash-text-faint",
+  deleted: "text-dash-text-faint",
 };
 
-/** Mirrors the durable-session/report lifecycle from components/Dashboard.tsx. */
+/** Canonical report route is the chess-style answer review. */
 function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "in_progress" || session.status === "paused" || session.status === "planned") {
     return {
@@ -49,10 +52,10 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
     return { label: "Try again", href: "/interview/setup" };
   }
   if (session.isDurable && session.reportStatus === "completed") {
-    return { label: "Review report", href: `/reports/${session.id}` };
+    return { label: "Review report", href: `/interview/session/${session.id}/report` };
   }
   if (session.isDurable && session.reportStatus === "processing") {
-    return { label: "Report preparing", href: `/reports/${session.id}` };
+    return { label: "Report preparing", href: `/interview/session/${session.id}/report` };
   }
   return { label: "Practice again", href: "/interview/setup" };
 }
@@ -63,6 +66,7 @@ export default async function InterviewsPage() {
   if (!user) redirect("/sign-in?redirect_url=%2Finterviews");
 
   const sessions = await listRecentSessions(user.id, 50);
+  const answeredCounts = await countUploadedAttemptsBySession(sessions.map((s) => s.id));
 
   return (
     <DashboardShell active="Interviews" firstName={user.firstName}>
@@ -92,7 +96,7 @@ export default async function InterviewsPage() {
                     <th className="px-4 py-2.5 font-medium">Date</th>
                     <th className="px-4 py-2.5 font-medium">Duration</th>
                     <th className="px-4 py-2.5 font-medium">Questions</th>
-                    <th className="px-4 py-2.5 font-medium">Score</th>
+                    <th className="px-4 py-2.5 font-medium">Score (preview)</th>
                     <th className="px-4 py-2.5 font-medium">Status</th>
                     <th className="px-4 py-2.5 font-medium" />
                   </tr>
@@ -101,7 +105,8 @@ export default async function InterviewsPage() {
                   {sessions.map((session) => {
                     const action = actionFor(session);
                     const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
-                    const score = session.status === "completed" ? sessionScore(session.id) : null;
+                    const answered = answeredCounts[session.id] ?? 0;
+                    const score = session.status === "completed" ? sessionScoreWithSkips(session.id, answered, session.questionCount) : null;
                     return (
                       <tr key={session.id} className="transition-colors duration-150 hover:bg-dash-surface-hover">
                         <td className="px-4 py-3 text-dash-text">

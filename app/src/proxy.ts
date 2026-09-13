@@ -7,7 +7,21 @@ const isPersistedInterviewRoute = createRouteMatcher([
   "/interview/session(.*)",
 ]);
 
+const isAuthPage = createRouteMatcher([
+  "/sign-in(.*)",
+  "/sign-up(.*)",
+  "/login(.*)",
+]);
+
 const withClerk = clerkMiddleware(async (auth, request) => {
+  if (isAuthPage(request)) {
+    const { userId } = await auth();
+    if (userId) {
+      const redirectUrl = request.nextUrl.searchParams.get("redirect_url");
+      const dest = redirectUrl?.startsWith("/") ? redirectUrl : "/";
+      return NextResponse.redirect(new URL(dest, request.url));
+    }
+  }
   if (isPersistedInterviewRoute(request)) await auth.protect();
 });
 

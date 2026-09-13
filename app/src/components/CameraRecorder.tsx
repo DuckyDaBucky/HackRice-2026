@@ -18,6 +18,8 @@ import type { UseTextToSpeech } from "@/hooks/useTextToSpeech";
 import type { InterviewMood } from "@/lib/interview-config";
 import { formatDuration } from "@/lib/recording/format-duration";
 import type { InterviewMode } from "@/lib/questions/types";
+import { reconcileTranscripts } from "@/lib/transcription/reconcile";
+import type { TranscribeResponse } from "@/lib/transcription/types";
 
 const FOLLOW_UP_CHECK_INTERVAL_MS = 500;
 const ANSWER_SILENCE_MS = 5_000;
@@ -107,6 +109,8 @@ interface CameraRecorderProps {
   timeBudgetSeconds?: number;
   onTimeBudgetReached?: () => void;
   onLeave: () => void;
+  /** Spoken once before the first question so the session opens like a conversation. */
+  introLine?: string | null;
 }
 
 export function CameraRecorder({
@@ -126,11 +130,21 @@ export function CameraRecorder({
   timeBudgetSeconds,
   onTimeBudgetReached,
   onLeave,
+  introLine,
 }: CameraRecorderProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captions = useLiveCaptions();
   const { record, reset, state: recorderState, stop, pause, resume } = recorder;
-  const { finalText, interimText, lastSpeechAt, start: startCaptions, resume: resumeCaptions, stop: stopCaptions } = captions;
+  const {
+    finalText,
+    interimText,
+    confidence: liveConfidence,
+    lastSpeechAt,
+    start: startCaptions,
+    resume: resumeCaptions,
+    stop: stopCaptions,
+    correctTranscript,
+  } = captions;
   const speak = tts.speak;
   const [followUp, setFollowUp] = useState<string | null>(null);
   const [rephrasedQuestion, setRephrasedQuestion] = useState<string | null>(null);
@@ -142,6 +156,8 @@ export function CameraRecorder({
   const [finishSuggestionVisible, setFinishSuggestionVisible] = useState(false);
   const [skipConfirmationVisible, setSkipConfirmationVisible] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
+  const [refiningTranscript, setRefiningTranscript] = useState(false);
+  const [transcriptNotice, setTranscriptNotice] = useState<string | null>(null);
   const transcriptPanelRef = useRef<HTMLDivElement | null>(null);
   const currentQuestionRef = useRef<string | null>(null);
   const isRecording = recorderState === "recording";
@@ -167,14 +183,54 @@ export function CameraRecorder({
   const completeAnswer = useCallback(async () => {
     if (saving) return;
     setSaving(true);
+    setTranscriptNotice(null);
     stopCaptions();
     try {
       const artifact = await stop();
+      // Live captions are provisional display only — the durable transcript
+      // comes from batch-transcribing the recorded blob. Interim segments
+      // are excluded here because they are frequently revised or dropped.
+      const liveText = finalText.trim();
+      let durableText = liveText;
+      setRefiningTranscript(true);
+      try {
+        const form = new FormData();
+        form.append(
+          "audio",
+          new Blob([artifact.blob], { type: artifact.mimeType || "audio/webm" }),
+          "answer.webm",
+        );
+        const response = await fetch("/api/interview/transcribe", {
+          method: "POST",
+          body: form,
+        });
+        if (response.ok) {
+          const batch = (await response.json()) as Partial<TranscribeResponse>;
+          const reconciled = reconcileTranscripts({
+            liveText,
+            liveConfidence,
+            batchText: typeof batch.transcript === "string" ? batch.transcript : null,
+            batchConfidence: typeof batch.confidence === "number" ? batch.confidence : null,
+            batchProvider: batch.provider ?? null,
+          });
+          durableText = reconciled.text;
+          if (reconciled.source === "batch" && reconciled.text) {
+            correctTranscript(reconciled.text);
+          }
+        } else {
+          setTranscriptNotice("Batch transcription was unavailable — saved live captions instead (lower accuracy).");
+        }
+      } catch {
+        // Batch correction is best-effort — fall back to live finals.
+        setTranscriptNotice("Batch transcription was unavailable — saved live captions instead (lower accuracy).");
+      } finally {
+        setRefiningTranscript(false);
+      }
       const outcome = await onAnswerRecorded(
         artifact.blob,
         artifact.mimeType,
         artifact.durationMs,
-        `${finalText} ${interimText}`.trim(),
+        durableText,
       );
       if (outcome?.followUp) setFollowUp(outcome.followUp);
       reset();
@@ -191,8 +247,9 @@ export function CameraRecorder({
       setSaving(false);
     }
   }, [
+    correctTranscript,
     finalText,
-    interimText,
+    liveConfidence,
     onAnswerRecorded,
     reset,
     saving,
@@ -218,6 +275,13 @@ export function CameraRecorder({
           window.setTimeout(resolve, INTER_QUESTION_BUFFER_MS);
         });
       }
+      if (cancelled) return;
+      // The interviewer opens with a greeting before the first question so
+      // the session feels like a conversation, not a recording widget.
+      if (questionNumber === 1 && introLine) {
+        await speak(introLine, voiceId, mood);
+        if (cancelled) return;
+      }
       await speak(questionPrompt, voiceId, mood);
       if (cancelled) return;
       currentQuestionRef.current = questionKey;
@@ -229,7 +293,7 @@ export function CameraRecorder({
     return () => {
       cancelled = true;
     };
-  }, [mood, questionNumber, questionPrompt, record, recorderState, speak, startCaptions, voiceId]);
+  }, [introLine, mood, questionNumber, questionPrompt, record, recorderState, speak, startCaptions, voiceId]);
 
   // Silence is a gentle prompt, not permission for the interviewer to submit
   // or advance the candidate's answer. The candidate explicitly finishes.
@@ -398,7 +462,7 @@ export function CameraRecorder({
       <footer className="flex h-[92px] shrink-0 items-center justify-start gap-3 overflow-x-auto bg-[#171717] px-4 sm:justify-center">
         <button type="button" onClick={() => toggleTrack("audio")} aria-label="Toggle microphone" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${micEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><MicrophoneIcon size={21} weight="fill" /></button>
         <button type="button" onClick={() => toggleTrack("video")} aria-label="Toggle camera" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${cameraEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><VideoCameraIcon size={21} weight="fill" /></button>
-        <div aria-live="polite" className="min-w-32 text-center text-sm text-zinc-300">{controlError ?? (saving || finishRequested ? "Interviewer is reviewing…" : recorderState === "paused" ? "Interview paused" : tts.isSpeaking ? "Interviewer is asking…" : finishSuggestionVisible ? "Finished answering?" : isRecording ? "Listening…" : "Preparing next question…")}</div>
+        <div aria-live="polite" className="min-w-32 text-center text-sm text-zinc-300">{controlError ?? transcriptNotice ?? (saving || finishRequested ? (refiningTranscript ? "Refining transcript…" : "Interviewer is reviewing…") : recorderState === "paused" ? "Interview paused" : tts.isSpeaking ? "Interviewer is asking…" : finishSuggestionVisible ? "Finished answering?" : isRecording ? "Listening…" : "Preparing next question…")}</div>
         {controlError && <button type="button" onClick={() => window.location.reload()} className="h-12 rounded-full border border-amber-400/50 px-4 text-sm font-medium text-amber-100 transition hover:bg-amber-400/10">Reload</button>}
         <button type="button" onClick={() => void togglePause()} disabled={saving || tts.isSpeaking || (!isRecording && recorderState !== "paused")} className="h-12 rounded-full border border-white/15 px-4 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">{recorderState === "paused" ? "Resume" : "Pause"}</button>
         <button type="button" onClick={() => void replayQuestion(followUp ?? rephrasedQuestion ?? questionPrompt)} disabled={!isRecording || saving || tts.isSpeaking} className="h-12 rounded-full border border-white/15 px-4 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">Repeat</button>

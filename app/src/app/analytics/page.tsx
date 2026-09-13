@@ -7,13 +7,14 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { SkillBars } from "@/components/dashboard/SkillBars";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { listRecentSessions } from "@/lib/sessions";
+import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
 import {
   SKILL_CATEGORIES,
   overallScore,
   readinessDelta,
   readinessLabel,
-  sessionScore,
-  skillBreakdown,
+  sessionScoreWithSkips,
+  skillBreakdownWithSkips,
   type SkillScores,
 } from "@/lib/dashboard/performance";
 
@@ -24,6 +25,7 @@ export default async function AnalyticsPage() {
 
   const sessions = await listRecentSessions(user.id, 50);
   const completed = sessions.filter((s) => s.status === "completed");
+  const answeredCounts = await countUploadedAttemptsBySession(completed.map((s) => s.id));
 
   if (completed.length === 0) {
     return (
@@ -46,13 +48,15 @@ export default async function AnalyticsPage() {
   }
 
   // Oldest → newest, for the trend line; reversed for the "recent" list below.
+  // Each skipped question scores 0, so skipping drags history + aggregates down.
   const chronological = [...completed].reverse();
-  const history = chronological.map((s) => sessionScore(s.id));
+  const answeredFor = (s: (typeof completed)[number]) => answeredCounts[s.id] ?? 0;
+  const history = chronological.map((s) => sessionScoreWithSkips(s.id, answeredFor(s), s.questionCount));
   const currentScore = history[history.length - 1];
   const previousScore = history.length > 1 ? history[history.length - 2] : null;
   const delta = readinessDelta(previousScore, currentScore);
 
-  const perSessionScores = completed.map((s) => skillBreakdown(s.id));
+  const perSessionScores = completed.map((s) => skillBreakdownWithSkips(s.id, answeredFor(s), s.questionCount));
   const aggregate = SKILL_CATEGORIES.reduce((acc, category) => {
     acc[category] = Math.round(
       perSessionScores.reduce((sum, s) => sum + s[category], 0) / perSessionScores.length,
@@ -69,9 +73,9 @@ export default async function AnalyticsPage() {
     <DashboardShell active="Analytics" firstName={user.firstName}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics</h1>
+          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 align-middle text-[11px] font-medium text-amber-600">preview scores</span></h1>
           <p className="mt-1 text-sm text-dash-text-muted">
-            Based on your last {completed.length} completed interview{completed.length === 1 ? "" : "s"}.
+            Based on your last {completed.length} completed interview{completed.length === 1 ? "" : "s"}. Scores are placeholders until rubric evaluation lands.
           </p>
         </div>
 

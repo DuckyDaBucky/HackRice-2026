@@ -9,6 +9,8 @@ declare global {
 
 export const db = global._pgPool ?? new Pool({ connectionString: process.env.DATABASE_URL });
 
+// Typed query client — the default for application queries. Raw `db.query`
+// is reserved for scripts and one-off SQL the builder cannot express.
 export const orm = drizzle(db, { schema });
 
 if (process.env.NODE_ENV !== "production") {
