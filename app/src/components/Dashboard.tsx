@@ -15,9 +15,10 @@ import {
   overallScore,
   readinessDelta,
   sessionDurationMinutes,
-  sessionScore,
+  sessionScoreWithSkips,
   shortDate,
-  skillBreakdown,
+  skillBreakdownWithSkips,
+  skippedCountFor,
   weakestCategory,
 } from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
@@ -105,9 +106,13 @@ export function Dashboard({
   const hasCompleted = stats.completedSessions > 0;
   const completed = sessions.filter((s) => s.status === "completed");
 
-  const currentScores = completed[0] ? skillBreakdown(completed[0].id) : null;
+  const scoresFor = (session: SessionRecord) => {
+    const answered = answeredCounts[session.id] ?? 0;
+    return skillBreakdownWithSkips(session.id, answered, session.questionCount);
+  };
+  const currentScores = completed[0] ? scoresFor(completed[0]) : null;
   const overall = currentScores ? overallScore(currentScores) : null;
-  const previousOverall = completed[1] ? overallScore(skillBreakdown(completed[1].id)) : null;
+  const previousOverall = completed[1] ? overallScore(scoresFor(completed[1])) : null;
   const delta = overall !== null ? readinessDelta(previousOverall, overall) : null;
   const focus = currentScores ? weakestCategory(currentScores) : null;
 
@@ -201,7 +206,8 @@ export function Dashboard({
                   const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
                   const answered = answeredCounts[session.id] ?? 0;
                   const isScored = session.status === "completed";
-                  const score = isScored ? sessionScore(session.id) : null;
+                  const skipped = skippedCountFor(answered, session.questionCount);
+                  const score = isScored ? sessionScoreWithSkips(session.id, answered, session.questionCount) : null;
                   return (
                     <li
                       key={session.id}
@@ -227,7 +233,11 @@ export function Dashboard({
                         {score !== null && (
                           <span
                             className="text-sm font-semibold tabular-nums text-dash-text"
-                            title="Preview score — rubric-based scoring is not wired up yet"
+                            title={
+                              skipped > 0
+                                ? `Preview score — penalized ${skipped} skipped question${skipped === 1 ? "" : "s"} (each skip scores 0)`
+                                : "Preview score — rubric-based scoring is not wired up yet"
+                            }
                           >
                             {score} <span className="text-[10px] font-normal text-dash-text-faint">preview</span>
                           </span>

@@ -6,7 +6,8 @@ import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { listRecentSessions } from "@/lib/sessions";
-import { sessionDurationMinutes, sessionScore, shortDate } from "@/lib/dashboard/performance";
+import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
+import { sessionDurationMinutes, sessionScoreWithSkips, shortDate } from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord } from "@/lib/sessions";
 
@@ -62,6 +63,7 @@ export default async function InterviewsPage() {
   if (!user) redirect("/sign-in?redirect_url=%2Finterviews");
 
   const sessions = await listRecentSessions(user.id, 50);
+  const answeredCounts = await countUploadedAttemptsBySession(sessions.map((s) => s.id));
 
   return (
     <DashboardShell active="Interviews" firstName={user.firstName}>
@@ -100,7 +102,8 @@ export default async function InterviewsPage() {
                   {sessions.map((session) => {
                     const action = actionFor(session);
                     const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
-                    const score = session.status === "completed" ? sessionScore(session.id) : null;
+                    const answered = answeredCounts[session.id] ?? 0;
+                    const score = session.status === "completed" ? sessionScoreWithSkips(session.id, answered, session.questionCount) : null;
                     return (
                       <tr key={session.id} className="transition-colors duration-150 hover:bg-dash-surface-hover">
                         <td className="px-4 py-3 text-dash-text">

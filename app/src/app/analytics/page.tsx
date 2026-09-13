@@ -7,13 +7,14 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { SkillBars } from "@/components/dashboard/SkillBars";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import { listRecentSessions } from "@/lib/sessions";
+import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
 import {
   SKILL_CATEGORIES,
   overallScore,
   readinessDelta,
   readinessLabel,
-  sessionScore,
-  skillBreakdown,
+  sessionScoreWithSkips,
+  skillBreakdownWithSkips,
   type SkillScores,
 } from "@/lib/dashboard/performance";
 
@@ -24,6 +25,7 @@ export default async function AnalyticsPage() {
 
   const sessions = await listRecentSessions(user.id, 50);
   const completed = sessions.filter((s) => s.status === "completed");
+  const answeredCounts = await countUploadedAttemptsBySession(completed.map((s) => s.id));
 
   if (completed.length === 0) {
     return (
@@ -46,13 +48,15 @@ export default async function AnalyticsPage() {
   }
 
   // Oldest → newest, for the trend line; reversed for the "recent" list below.
+  // Each skipped question scores 0, so skipping drags history + aggregates down.
   const chronological = [...completed].reverse();
-  const history = chronological.map((s) => sessionScore(s.id));
+  const answeredFor = (s: (typeof completed)[number]) => answeredCounts[s.id] ?? 0;
+  const history = chronological.map((s) => sessionScoreWithSkips(s.id, answeredFor(s), s.questionCount));
   const currentScore = history[history.length - 1];
   const previousScore = history.length > 1 ? history[history.length - 2] : null;
   const delta = readinessDelta(previousScore, currentScore);
 
-  const perSessionScores = completed.map((s) => skillBreakdown(s.id));
+  const perSessionScores = completed.map((s) => skillBreakdownWithSkips(s.id, answeredFor(s), s.questionCount));
   const aggregate = SKILL_CATEGORIES.reduce((acc, category) => {
     acc[category] = Math.round(
       perSessionScores.reduce((sum, s) => sum + s[category], 0) / perSessionScores.length,
