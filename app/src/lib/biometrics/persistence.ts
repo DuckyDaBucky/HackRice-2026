@@ -8,7 +8,7 @@ import {
   mediaArtifacts,
 } from "@/lib/db/schema";
 import type { VideoAnalysis } from "./contracts";
-import { biometricNoteFor, summarizeVideoAnalysis } from "./contracts";
+import { biometricNoteFor, summarizeVideoAnalysis, syntheticDemoMetrics } from "./contracts";
 
 /** Fixed key for the Postgres advisory lock serializing presage-api calls (single SDK session). */
 const PRESAGE_RELAY_LOCK_KEY = 847_291_003;
@@ -181,9 +181,26 @@ export async function getPresageNotesForSession(sessionId: string): Promise<stri
   return notes.join("\n").slice(0, 1500);
 }
 
+/** Stores clearly-marked synthetic signals when real inference fails. */
+async function markCompletedDemo(id: string) {
+  const metrics = syntheticDemoMetrics();
+  await orm
+    .update(biometricAnalyses)
+    .set({
+      status: "completed",
+      analysisId: String(metrics.analysisId ?? ""),
+      sdkVersion: String(metrics.sdkVersion ?? ""),
+      metrics,
+      errorCode: null,
+      completedAt: new Date(),
+    })
+    .where(eq(biometricAnalyses.id, id));
+}
+
 export const biometricQueue = {
   getPendingAnalyses,
   markProcessing,
   markCompleted,
+  markCompletedDemo,
   markFailed,
 };

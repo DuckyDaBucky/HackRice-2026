@@ -49,6 +49,52 @@ export function summarizeVideoAnalysis(analysis: VideoAnalysis): Record<string, 
   };
 }
 
+export const DEMO_SDK_VERSION = "demo-simulated";
+
+function demoVitalSeries(avg: number, spread: number, samples: number): VitalSeries {
+  const min = Math.round((avg - spread - Math.random() * 4) * 10) / 10;
+  const max = Math.round((avg + spread + Math.random() * 4) * 10) / 10;
+  return {
+    samples,
+    avg: Math.round(avg * 10) / 10,
+    min,
+    max,
+    trend: Math.round((0.95 + Math.random() * 0.1) * 100) / 100,
+  };
+}
+
+/**
+ * Clearly-marked synthetic delivery signals used only when real Presage
+ * inference fails (see processor fallback). Shape matches
+ * summarizeVideoAnalysis output so every consumer keeps working; the
+ * demoMode flag and demo SDK version mark it at each display sight.
+ */
+export function syntheticDemoMetrics(): Record<string, unknown> {
+  const pulseSamples = 8 + Math.floor(Math.random() * 11);
+  const breathSamples = 8 + Math.floor(Math.random() * 11);
+  const metricEvents = pulseSamples + 1;
+  return {
+    analysisId: "demo-" + Math.random().toString(36).slice(2, 10),
+    sdkVersion: DEMO_SDK_VERSION,
+    demoMode: true,
+    eventCounts: {
+      metrics: pulseSamples,
+      accumulated_metrics: 1,
+      validation_status: pulseSamples,
+      frame_sent_through: pulseSamples * 20,
+    },
+    metricReadouts: metricEvents,
+    biometricEvents: metricEvents,
+    pulseBpm: demoVitalSeries(68 + Math.random() * 26, 6 + Math.random() * 5, pulseSamples),
+    breathingPerMin: demoVitalSeries(12 + Math.random() * 7, 2 + Math.random() * 2, breathSamples),
+  };
+}
+
+export function isDemoMetrics(metrics: Record<string, unknown> | null | undefined): boolean {
+  if (!metrics || typeof metrics !== "object") return false;
+  return metrics.demoMode === true || metrics.sdkVersion === DEMO_SDK_VERSION;
+}
+
 const PULSE_KEYS = /(pulse|heart|bpm|cardio)/i;
 const BREATH_KEYS = /(breath|respir|chest)/i;
 // Numeric fields that are metadata, never vital readings.
@@ -152,16 +198,21 @@ export function composureSignalsFor(metrics: Record<string, unknown>): string[] 
 
 /** One-line human note per analysis, used for per-answer incremental feedback. */
 export function biometricNoteFor(metrics: Record<string, unknown>): string | null {
+  const demo = isDemoMetrics(metrics);
+  const prefix = demo
+    ? "Delivery observation (demo preview — simulated signals, not measured): "
+    : "Delivery observation (video biometrics, practice cue only): ";
   const signals = composureSignalsFor(metrics);
   if (signals.length > 0) {
-    return `Delivery observation (video biometrics, practice cue only): ${signals.join("; ")}.`;
+    return prefix + signals.join("; ") + ".";
   }
   const counts = (metrics.eventCounts ?? {}) as Record<string, number>;
   if (!counts || Object.keys(counts).length === 0) return null;
   const readouts = (metrics.metricReadouts as number | undefined) ?? 0;
   const total = (metrics.biometricEvents as number | undefined) ?? 0;
   if (readouts === 0 && total === 0) return null;
-  return `${total} biometric events · ${readouts} metric readouts (SDK ${String(metrics.sdkVersion ?? "")})`;
+  const suffix = demo ? " (demo preview)" : "";
+  return `${total} biometric events · ${readouts} metric readouts (SDK ${String(metrics.sdkVersion ?? "")})${suffix}`;
 }
 
 /** Compact context block for the evaluator prompt, linking clips to turns. */

@@ -21,10 +21,18 @@ export async function runBiometricAnalysesForSession(sessionId: string): Promise
           await biometricQueue.markFailed(analysis.id, { errorCode: "SDK_BUSY", retryable: true });
           continue;
         }
-        await biometricQueue.markFailed(analysis.id, {
-          errorCode: error instanceof Error ? error.message.slice(0, 200) : "biometric_analysis_failed",
-          retryable: true,
-        });
+        // Real inference failed (unreachable service, vendor 403s, SDK
+        // error): store clearly-marked synthetic signals so the demo still
+        // exercises the full reporting path. Set PRESAGE_DEMO_FALLBACK=off
+        // to keep failures as failures instead.
+        if (process.env.PRESAGE_DEMO_FALLBACK !== "off") {
+          await biometricQueue.markCompletedDemo(analysis.id);
+        } else {
+          await biometricQueue.markFailed(analysis.id, {
+            errorCode: error instanceof Error ? error.message.slice(0, 200) : "biometric_analysis_failed",
+            retryable: true,
+          });
+        }
       }
       processed += 1;
     }

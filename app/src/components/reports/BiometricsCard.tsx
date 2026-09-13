@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { retrySessionBiometrics } from "@/app/interview/report-actions";
-import { composureSignalsFor } from "@/lib/biometrics/contracts";
+import { composureSignalsFor, isDemoMetrics } from "@/lib/biometrics/contracts";
 import type { StoredBiometricAnalysis } from "@/lib/biometrics/persistence";
 
 function describeMetrics(metrics: Record<string, unknown>): string {
@@ -80,6 +80,11 @@ export function BiometricsCard({
                   <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-400" />
                   Answer {index + 1}
                   <span className="font-normal text-dash-text-faint">· Analyzed</span>
+                  {isDemoMetrics(analysis.metrics) && (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-600">
+                      Demo preview — simulated signals
+                    </span>
+                  )}
                 </span>
                 {signals.length > 0 ? (
                   <span className="pl-4 text-xs leading-relaxed text-dash-text-muted">
