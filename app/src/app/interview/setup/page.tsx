@@ -21,6 +21,7 @@ const CONTENT_OPTIONS: Array<{ id: InterviewContentType; label: string; descript
 ];
 
 const TIME_OPTIONS = [
+  { seconds: 180, label: "Blitz ⚡", description: "1 question + follow-up · ~3 min demo" },
   { seconds: 600, label: "10 min", description: "A focused warm-up" },
   { seconds: 1200, label: "20 min", description: "A full practice round" },
   { seconds: 1800, label: "30 min", description: "A deeper interview" },
@@ -46,7 +47,7 @@ function InterviewSetupForm() {
   const inviteCode = searchParams.get("code")?.trim() ?? "";
   const { voiceId, setVoiceId } = useVoicePreference();
   const [contentTypes, setContentTypes] = useState<InterviewContentType[]>(["technical_concepts"]);
-  const [timeBudgetSeconds, setTimeBudgetSeconds] = useState<600 | 1200 | 1800>(1200);
+  const [timeBudgetSeconds, setTimeBudgetSeconds] = useState<180 | 600 | 1200 | 1800>(1200);
   const [targetRole, setTargetRole] = useState("");
   const [seniority, setSeniority] = useState<Seniority>("junior");
   const [mood, setMood] = useState<InterviewMood>(DEFAULT_MOOD);
@@ -140,15 +141,16 @@ function InterviewSetupForm() {
 
       <section className="flex flex-col gap-3" aria-labelledby="interview-length">
         <h2 id="interview-length" className="text-sm font-medium text-zinc-300">Time available</h2>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {TIME_OPTIONS.map((option) => {
             const selected = timeBudgetSeconds === option.seconds;
+            const isBlitz = option.seconds === 180;
             return (
               <button
                 key={option.seconds}
                 type="button"
                 onClick={() => setTimeBudgetSeconds(option.seconds)}
-                className={`flex flex-col gap-1 rounded-2xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${selected ? "border-sky-600 bg-sky-500/10" : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"}`}
+                className={`flex flex-col gap-1 rounded-2xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${selected ? "border-sky-600 bg-sky-500/10" : isBlitz ? "border-amber-600/60 bg-amber-500/5 hover:border-amber-500" : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700"}`}
               >
                 <span className={`text-sm font-medium ${selected ? "text-zinc-50" : "text-zinc-300"}`}>{option.label}</span>
                 <span className="text-xs text-zinc-500">{option.description}</span>
@@ -156,6 +158,12 @@ function InterviewSetupForm() {
             );
           })}
         </div>
+        {timeBudgetSeconds === 180 && (
+          <p className="rounded-xl border border-amber-600/40 bg-amber-500/5 px-4 py-3 text-xs leading-relaxed text-amber-200/90">
+            Blitz demo: one question plus at most one follow-up, about three minutes end to end —
+            ideal for showing the full loop on stage.
+          </p>
+        )}
       </section>
 
       <section className="flex flex-col gap-4" aria-labelledby="interview-context">

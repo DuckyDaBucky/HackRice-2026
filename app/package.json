@@ -22,7 +22,13 @@
     "verify:research-db": "node --conditions=react-server --env-file=.env.local --import tsx scripts/research-db.ts --verify",
     "check:ai": "node --conditions=react-server --env-file=.env.local --import tsx scripts/check-ai.ts",
     "check:memory": "node --conditions=react-server --env-file=.env.local --import tsx scripts/check-memory.ts",
-    "setup:r2-cors": "node --conditions=react-server --env-file=.env.local --import tsx scripts/configure-r2-cors.ts"
+    "setup:r2-cors": "node --conditions=react-server --env-file=.env.local --import tsx scripts/configure-r2-cors.ts",
+    "tunnel:persona": "npx --yes cloudflared tunnel --url http://localhost:3000",
+    "setup:persona-webhook": "node --env-file=.env.local --import tsx scripts/setup-persona-webhook.ts",
+    "verify:persona": "node --env-file=.env.local --import tsx scripts/verify-persona-webhook-e2e.ts",
+    "verify:hiring-api": "node --env-file=.env.local --import tsx scripts/verify-hiring-api.ts",
+    "verify:solana": "node --env-file=.env.local --import tsx scripts/verify-solana-outbox.ts",
+    "fund:solana": "node --env-file=.env.local --import tsx scripts/fund-solana-devnet.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1130.0",
@@ -30,7 +36,9 @@
     "@clerk/nextjs": "^7.9.2",
     "@langchain/core": "^1.2.10",
     "@langchain/google": "^0.2.5",
+    "@langchain/openai": "^1.5.12",
     "@phosphor-icons/react": "^2.1.10",
+    "@solana/web3.js": "1.98.4",
     "drizzle-orm": "^0.45.2",
     "mammoth": "^1.12.2",
     "next": "16.3.5",

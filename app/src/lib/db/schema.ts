@@ -16,6 +16,7 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const interviewModes = ["technical", "behavioral"] as const;
+export const sessionModes = ["practice", "hiring_recorded"] as const;
 export const interviewMoods = ["supportive", "neutral", "challenging"] as const;
 export const sessionStatuses = [
   "planned",
@@ -58,6 +59,7 @@ export const interviewSessions = pgTable(
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedByUserId: text("deleted_by_user_id"),
     activeConfigRevision: integer("active_config_revision"),
+    sessionMode: text("session_mode", { enum: sessionModes }).default("practice").notNull(),
   },
   (table) => [
     index("idx_interview_sessions_clerk_user_id").on(table.clerkUserId),
@@ -66,6 +68,10 @@ export const interviewSessions = pgTable(
     check(
       "interview_sessions_status_check",
       sql`${table.status} in ('planned', 'in_progress', 'paused', 'completed', 'abandoned', 'deleted')`,
+    ),
+    check(
+      "interview_sessions_session_mode_check",
+      sql`${table.sessionMode} in ('practice', 'hiring_recorded')`,
     ),
   ],
 );
@@ -209,7 +215,7 @@ export const interviewSessionConfigs = pgTable(
     check("interview_session_configs_revision_check", sql`${table.revision} >= 1`),
     check(
       "interview_session_configs_duration_check",
-      sql`${table.timeBudgetSeconds} in (600, 1200, 1800)`,
+      sql`${table.timeBudgetSeconds} in (180, 600, 1200, 1800)`,
     ),
   ],
 );
@@ -433,6 +439,195 @@ export const reportShareLinks = pgTable(
     check("report_share_links_expiry_check", sql`${table.expiresAt} > ${table.createdAt}`),
   ],
 );
+
+export const organizationStatuses = ["pending", "active", "suspended"] as const;
+export const candidacyStatuses = [
+  "draft", "questions_pending", "ready_to_invite", "invited",
+  "verification_pending", "verification_review", "verified",
+  "interview_in_progress", "interview_completed", "processing",
+  "report_ready", "revoked", "expired", "deleted",
+] as const;
+export const invitationStatuses = ["active", "revoked", "expired", "superseded", "accepted"] as const;
+export const verificationStatuses = ["pending", "verified", "review", "failed"] as const;
+export const processingJobTypes = ["transcription", "evaluation", "solana_reconcile", "retention"] as const;
+export const processingJobStatuses = ["queued", "leased", "completed", "retryable_failed", "terminal_failed"] as const;
+export const solanaOutboxStates = ["queued", "submitted", "finalized", "failed", "reconcile_required"] as const;
+
+export const organizations = pgTable("organizations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  clerkOrgId: text("clerk_org_id").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  provisioningStatus: text("provisioning_status", { enum: organizationStatuses }).default("active").notNull(),
+  maxInvitationsPerDay: integer("max_invitations_per_day").default(50).notNull(),
+  maxSolanaLamportsPerDay: bigint("max_solana_lamports_per_day", { mode: "number" }).default(500_000_000).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const hiringJobs = pgTable("hiring_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  roleFamily: text("role_family").notNull(),
+  specialty: text("specialty"),
+  competencies: jsonb("competencies").notNull().default([]),
+  questionCount: integer("question_count").default(6).notNull(),
+  timeBudgetSeconds: integer("time_budget_seconds").default(1200).notNull(),
+  language: text("language").default("en").notNull(),
+  sharedQuestionCount: integer("shared_question_count").default(3).notNull(),
+  personalizedQuestionCount: integer("personalized_question_count").default(3).notNull(),
+  allowLiveFollowUps: boolean("allow_live_follow_ups").default(false).notNull(),
+  createdByClerkUserId: text("created_by_clerk_user_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+export const candidacies = pgTable("candidacies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  jobId: uuid("job_id").notNull().references(() => hiringJobs.id, { onDelete: "cascade" }),
+  confirmedName: text("confirmed_name").notNull(),
+  confirmedEmail: text("confirmed_email").notNull(),
+  resumeId: uuid("resume_id"),
+  resumeVersion: integer("resume_version").default(1).notNull(),
+  clerkUserId: text("clerk_user_id"),
+  status: text("status", { enum: candidacyStatuses }).default("draft").notNull(),
+  deleteAfter: timestamp("delete_after", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const hiringResumes = pgTable("hiring_resumes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  candidacyId: uuid("candidacy_id").references(() => candidacies.id, { onDelete: "set null" }),
+  originalFilename: text("original_filename").notNull(),
+  r2Key: text("r2_key").notNull(),
+  extractedText: text("extracted_text").notNull(),
+  structuredFacts: jsonb("structured_facts").notNull().default({}),
+  resumeVersion: integer("resume_version").default(1).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const approvedQuestionPacks = pgTable("approved_question_packs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  revision: integer("revision").notNull(),
+  resumeVersion: integer("resume_version").notNull(),
+  questions: jsonb("questions").notNull(),
+  packCommitment: text("pack_commitment").notNull(),
+  approvedByClerkUserId: text("approved_by_clerk_user_id").notNull(),
+  approvedAt: timestamp("approved_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [unique("approved_question_packs_candidacy_revision_key").on(table.candidacyId, table.revision)]);
+
+export const invitations = pgTable("invitations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  packRevision: integer("pack_revision").notNull(),
+  secretHash: text("secret_hash").notNull().unique(),
+  deadlineAt: timestamp("deadline_at", { withTimezone: true }).notNull(),
+  recruiterContact: text("recruiter_contact").notNull().default(""),
+  status: text("status", { enum: invitationStatuses }).default("active").notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  supersededBy: uuid("superseded_by"),
+  solanaInvitationPda: text("solana_invitation_pda"),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).defaultNow().notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+});
+
+export const verificationAttempts = pgTable("verification_attempts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  invitationId: uuid("invitation_id").notNull().references(() => invitations.id, { onDelete: "cascade" }),
+  personaInquiryRef: text("persona_inquiry_ref").notNull(),
+  environment: text("environment").notNull(),
+  status: text("status", { enum: verificationStatuses }).default("pending").notNull(),
+  nameMatch: text("name_match"),
+  boundAt: timestamp("bound_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const hiringSessionBindings = pgTable("hiring_session_bindings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  interviewSessionId: uuid("interview_session_id").notNull().unique().references(() => interviewSessions.id, { onDelete: "cascade" }),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  invitationId: uuid("invitation_id").notNull().references(() => invitations.id, { onDelete: "cascade" }),
+  packRevision: integer("pack_revision").notNull(),
+  policy: jsonb("policy").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const reportRevisions = pgTable("report_revisions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  sessionId: uuid("session_id").notNull().references(() => interviewSessions.id, { onDelete: "cascade" }),
+  candidacyId: uuid("candidacy_id").notNull().references(() => candidacies.id, { onDelete: "cascade" }),
+  revision: integer("revision").notNull(),
+  revisionCommitment: text("revision_commitment"),
+  status: text("status", { enum: reportStatuses }).default("processing").notNull(),
+  summary: jsonb("summary").notNull().default({}),
+  privateNotes: text("private_notes"),
+  generatedAt: timestamp("generated_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [unique("report_revisions_session_revision_key").on(table.sessionId, table.revision)]);
+
+export const reportReleases = pgTable("report_releases", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  reportRevisionId: uuid("report_revision_id").notNull().references(() => reportRevisions.id, { onDelete: "cascade" }),
+  releaseSummary: boolean("release_summary").default(false).notNull(),
+  releaseRubric: boolean("release_rubric").default(false).notNull(),
+  releasePerQuestion: boolean("release_per_question").default(false).notNull(),
+  releaseTranscript: boolean("release_transcript").default(false).notNull(),
+  releaseRecordings: boolean("release_recordings").default(false).notNull(),
+  releasedByClerkUserId: text("released_by_clerk_user_id").notNull(),
+  releasedAt: timestamp("released_at", { withTimezone: true }).defaultNow().notNull(),
+  revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  solanaReleasePda: text("solana_release_pda"),
+});
+
+export const processingJobs = pgTable("processing_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  jobType: text("job_type", { enum: processingJobTypes }).notNull(),
+  targetId: uuid("target_id").notNull(),
+  targetKind: text("target_kind").notNull(),
+  status: text("status", { enum: processingJobStatuses }).default("queued").notNull(),
+  leaseOwner: text("lease_owner"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  attempts: integer("attempts").default(0).notNull(),
+  nextRunAt: timestamp("next_run_at", { withTimezone: true }).defaultNow().notNull(),
+  lastError: text("last_error"),
+  payload: jsonb("payload").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const solanaOutbox = pgTable("solana_outbox", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  action: text("action").notNull(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  expectedRevision: integer("expected_revision"),
+  payloadCommitment: text("payload_commitment").notNull(),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  candidacyId: uuid("candidacy_id").references(() => candidacies.id, { onDelete: "set null" }),
+  invitationId: uuid("invitation_id").references(() => invitations.id, { onDelete: "set null" }),
+  txSignature: text("tx_signature"),
+  state: text("state", { enum: solanaOutboxStates }).default("queued").notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+});
+
+/** Persona webhook dedupe log. Mirrors migrations/0011_hiring_flow.sql. */
+export const personaWebhookEvents = pgTable("persona_webhook_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventId: text("event_id").notNull().unique(),
+  inquiryRef: text("inquiry_ref").notNull(),
+  receivedAt: timestamp("received_at", { withTimezone: true }).defaultNow().notNull(),
+  processedAt: timestamp("processed_at", { withTimezone: true }),
+});
 
 /** Chess.com-style move review, applied to answers: a verdict per answered turn. */
 export const reportVerdicts = ["blunder", "mistake", "inaccuracy", "good", "best", "insufficient_evidence"] as const;

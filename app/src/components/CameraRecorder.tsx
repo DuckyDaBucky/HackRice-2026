@@ -108,6 +108,8 @@ interface CameraRecorderProps {
   timeBudgetSeconds?: number;
   onTimeBudgetReached?: () => void;
   onLeave: () => void;
+  /** Spoken once before the first question so the session opens like a conversation. */
+  introLine?: string | null;
 }
 
 export function CameraRecorder({
@@ -127,6 +129,7 @@ export function CameraRecorder({
   timeBudgetSeconds,
   onTimeBudgetReached,
   onLeave,
+  introLine,
 }: CameraRecorderProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captions = useLiveCaptions();
@@ -271,6 +274,13 @@ export function CameraRecorder({
           window.setTimeout(resolve, INTER_QUESTION_BUFFER_MS);
         });
       }
+      if (cancelled) return;
+      // The interviewer opens with a greeting before the first question so
+      // the session feels like a conversation, not a recording widget.
+      if (questionNumber === 1 && introLine) {
+        await speak(introLine, voiceId, mood);
+        if (cancelled) return;
+      }
       await speak(questionPrompt, voiceId, mood);
       if (cancelled) return;
       currentQuestionRef.current = questionKey;
@@ -282,7 +292,7 @@ export function CameraRecorder({
     return () => {
       cancelled = true;
     };
-  }, [mood, questionNumber, questionPrompt, record, recorderState, speak, startCaptions, voiceId]);
+  }, [introLine, mood, questionNumber, questionPrompt, record, recorderState, speak, startCaptions, voiceId]);
 
   // Silence is a gentle prompt, not permission for the interviewer to submit
   // or advance the candidate's answer. The candidate explicitly finishes.

@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
 import type { ProcessMistake } from "@/lib/analytics/process-events";
 import type { ReportOverview } from "@/lib/reports/contracts";
 import type { ReviewAnswer, SessionReview } from "@/lib/reports/timeline";
 import { formatDuration } from "@/lib/recording/format-duration";
+import { AnswerVideo } from "@/components/reports/AnswerVideo";
 
 interface VerdictMeta {
   label: string;
@@ -94,10 +94,19 @@ function StepButton({ label, disabled, onClick, children }: {
   );
 }
 
-function AnswerDetail({ answer, total, onStep }: { answer: ReviewAnswer; total: number; onStep: (delta: number) => void }) {
+function AnswerDetail({ answer, total, answers, selected, sessionId, onStep, onSelect }: {
+  answer: ReviewAnswer;
+  total: number;
+  answers: ReviewAnswer[];
+  selected: number;
+  sessionId: string | null;
+  onStep: (delta: number) => void;
+  onSelect: (index: number) => void;
+}) {
   const meta = verdictOf(answer);
-  const router = useRouter();
-  const [clipExpired, setClipExpired] = useState(false);
+  const timed = answers.some((a) => a.clip?.durationMs);
+  const weights = answers.map((a) => a.clip?.durationMs ?? 1);
+  const weightTotal = weights.reduce((s, w) => s + w, 0) || 1;
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex items-center justify-between gap-3">
@@ -119,34 +128,58 @@ function AnswerDetail({ answer, total, onStep }: { answer: ReviewAnswer; total: 
         </div>
       </div>
 
-      {answer.clip ? (
-        clipExpired ? (
-          <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500">
-            <span>Recording link expired (signed URLs last ~1h).</span>
-            <button
-              type="button"
-              onClick={() => router.refresh()}
-              className="rounded-full border border-sky-400/40 px-3 py-1.5 text-xs font-medium text-sky-200 hover:bg-sky-500/10"
-            >
-              Refresh links
-            </button>
-          </div>
-        ) : (
-          <video
-            key={answer.turnId}
-            src={answer.clip.url}
-            controls
-            preload="metadata"
-            playsInline
-            onError={() => setClipExpired(true)}
-            className="aspect-video w-full rounded-xl bg-black"
-          />
-        )
+      {sessionId ? (
+        <AnswerVideo
+          sessionId={sessionId}
+          artifactId={answer.artifactId}
+          initialUrl={answer.clip?.url ?? null}
+          turnId={answer.turnId}
+        />
+      ) : answer.clip ? (
+        <video
+          key={answer.turnId}
+          src={answer.clip.url}
+          controls
+          preload="metadata"
+          playsInline
+          className="aspect-video w-full rounded-xl bg-black"
+        />
       ) : (
         <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500">
           No recording was saved for this answer
         </div>
       )}
+
+      {/* Answer accuracy mapped onto the video position: session chapters colored by verdict. */}
+      <div
+        role="group"
+        aria-label="Answer accuracy chapters for this interview"
+        className="flex h-6 gap-[2px]"
+      >
+        {answers.map((item, index) => {
+          const itemMeta = verdictOf(item);
+          const isCurrent = index === selected;
+          return (
+            <button
+              key={item.turnId}
+              type="button"
+              title={`Answer ${item.number}: ${itemMeta.label}${itemMeta.score === null ? "" : ` (${itemMeta.score})`}${item.finding ? ` — ${item.finding.explanation}` : ""}`}
+              aria-label={`Answer ${item.number}: ${itemMeta.label}${item.finding ? `. ${item.finding.explanation}` : ""}`}
+              aria-current={isCurrent ? "true" : undefined}
+              onClick={() => onSelect(index)}
+              style={{
+                flexGrow: timed ? weights[index] : 1,
+                flexBasis: 0,
+                backgroundColor: itemMeta.color,
+                color: inkOn(itemMeta.color),
+              }}
+              className={`min-w-6 rounded text-[10px] font-bold transition hover:brightness-110 focus-visible:outline-2 focus-visible:outline-sky-400 ${isCurrent ? "outline-2 outline-offset-2 outline-zinc-100" : "opacity-80"}`}
+            >
+              {weights[index] / weightTotal >= 0.06 ? itemMeta.glyph : <span aria-hidden="true">·</span>}
+            </button>
+          );
+        })}
+      </div>
 
       {answer.question && <h2 className="text-base font-medium text-zinc-50">{answer.question}</h2>}
 
@@ -189,28 +222,53 @@ function SessionTimelineStrip({ answers, selected, onSelect }: {
   onSelect: (index: number) => void;
 }) {
   const [hovered, setHovered] = useState<number | null>(null);
-  const timed = answers.every((answer) => answer.clip?.durationMs);
-  const weights = answers.map((answer) => (timed ? answer.clip?.durationMs ?? 1 : 1));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  const starts = weights.map((_, index) => weights.slice(0, index).reduce((sum, weight) => sum + weight, 0));
+  // Stable widths: use real durations where present, fall back to equal slices
+  // for missing clips instead of collapsing the whole strip to equal weights.
+  const weights = answers.map((answer) =>
+    answer.clip?.durationMs && answer.clip.durationMs > 0 ? (answer.clip.durationMs as number) : null,
+  );
+  const knownTotal: number = weights.reduce<number>((sum, w) => sum + (w ?? 0), 0);
+  const missing = weights.filter((w) => w === null).length;
+  const fallbackWeight = missing > 0 ? Math.max(knownTotal / Math.max(1, answers.length - missing), 15_000) : 1;
+  const resolved = weights.map((w) => w ?? fallbackWeight);
+  const total = resolved.reduce((sum, weight) => sum + weight, 0) || 1;
+  const hasAnyDuration = weights.some((w) => w !== null);
+  const starts = resolved.map((_, index) => resolved.slice(0, index).reduce((sum, weight) => sum + weight, 0));
   const hoveredAnswer = hovered === null ? null : answers[hovered];
+  const hoveredMeta = hoveredAnswer ? verdictOf(hoveredAnswer) : null;
+  // Clamp tooltip so it never overflows the card at the edges.
+  const hoverPct = hovered === null ? 0 : ((starts[hovered] + resolved[hovered] / 2) / total) * 100;
+  const clampedPct = Math.min(82, Math.max(18, hoverPct));
 
   return (
-    <Card title="Interview timeline" hint={timed ? "Width shows how long each answer ran" : "Answers in order"}>
+    <Card title="Interview timeline" hint={hasAnyDuration ? "Width shows how long each answer ran" : "Answers in order"}>
       <div className="relative">
-        {hoveredAnswer && hovered !== null && (
+        {hoveredAnswer && hovered !== null && hoveredMeta && (
           <div
-            className="pointer-events-none absolute bottom-full z-10 mb-2 -translate-x-1/2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs whitespace-nowrap shadow-lg"
-            style={{ left: `${((starts[hovered] + weights[hovered] / 2) / total) * 100}%` }}
+            role="status"
+            className="pointer-events-none absolute bottom-full z-10 mb-2 w-64 -translate-x-1/2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs shadow-lg"
+            style={{ left: `${clampedPct}%` }}
           >
-            <p className="text-sm font-semibold text-zinc-50">{verdictOf(hoveredAnswer).label}</p>
-            <p className="text-zinc-400">
+            <p className="flex items-center gap-2 text-sm font-semibold text-zinc-50">
+              <VerdictGlyph meta={hoveredMeta} size="sm" />
+              {hoveredMeta.label}
+              {hoveredMeta.score !== null && <span className="text-zinc-400 tabular-nums">· {hoveredMeta.score}</span>}
+            </p>
+            <p className="mt-0.5 text-zinc-400">
               Answer {hoveredAnswer.number}
               {hoveredAnswer.clip?.durationMs ? ` · ${formatDuration(hoveredAnswer.clip.durationMs)}` : ""}
             </p>
+            {hoveredAnswer.finding ? (
+              <p className="mt-1 leading-relaxed text-zinc-300 normal-case">
+                <span className="text-zinc-500">Why: </span>
+                {hoveredAnswer.finding.explanation}
+              </p>
+            ) : (
+              <p className="mt-1 text-zinc-500">Not reviewed yet.</p>
+            )}
           </div>
         )}
-        <div className="flex h-9 gap-[2px]">
+        <div className="flex h-9 gap-[2px]" role="listbox" aria-label="Answers in order">
           {answers.map((answer, index) => {
             const meta = verdictOf(answer);
             const isSelected = index === selected;
@@ -218,24 +276,26 @@ function SessionTimelineStrip({ answers, selected, onSelect }: {
               <button
                 key={answer.turnId}
                 type="button"
-                aria-label={`Answer ${answer.number}: ${meta.label}`}
-                aria-pressed={isSelected}
+                role="option"
+                aria-selected={isSelected}
+                aria-label={`Answer ${answer.number}: ${meta.label}${answer.finding ? `. ${answer.finding.explanation}` : ". Not reviewed"}`}
+                title={answer.finding ? `Answer ${answer.number} — ${meta.label}: ${answer.finding.explanation}` : `Answer ${answer.number} — ${meta.label}`}
                 onClick={() => onSelect(index)}
                 onPointerEnter={() => setHovered(index)}
                 onPointerLeave={() => setHovered(null)}
                 onFocus={() => setHovered(index)}
                 onBlur={() => setHovered(null)}
-                style={{ flexGrow: weights[index], flexBasis: 0, backgroundColor: meta.color, color: inkOn(meta.color) }}
+                style={{ flexGrow: resolved[index], flexBasis: 0, backgroundColor: meta.color, color: inkOn(meta.color) }}
                 className={`min-w-3 text-xs font-bold transition first:rounded-l-[4px] last:rounded-r-[4px] hover:brightness-110 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400 ${isSelected ? "outline-2 outline-offset-2 outline-zinc-100" : ""}`}
               >
-                {weights[index] / total >= 0.08 ? meta.glyph : null}
+                {resolved[index] / total >= 0.06 ? meta.glyph : <span aria-hidden="true" className="opacity-70">·</span>}
               </button>
             );
           })}
         </div>
         <div className="mt-2 flex justify-between text-[11px] text-zinc-500 tabular-nums">
-          <span>{timed ? "0:00" : "Start"}</span>
-          <span>{timed ? formatDuration(total) : "End"}</span>
+          <span>{hasAnyDuration ? "0:00" : "Start"}</span>
+          <span>{hasAnyDuration ? formatDuration(total) : "End"}</span>
         </div>
       </div>
     </Card>
@@ -287,15 +347,17 @@ function EvaluationGraph({ answers, selected, onSelect }: {
     return points.reduce((best, point) => (Math.abs(point.x - x) < Math.abs(points[best].x - x) ? point.index : best), 0);
   };
   const hoveredPoint = hovered === null ? null : points[hovered];
+  const hoveredAnswer = hovered === null ? null : answers[hovered];
+  const hoverLeftPct = hoveredPoint ? Math.min(80, Math.max(20, (hoveredPoint.x / GRAPH.width) * 100)) : 50;
 
   return (
-    <Card title="Answer quality across the interview" hint="Click a point to review that answer">
+    <Card title="Answer accuracy across the interview" hint="Hover for why · click a point to review that answer">
       <div className="relative">
         <svg
           viewBox={`0 0 ${GRAPH.width} ${GRAPH.height}`}
           className="h-auto w-full touch-none"
           role="img"
-          aria-label="Answer quality score by answer number, from 0 (blunder) to 100 (best)"
+          aria-label="Answer accuracy score by answer number, from 0 (blunder) to 100 (best)"
           onPointerMove={(event) => setHovered(nearestIndex(event))}
           onPointerLeave={() => setHovered(null)}
           onClick={(event) => onSelect(nearestIndex(event as unknown as ReactPointerEvent<SVGSVGElement>))}
@@ -368,22 +430,57 @@ function EvaluationGraph({ answers, selected, onSelect }: {
           })}
         </svg>
 
-        {hoveredPoint && (
+        {hoveredPoint && hoveredAnswer && (
           <div
-            className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs whitespace-nowrap shadow-lg"
+            role="status"
+            className="pointer-events-none absolute z-10 w-64 -translate-x-1/2 -translate-y-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs shadow-lg"
             style={{
-              left: `${(hoveredPoint.x / GRAPH.width) * 100}%`,
+              left: `${hoverLeftPct}%`,
               top: `calc(${((hoveredPoint.y ?? baseline) / GRAPH.height) * 100}% - 10px)`,
             }}
           >
-            <p className="text-sm font-semibold text-zinc-50">
-              {hoveredPoint.meta.score === null ? "Not scored" : hoveredPoint.meta.score}
+            <p className="flex items-center gap-2 text-sm font-semibold text-zinc-50">
+              <VerdictGlyph meta={hoveredPoint.meta} size="sm" />
+              {hoveredPoint.meta.score === null ? "Not scored" : `${hoveredPoint.meta.score} · ${hoveredPoint.meta.label}`}
             </p>
-            <p className="text-zinc-400">
-              Answer {answers[hoveredPoint.index].number} · {hoveredPoint.meta.label}
-            </p>
+            <p className="mt-0.5 text-zinc-400">Answer {hoveredAnswer.number}</p>
+            {hoveredAnswer.finding ? (
+              <>
+                <p className="mt-1 leading-relaxed text-zinc-300">
+                  <span className="text-zinc-500">Why: </span>
+                  {hoveredAnswer.finding.explanation}
+                </p>
+                {hoveredAnswer.finding.improvement && (
+                  <p className="mt-1 leading-relaxed text-zinc-400">
+                    <span className="text-zinc-500">Try: </span>
+                    {hoveredAnswer.finding.improvement}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="mt-1 text-zinc-500">Generate the review to get a verdict for this answer.</p>
+            )}
           </div>
         )}
+        {/* Keyboard / screen-reader stable list: the SVG is visual only. */}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {answers.map((answer, index) => {
+            const meta = verdictOf(answer);
+            return (
+              <button
+                key={answer.turnId}
+                type="button"
+                onClick={() => onSelect(index)}
+                title={answer.finding ? `Answer ${answer.number} — ${meta.label}: ${answer.finding.explanation}` : `Answer ${answer.number} — ${meta.label}`}
+                aria-label={`Go to answer ${answer.number}, ${meta.label}`}
+                aria-current={index === selected ? "true" : undefined}
+                className={`rounded-full border px-2.5 py-1 text-xs transition focus-visible:outline-2 focus-visible:outline-sky-400 ${index === selected ? "border-zinc-100 text-zinc-50" : "border-zinc-800 text-zinc-400 hover:text-zinc-200"}`}
+              >
+                {answer.number} · {meta.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </Card>
   );
@@ -475,6 +572,7 @@ function MoveList({ answers, selected, onSelect }: {
               <button
                 type="button"
                 aria-current={isSelected ? "true" : undefined}
+                title={answer.finding ? `${meta.label}: ${answer.finding.explanation}` : meta.label}
                 onClick={() => onSelect(index)}
                 className={`flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left text-sm transition focus-visible:outline-2 focus-visible:outline-sky-400 ${isSelected ? "bg-zinc-800" : "hover:bg-zinc-800/50"}`}
               >
@@ -509,10 +607,11 @@ function SessionIssues({ mistakes }: { mistakes: ProcessMistake[] }) {
 }
 
 /** Chess.com-style game review for an interview: step through answers, see verdicts and why. */
-export function InterviewReview({ review, overview, aside }: {
+export function InterviewReview({ review, overview, aside, sessionId }: {
   review: SessionReview;
   overview: ReportOverview | null;
   aside?: ReactNode;
+  sessionId?: string | null;
 }) {
   const [selected, setSelected] = useState(0);
   const count = review.answers.length;
@@ -553,7 +652,16 @@ export function InterviewReview({ review, overview, aside }: {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-6">
-        <AnswerDetail key={review.answers[current].turnId} answer={review.answers[current]} total={count} onStep={step} />
+        <AnswerDetail
+          key={review.answers[current].turnId}
+          answer={review.answers[current]}
+          total={count}
+          answers={review.answers}
+          selected={current}
+          sessionId={sessionId ?? null}
+          onStep={step}
+          onSelect={setSelected}
+        />
         <SessionTimelineStrip answers={review.answers} selected={current} onSelect={setSelected} />
         <EvaluationGraph answers={review.answers} selected={current} onSelect={setSelected} />
       </div>

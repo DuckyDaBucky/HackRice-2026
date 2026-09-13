@@ -51,8 +51,11 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "abandoned") {
     return { label: "Try again", href: "/interview/setup" };
   }
-  if (session.isDurable && session.status === "completed") {
-    return { label: "Answer review", href: `/interview/session/${session.id}/report` };
+  if (session.isDurable && session.reportStatus === "completed") {
+    return { label: "Review report", href: `/interview/session/${session.id}/report` };
+  }
+  if (session.isDurable && session.reportStatus === "processing") {
+    return { label: "Report preparing", href: `/interview/session/${session.id}/report` };
   }
   return { label: "Practice again", href: "/interview/setup" };
 }

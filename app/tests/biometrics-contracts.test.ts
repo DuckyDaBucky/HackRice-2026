@@ -25,12 +25,14 @@ describe("summarizeVideoAnalysis", () => {
   it("keeps only the small display-ready fields, dropping the raw event stream", () => {
     const parsed = videoAnalysisSchema.parse(sampleAnalysis);
     const summary = summarizeVideoAnalysis(parsed);
-    expect(summary).toEqual({
+    expect(summary).toMatchObject({
       analysisId: sampleAnalysis.analysisId,
       sdkVersion: sampleAnalysis.sdkVersion,
       eventCounts: sampleAnalysis.eventCounts,
     });
     expect(summary).not.toHaveProperty("events");
+    expect(summary.metricReadouts).toBe(43);
+    expect(summary.biometricEvents).toBe(43);
   });
 });
 

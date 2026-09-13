@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  BLITZ_TIME_BUDGET_SECONDS,
   interviewSetupSchema,
+  isBlitzBudget,
   planLengthFor,
   transcriptSegmentSchema,
 } from "../src/lib/interviews/contracts";
@@ -26,6 +28,22 @@ describe("durable interview setup contract", () => {
     });
     expect(setup.contentTypes).toEqual(["system_design", "behavioral"]);
     expect(planLengthFor(setup.timeBudgetSeconds)).toEqual({ minimum: 5, target: 6, maximum: 7 });
+  });
+
+  it("accepts the blitz budget with a single-question plan", () => {
+    const setup = interviewSetupSchema.parse({
+      contentTypes: ["behavioral"],
+      targetRole: "Backend engineer",
+      seniority: "junior",
+      focusArea: null,
+      timeBudgetSeconds: 180,
+      voiceId: null,
+      mood: "neutral",
+    });
+    expect(planLengthFor(setup.timeBudgetSeconds)).toEqual({ minimum: 1, target: 1, maximum: 1 });
+    expect(isBlitzBudget(setup.timeBudgetSeconds)).toBe(true);
+    expect(BLITZ_TIME_BUDGET_SECONDS).toBe(180);
+    expect(isBlitzBudget(600)).toBe(false);
   });
 
   it("rejects an unbounded duration or unsupported content type", () => {

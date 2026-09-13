@@ -7,7 +7,7 @@ import {WorkbenchError} from "../errors";
 export function effectiveLevel(context:AiContext):Resume["experienceLevel"] {
   return context.profile?.experienceLevel??"unknown";
 }
-// Stable selection for replay; Gemini wording is deliberately not deterministic.
+// Stable selection for replay; provider wording is deliberately not deterministic.
 const draw=(seed:string,id:string)=> (parseInt(createHash("sha256").update(seed+":"+id).digest("hex").slice(0,8),16)+1)/4294967297;
 export function planInterview(corpus:Corpus,context:AiContext,count:number,seed:string,excluded:string[]=[]) {
   const target=context.target, level=effectiveLevel(context);

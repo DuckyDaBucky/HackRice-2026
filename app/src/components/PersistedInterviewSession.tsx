@@ -19,6 +19,7 @@ import {
   skipPersistedInterviewQuestion,
 } from "@/app/interview/v2-actions";
 import { DEFAULT_VOICE_ID } from "@/lib/voice/presets";
+import { buildExitLine, buildIntroLine } from "@/lib/interview-dialog";
 import type { V2ResumeState } from "@/lib/interviews/persistence";
 import type { InterviewMode, Question } from "@/lib/questions/types";
 
@@ -58,6 +59,28 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
   const mode = legacyModeFor(initialState);
   const voiceId = initialState.config.voiceId ?? DEFAULT_VOICE_ID;
   const done = index >= questions.length;
+  const introLine = buildIntroLine({
+    targetRole: initialState.config.targetRole,
+    seniority: initialState.config.seniority,
+    timeBudgetSeconds: initialState.config.timeBudgetSeconds,
+    questionCount: questions.length,
+  });
+
+  // Spoken outro on the completion screen, once per session.
+  const exitSpokenRef = useRef(false);
+  useEffect(() => {
+    if (!done || exitSpokenRef.current) return;
+    exitSpokenRef.current = true;
+    void tts.speak(
+      buildExitLine({
+        answeredCount: uploadCount,
+        totalQuestions: questions.length,
+        timeBudgetSeconds: initialState.config.timeBudgetSeconds,
+      }),
+      voiceId,
+      initialState.config.mood,
+    );
+  }, [done, initialState.config.mood, initialState.config.timeBudgetSeconds, questions.length, tts, uploadCount, voiceId]);
 
   useEffect(() => {
     if (!recorder.stream || joined) return;
@@ -128,6 +151,13 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
             Evidence
           </button>
         </div>
+        <button
+          type="button"
+          onClick={() => router.push("/")}
+          className="text-sm text-zinc-500 underline-offset-4 transition hover:text-zinc-300 hover:underline"
+        >
+          Back to dashboard
+        </button>
       </div>
     );
   }
@@ -171,6 +201,7 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
       questionPrompt={currentPrompt}
       questionNumber={index + 1}
       totalQuestions={questions.length}
+      introLine={introLine}
       onLeave={leave}
       onPauseChange={async (paused) => {
         const changed = paused

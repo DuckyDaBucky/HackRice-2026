@@ -6,14 +6,16 @@ import { GenerateReportButton } from "@/components/reports/GenerateReportButton"
 import { InterviewReview } from "@/components/reports/InterviewReview";
 
 const FALLBACK_REASON: Record<string, string> = {
-  QUOTA: "Gemini's request quota ran out, so these answers weren't reviewed.",
-  TIMEOUT: "The reviewer took too long to respond, so these answers weren't reviewed.",
-  INVALID_RESPONSE: "The reviewer's response couldn't be read, so these answers weren't reviewed.",
+  QUOTA: "The AI reviewer's request quota ran out, so these answers show instant local scores instead.",
+  TIMEOUT: "The reviewer took too long to respond, so these answers show instant local scores instead.",
+  INVALID_RESPONSE: "The reviewer's response couldn't be read, so these answers show instant local scores instead.",
 };
 
 export default async function InterviewReportPage({
   params,
-}: PageProps<"/interview/session/[sessionId]/report">) {
+}: {
+  params: Promise<{ sessionId: string }>;
+}) {
   const { sessionId } = await params;
   const data = await getReportPageData(sessionId);
   if (!data) notFound();
@@ -57,7 +59,8 @@ export default async function InterviewReportPage({
 
       <InterviewReview
         review={review}
-        overview={report && !report.usedFallback ? report.overview : null}
+        overview={report && !report.usedFallback ? report.overview : report?.overview ?? null}
+        sessionId={sessionId}
         aside={<BiometricsCard sessionId={sessionId} analyses={biometrics} />}
       />
     </div>

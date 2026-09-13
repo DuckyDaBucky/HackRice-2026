@@ -19,24 +19,37 @@ import {
   transitionOwnedV2Session,
 } from "@/lib/interviews/persistence";
 import { rephraseInterviewQuestion } from "@/lib/interviews/rephrase";
+import { llmTextModel } from "@/lib/llm/provider";
 import { AGENT_PROMPT_VERSION, agentInputHash, decideNextTurn } from "@/lib/interviews/agent";
 import type { AgentDecision } from "@/lib/interviews/agent-contracts";
 import { getUploadedObjectMetadata, artifactClipKey, createPlaybackUrl, createUploadUrl } from "@/lib/storage/r2";
+import { requireSessionPrincipal, isHiringSession } from "@/lib/access/session-principal";
+import { completeHiringInterview } from "@/lib/hiring/sessions";
 import { isBiometricsEnabledForSession, queueBiometricAnalysis } from "@/lib/biometrics/persistence";
+import { biometricNoteFor } from "@/lib/biometrics/contracts";
+import { getBiometricAnalysesForSession } from "@/lib/biometrics/persistence";
 import { runBiometricAnalysesForSession } from "@/lib/biometrics/processor";
+import { saveIncrementalFinding } from "@/lib/reports/incremental";
 
 async function requireOwnedV2Session(sessionId: string) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Sign in to access this interview.");
-  const state = await getV2ResumeState(sessionId, userId);
+  const principal = await requireSessionPrincipal(sessionId);
+  if (principal.kind === "org_recruiter") throw new Error("Interview session not found.");
+  const state = await getV2ResumeState(sessionId, principal.clerkUserId);
   if (!state) throw new Error("Interview session not found.");
-  return { userId, state };
+  return { userId: principal.clerkUserId, state, principal };
 }
 
 export async function getPersistedInterviewState(sessionId: string) {
   const { userId } = await auth();
   if (!userId) return null;
-  return getV2ResumeState(sessionId, userId);
+  try {
+    const principal = await requireSessionPrincipal(sessionId);
+    if (principal.kind === "org_recruiter") return null;
+    if (principal.clerkUserId !== userId) return null;
+    return getV2ResumeState(sessionId, userId);
+  } catch {
+    return null;
+  }
 }
 
 export async function beginOrResumePersistedInterview(sessionId: string) {
@@ -60,15 +73,75 @@ export async function pausePersistedInterview(sessionId: string) {
 
 export async function completePersistedInterview(sessionId: string) {
   const { userId, state } = await requireOwnedV2Session(sessionId);
-  if (state.session.status === "completed") {
+  const finish = async () => {
     await ensureEvidenceLinkedReport(sessionId, userId).catch(() => {});
+    // Best-effort full AI review so the report page already has verdicts.
+    // Never blocks completion: failures fall back to the instant heuristic.
+    const { getReportTranscript } = await import("@/lib/reports/persistence");
+    const { beginReportGeneration, completeReportGeneration } = await import("@/lib/reports/persistence");
+    const { createFallbackReport, generateReport, REPORT_PROMPT_VERSION, reportInputHash, reportModel } =
+      await import("@/lib/reports/generator");
+    const { biometricContextForPrompt } = await import("@/lib/biometrics/contracts");
+    try {
+      const turns = await getReportTranscript(sessionId);
+      if (turns.some((t) => t.kind === "candidate_answer" && t.text?.trim())) {
+        let biometricContext: string | null = null;
+        try {
+          const bios = await getBiometricAnalysesForSession(sessionId, userId);
+          biometricContext = biometricContextForPrompt(
+            bios.map((a) => ({ turnId: a.turnId, metrics: a.metrics, status: a.status })),
+          );
+        } catch {
+          biometricContext = null;
+        }
+        const generationId = await beginReportGeneration({
+          sessionId,
+          model: reportModel(),
+          promptVersion: REPORT_PROMPT_VERSION,
+          inputHash: reportInputHash(turns),
+        });
+        try {
+          const generated = await generateReport(turns, biometricContext);
+          await completeReportGeneration({
+            sessionId,
+            generationId,
+            findings: generated.findings,
+            result: generated.result,
+            usage: generated.usage,
+            model: generated.model,
+          });
+        } catch (error) {
+          console.error("Auto report generation failed; storing heuristic fallback", error);
+          const fallback = createFallbackReport(turns);
+          await completeReportGeneration({
+            sessionId,
+            generationId,
+            findings: fallback.findings,
+            result: fallback.result,
+            model: fallback.model,
+          }).catch(() => {});
+        }
+      }
+    } catch (error) {
+      console.error("Auto report setup failed", error);
+    }
+  };
+  if (state.session.status === "completed") {
+    await finish();
     return true;
   }
   if (state.session.status !== "in_progress") return false;
   const completed = await transitionOwnedV2Session({ sessionId, clerkUserId: userId, from: "in_progress", to: "completed" });
   // Report work is recoverable and must never make a completed recording look
-  // unfinished. The report page retries this deterministic first pass.
-  if (completed) await ensureEvidenceLinkedReport(sessionId, userId).catch(() => {});
+  // unfinished. Hiring sessions run their own completion; practice sessions get
+  // the evidence report plus the best-effort full review.
+  if (completed) {
+    if (await isHiringSession(sessionId)) {
+      await completeHiringInterview(sessionId, userId).catch(() => {});
+    } else {
+      await finish();
+    }
+  }
   return completed;
 }
 
@@ -109,13 +182,16 @@ export async function decidePersistedInterviewNextTurn(params: {
   planQuestionId: string;
   transcript: string;
 }): Promise<AgentDecision> {
-  await requireOwnedV2Session(params.sessionId);
+  const { principal } = await requireOwnedV2Session(params.sessionId);
+  if (principal.kind === "assigned_candidate") {
+    return { action: "move_to_next_question", rationale: "coverage_complete" };
+  }
   const baseContext = await getAgentContextForTurn(params);
   const context = { ...baseContext, transcript: params.transcript.slice(0, 12_000) };
   const inputHash = agentInputHash(context);
   const generationId = await beginAgentDecision({
     context,
-    model: process.env.GEMINI_MODEL || "gemini-3.6-flash",
+    model: llmTextModel("agent"),
     promptVersion: AGENT_PROMPT_VERSION,
     inputHash,
   });
@@ -191,6 +267,34 @@ export async function confirmPersistedAnswerUpload(params: {
       turnId: params.turnId,
       text: params.transcript.trim(),
     });
+  }
+  // Instant per-answer analysis: heuristic verdict stored immediately so the
+  // review page shows accuracy while the full AI pass is still pending.
+  try {
+    let biometricNote: string | null = null;
+    try {
+      const bios = await getBiometricAnalysesForSession(params.sessionId, userId);
+      const match = bios.find((b) => b.artifactId === params.artifactId);
+      if (match) biometricNote = biometricNoteFor(match.metrics);
+    } catch {
+      biometricNote = null;
+    }
+    await saveIncrementalFinding({
+      sessionId: params.sessionId,
+      turn: {
+        turnId: params.turnId,
+        planQuestionId: null,
+        kind: "candidate_answer",
+        position: null,
+        prompt: null,
+        text: params.transcript.trim() || null,
+        startMs: null,
+        endMs: null,
+      },
+      biometricNote,
+    });
+  } catch (error) {
+    console.error("Incremental answer analysis failed", error);
   }
   if (await isBiometricsEnabledForSession(params.sessionId)) {
     await queueBiometricAnalysis({ sessionId: params.sessionId, artifactId: params.artifactId });
