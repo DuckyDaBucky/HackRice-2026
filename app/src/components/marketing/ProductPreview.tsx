@@ -5,9 +5,9 @@ export function ProductPreview() {
     <div className="overflow-hidden rounded-xl border border-border/60 shadow-[0_30px_80px_-20px_rgba(0,0,0,0.6)]">
       <Image
         src="/hero-preview.png"
-        alt="GetMeHired practice interview in progress, with the current question, a live recording indicator, and a real-time transcription note"
-        width={1490}
-        height={982}
+        alt="GetMeHired practice interview in progress, showing the candidate's camera feed alongside the AI interviewer and the current technical question"
+        width={1681}
+        height={935}
         priority
         className="h-auto w-full"
       />
