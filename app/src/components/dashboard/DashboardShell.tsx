@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import {
+  BriefcaseIcon,
   ChartBarIcon,
   ClockCounterClockwiseIcon,
   FileTextIcon,
   GearSixIcon,
   HouseIcon,
   TargetIcon,
+  VideoCameraIcon,
 } from "@phosphor-icons/react";
 import { Logo } from "@/components/marketing/Logo";
 import { ThemeToggle } from "@/components/dashboard/ThemeToggle";
@@ -19,7 +21,7 @@ import { roleLabel, type AppUserRole } from "@/lib/user-roles.shared";
 import type { DashboardView } from "@/lib/dashboard/view-mode";
 import { canSwitchDashboardView } from "@/lib/dashboard/view-mode";
 
-const NAV_ITEMS = [
+const CANDIDATE_NAV = [
   { href: "/", label: "Home", icon: HouseIcon },
   { href: "/interview/setup", label: "Practice", icon: TargetIcon },
   { href: "/interviews", label: "Interviews", icon: ClockCounterClockwiseIcon },
@@ -28,6 +30,15 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: GearSixIcon },
 ] as const;
 
+const HR_NAV = [
+  { href: "/", label: "Home", icon: HouseIcon },
+  { href: "/hr", label: "Jobs", icon: BriefcaseIcon },
+  { href: "/hr/live", label: "Live demo", icon: VideoCameraIcon },
+  { href: "/settings", label: "Settings", icon: GearSixIcon },
+] as const;
+
+type NavLabel = (typeof CANDIDATE_NAV)[number]["label"] | (typeof HR_NAV)[number]["label"];
+
 export function DashboardShell({
   active,
   firstName,
@@ -35,15 +46,16 @@ export function DashboardShell({
   dashboardView = "practice",
   children,
 }: {
-  active: (typeof NAV_ITEMS)[number]["label"];
+  active: NavLabel;
   firstName: string | null;
   role?: AppUserRole;
   dashboardView?: DashboardView;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // HR workspace gets the burgundy identity; candidate keeps teal.
+  // HR workspace gets the dark-green identity; candidate keeps teal.
   const isHr = dashboardView === "hr";
+  const navItems = isHr ? HR_NAV : CANDIDATE_NAV;
   const activeBorder = isHr ? "border-hr-accent" : "border-accent";
   const activeBg = isHr ? "bg-dash-nav-active-hr" : "bg-dash-nav-active";
   const activeIcon = isHr ? "text-hr-accent-deep" : "text-accent-deep";
@@ -57,7 +69,7 @@ export function DashboardShell({
         </Link>
 
         <nav className="mt-7 flex flex-1 flex-col gap-1 px-3">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = item.label === active || pathname === item.href;
             const Icon = item.icon;
             return (

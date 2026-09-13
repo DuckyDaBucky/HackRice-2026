@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { hiringEnabled } from "@/lib/hiring/config";
 import { HrLiveDemo } from "@/components/hiring/HrLiveDemo";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { getDashboardShellContext } from "@/lib/dashboard/shell-props";
 import { setupOrganization, hrGetOrganization } from "../actions";
 import { resolveHiringClerkOrgId } from "@/lib/hiring/superadmin";
 
@@ -34,9 +36,12 @@ export default async function HrLiveDemoPage() {
     org = await hrGetOrganization(orgId);
   }
 
+  const shell = await getDashboardShellContext(userId);
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12 text-zinc-200">
-      <Link href="/hr" className="text-sm text-zinc-500 hover:text-zinc-300">← Hiring home</Link>
+    <DashboardShell active="Live demo" firstName={null} role={shell.role} dashboardView="hr">
+      <div className="mx-auto max-w-3xl px-6 py-12 text-zinc-200">
+        <Link href="/" className="text-sm text-zinc-500 hover:text-zinc-300">← Hiring home</Link>
       <header className="mt-4 mb-8">
         <span className="text-xs font-medium tracking-wide text-sky-400 uppercase">Judge demo</span>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-50">Build an interview live</h1>
@@ -45,6 +50,7 @@ export default async function HrLiveDemoPage() {
         </p>
       </header>
       <HrLiveDemo />
-    </div>
+      </div>
+    </DashboardShell>
   );
 }

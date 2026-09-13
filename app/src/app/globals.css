@@ -25,10 +25,10 @@
   --dash-solid: #0b1120;
   --dash-solid-text: #ffffff;
 
-  /* HR workspace identity — burgundy/wine. Light-mode values. */
-  --hr-accent: #9d1c3f;
-  --hr-accent-hover: #b4234a;
-  --hr-accent-deep: #841434;
+  /* HR workspace identity — dark green. Light-mode values. */
+  --hr-accent: #2f6b3c;
+  --hr-accent-hover: #38814a;
+  --hr-accent-deep: #245c31;
   --hr-on-accent: #ffffff;
   --dash-nav-active-hr: color-mix(in srgb, #ffffff 88%, var(--hr-accent) 12%);
 }
@@ -56,11 +56,11 @@
   --dash-solid: #f8fafc;
   --dash-solid-text: #0b1220;
 
-  /* HR workspace identity — burgundy/wine. Dark-mode values (brightened for contrast). */
-  --hr-accent: #d15474;
-  --hr-accent-hover: #e0607f;
-  --hr-accent-deep: #e78ba2;
-  --hr-on-accent: #2b0a12;
+  /* HR workspace identity — dark green. Dark-mode values (brightened for contrast). */
+  --hr-accent: #6fb583;
+  --hr-accent-hover: #82c795;
+  --hr-accent-deep: #9ad6ab;
+  --hr-on-accent: #0b2417;
   --dash-nav-active-hr: color-mix(in srgb, #182235 86%, var(--hr-accent) 14%);
 }
 
