@@ -135,7 +135,11 @@ export function CameraRecorder({
 }: CameraRecorderProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captions = useLiveCaptions();
-  const { size: subtitleSize } = useSubtitleSize();
+  const {
+    size: subtitleSize,
+    intervieweeCaptions,
+    interviewerCaptions,
+  } = useSubtitleSize();
   const { record, reset, state: recorderState, stop, pause, resume } = recorder;
   const {
     finalText,
@@ -436,7 +440,7 @@ export function CameraRecorder({
               {!cameraEnabled && <div className="absolute inset-0 flex items-center justify-center text-zinc-500"><VideoCameraIcon size={48} /></div>}
               <span className="absolute bottom-3 left-3 rounded bg-black/65 px-2.5 py-1.5 text-xs font-medium">You</span>
               {isRecording && <span className="absolute right-3 top-3 flex items-center gap-1.5 rounded bg-black/65 px-2.5 py-1.5 text-xs"><CircleIcon size={8} weight="fill" className="animate-pulse text-red-400" />Recording · <RecordingTimer key={questionNumber} state={recorderState} /></span>}
-              {isRecording && (finalText || interimText) && (
+              {isRecording && intervieweeCaptions && (finalText || interimText) && (
                 <div
                   ref={transcriptPanelRef}
                   aria-live="polite"
@@ -454,10 +458,12 @@ export function CameraRecorder({
         <section className="relative flex min-h-0 flex-col items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_30%,#33385d,transparent_42%),linear-gradient(135deg,#16182a,#0e1018)] p-6 text-center">
           <div className={`flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-accent to-accent-deep shadow-[0_0_0_10px_rgba(255,255,255,0.05)] transition ${tts.isSpeaking ? "scale-105 shadow-[0_0_0_10px_rgba(255,255,255,0.05),0_0_45px_rgba(30,201,179,0.35)]" : ""}`}><RobotIcon size={60} weight="duotone" className="text-[#03231e]" /></div>
           <div className="mt-5 flex items-center gap-2 text-sm font-medium">GetMeHired interviewer {tts.isSpeaking && <SpeakerHighIcon size={16} className="animate-pulse text-accent" />}</div>
-          {questionVisible && <div className="absolute bottom-5 left-5 right-5 rounded-xl bg-[#20222b]/90 p-4 text-left shadow-lg backdrop-blur-sm">
-            <div className="mb-2 flex items-center justify-between gap-4 text-xs text-zinc-400"><span className="capitalize">{mode} question</span><span>{questionNumber} / {totalQuestions}</span></div>
-            <p className="text-base font-medium leading-6 text-zinc-50 sm:text-lg">{followUp ?? rephrasedQuestion ?? questionPrompt}</p>
-          </div>}
+          {questionVisible && interviewerCaptions && (
+            <div className={`absolute bottom-5 left-5 right-5 rounded-xl bg-[#20222b]/90 p-4 text-left shadow-lg backdrop-blur-sm ${SUBTITLE_SIZE_CLASS[subtitleSize]}`}>
+              <div className="mb-2 flex items-center justify-between gap-4 text-xs text-zinc-400"><span className="capitalize">{mode} question</span><span>{questionNumber} / {totalQuestions}</span></div>
+              <p className="font-medium leading-6 text-zinc-50">{followUp ?? rephrasedQuestion ?? questionPrompt}</p>
+            </div>
+          )}
         </section>
       </main>
 

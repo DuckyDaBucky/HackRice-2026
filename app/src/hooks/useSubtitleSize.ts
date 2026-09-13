@@ -4,6 +4,12 @@ import { useState } from "react";
 
 export type SubtitleSize = "small" | "medium" | "large";
 
+export type SubtitlePrefs = {
+  intervieweeCaptions: boolean;
+  interviewerCaptions: boolean;
+  size: SubtitleSize;
+};
+
 /** Caption overlay classes for each size. */
 export const SUBTITLE_SIZE_CLASS: Record<SubtitleSize, string> = {
   small: "text-sm",
@@ -11,29 +17,88 @@ export const SUBTITLE_SIZE_CLASS: Record<SubtitleSize, string> = {
   large: "text-lg",
 };
 
-const STORAGE_KEY = "gmh-subtitle-size";
+const PREFS_KEY = "gmh-subtitle-prefs";
+const LEGACY_SIZE_KEY = "gmh-subtitle-size";
 
-function readStored(): SubtitleSize {
-  if (typeof window === "undefined") return "medium";
-  try {
-    const value = window.localStorage.getItem(STORAGE_KEY);
-    if (value === "small" || value === "medium" || value === "large") return value;
-  } catch {
-    // Private mode / blocked storage — fall through to default.
-  }
-  return "medium";
+export const DEFAULT_SUBTITLE_PREFS: SubtitlePrefs = {
+  intervieweeCaptions: true,
+  interviewerCaptions: true,
+  size: "medium",
+};
+
+const DEFAULT_PREFS = DEFAULT_SUBTITLE_PREFS;
+
+function isSubtitleSize(value: unknown): value is SubtitleSize {
+  return value === "small" || value === "medium" || value === "large";
 }
 
-/** Persisted subtitle size shared by the lobby picker and caption overlays. */
-export function useSubtitleSize() {
-  const [size, setSizeState] = useState<SubtitleSize>(readStored);
-  const setSize = (next: SubtitleSize) => {
-    setSizeState(next);
+/** Parses persisted subtitle prefs for tests and migration helpers. */
+export function parseSubtitlePrefs(raw: string | null, legacySize: string | null = null): SubtitlePrefs {
+  if (raw) {
     try {
-      window.localStorage.setItem(STORAGE_KEY, next);
+      const parsed = JSON.parse(raw) as Partial<SubtitlePrefs>;
+      return {
+        intervieweeCaptions: parsed.intervieweeCaptions ?? DEFAULT_PREFS.intervieweeCaptions,
+        interviewerCaptions: parsed.interviewerCaptions ?? DEFAULT_PREFS.interviewerCaptions,
+        size: isSubtitleSize(parsed.size) ? parsed.size : DEFAULT_PREFS.size,
+      };
     } catch {
-      // Non-fatal; the choice still applies to this session.
+      return DEFAULT_PREFS;
     }
+  }
+  if (isSubtitleSize(legacySize)) {
+    return { ...DEFAULT_PREFS, size: legacySize };
+  }
+  return DEFAULT_PREFS;
+}
+
+export function subtitlesEnabled(prefs: SubtitlePrefs): boolean {
+  return prefs.intervieweeCaptions || prefs.interviewerCaptions;
+}
+
+function readStored(): SubtitlePrefs {
+  if (typeof window === "undefined") return DEFAULT_PREFS;
+  try {
+    return parseSubtitlePrefs(
+      window.localStorage.getItem(PREFS_KEY),
+      window.localStorage.getItem(LEGACY_SIZE_KEY),
+    );
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
+
+function writeStored(prefs: SubtitlePrefs) {
+  try {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Non-fatal; the choice still applies to this session.
+  }
+}
+
+/** Persisted subtitle visibility and size shared by the lobby picker and caption overlays. */
+export function useSubtitleSize() {
+  const [prefs, setPrefsState] = useState<SubtitlePrefs>(readStored);
+
+  const updatePrefs = (patch: Partial<SubtitlePrefs>) => {
+    setPrefsState((prev) => {
+      const next = { ...prev, ...patch };
+      writeStored(next);
+      return next;
+    });
   };
-  return { size, setSize };
+
+  const setSize = (size: SubtitleSize) => updatePrefs({ size });
+  const setIntervieweeCaptions = (intervieweeCaptions: boolean) => updatePrefs({ intervieweeCaptions });
+  const setInterviewerCaptions = (interviewerCaptions: boolean) => updatePrefs({ interviewerCaptions });
+
+  const captionsEnabled = prefs.intervieweeCaptions || prefs.interviewerCaptions;
+
+  return {
+    ...prefs,
+    captionsEnabled,
+    setSize,
+    setIntervieweeCaptions,
+    setInterviewerCaptions,
+  };
 }

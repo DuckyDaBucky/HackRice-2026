@@ -8,8 +8,8 @@ import type { TranscribeResponse } from "@/lib/transcription/types";
 const TEST_SECONDS = 3;
 
 /**
- * Mic check: live level meter, 3-second record-and-playback, and a real
- * server-transcription demo of the recorded clip.
+ * Mic check: prominent live level meter, compact record-and-playback, and an
+ * optional server-transcription demo of the recorded clip.
  */
 export function MicCheck({ stream }: { stream: MediaStream | null }) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -47,7 +47,7 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
         analyser.getByteTimeDomainData(data);
         let peak = 0;
         for (const value of data) peak = Math.max(peak, Math.abs(value - 128) / 128);
-        if (barRef.current) barRef.current.style.transform = `scaleX(${Math.min(1, peak * 1.6)})`;
+        if (barRef.current) barRef.current.style.transform = `scaleX(${Math.min(1, peak * 2.2)})`;
         raf = requestAnimationFrame(tick);
       };
       tick();
@@ -132,53 +132,58 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
       </h2>
 
       <div className="mt-3">
+        <div className="flex items-end justify-between gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Input level</p>
+          <p className="text-xs text-zinc-500">
+            {phase === "recording" ? `Recording… ${countdown}s` : "Speak to test"}
+          </p>
+        </div>
         <div
-          className="h-2 overflow-hidden rounded-full bg-zinc-800"
+          className="mt-2 h-4 overflow-hidden rounded-full bg-zinc-800 ring-1 ring-inset ring-zinc-700/80"
           role="meter"
           aria-label="Microphone input level"
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuetext={phase === "recording" ? "Listening" : "Speak to see your level"}
         >
-          <div ref={barRef} className="h-full w-full origin-left rounded-full bg-sky-400" style={{ transform: "scaleX(0)" }} />
+          <div
+            ref={barRef}
+            className="h-full w-full origin-left rounded-full bg-gradient-to-r from-sky-500 via-sky-400 to-emerald-300 shadow-[0_0_12px_rgba(56,189,248,0.45)]"
+            style={{ transform: "scaleX(0)" }}
+          />
         </div>
-        <p className="mt-1.5 text-xs text-zinc-500">
-          {phase === "recording" ? `Recording… ${countdown}s — say something` : "Speak to see your level move."}
-        </p>
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={startTest}
           disabled={phase === "recording"}
-          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3.5 py-1.5 text-sm transition hover:bg-zinc-800 disabled:opacity-50"
+          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium transition hover:bg-zinc-800 disabled:opacity-50"
         >
-          {phase === "recording" ? <StopIcon size={15} weight="fill" /> : <RecordIcon size={15} weight="fill" />}
-          {phase === "recording" ? "Recording…" : "Record 3s test"}
+          {phase === "recording" ? <StopIcon size={14} weight="fill" /> : <RecordIcon size={14} weight="fill" />}
+          {phase === "recording" ? "Recording…" : "Record 3s"}
         </button>
         {clipUrl && (
-          <audio controls src={clipUrl} className="h-9 w-full min-w-0 flex-1" aria-label="Play back your mic test recording" />
+          <audio controls src={clipUrl} className="h-8 min-w-0 flex-1" aria-label="Play back your mic test recording" />
         )}
-      </div>
-
-      {phase === "ready" && clipUrl && (
-        <div className="mt-3 border-t border-zinc-800 pt-3">
+        {phase === "ready" && clipUrl && (
           <button
             type="button"
             onClick={() => void runTranscriptionDemo()}
             disabled={transcribing}
-            className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/10 px-3.5 py-1.5 text-sm text-sky-100 transition hover:bg-sky-500/20 disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-100 transition hover:bg-sky-500/20 disabled:opacity-50"
           >
-            <PlayIcon size={15} weight="fill" />
-            {transcribing ? "Transcribing…" : "Try live transcription"}
+            <PlayIcon size={14} weight="fill" />
+            {transcribing ? "Transcribing…" : "Test transcription"}
           </button>
-          {transcript && (
-            <p aria-live="polite" className="mt-2 rounded-lg bg-zinc-950 px-3 py-2 text-sm leading-relaxed text-zinc-200">
-              “{transcript}”
-            </p>
-          )}
-        </div>
+        )}
+      </div>
+
+      {transcript && (
+        <p aria-live="polite" className="mt-2 rounded-lg bg-zinc-950 px-3 py-2 text-xs leading-relaxed text-zinc-200">
+          “{transcript}”
+        </p>
       )}
 
       {note && <p role="status" className="mt-2 text-xs text-amber-300">{note}</p>}

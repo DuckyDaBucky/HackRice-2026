@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
+import { useUser } from "@clerk/nextjs";
 import {
   BriefcaseIcon,
   ChartBarIcon,
@@ -53,6 +53,7 @@ export function DashboardShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { user } = useUser();
   // HR workspace gets the dark-green identity; candidate keeps teal.
   const isHr = dashboardView === "hr";
   const navItems = isHr ? HR_NAV : CANDIDATE_NAV;
@@ -95,18 +96,32 @@ export function DashboardShell({
           </div>
         )}
 
+        {/* Profile opens Settings — account management lives there as a section. */}
         <div className="flex items-center gap-2.5 border-t border-dash-border px-5 pt-4">
-          {clerkEnabled ? (
-            <UserButton appearance={{ elements: { userButtonAvatarBox: "h-7 w-7" } }} />
-          ) : (
-            <span className="h-7 w-7 shrink-0 rounded-full bg-dash-border" />
-          )}
-          <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-[13px] font-medium text-dash-text">
-              {firstName ?? "Your account"}
+          <Link
+            href="/settings"
+            aria-label="Open settings"
+            className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md transition-colors duration-150 hover:bg-dash-nav-hover"
+          >
+            {clerkEnabled && user?.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={user.imageUrl}
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 shrink-0 rounded-full"
+              />
+            ) : (
+              <span className="h-7 w-7 shrink-0 rounded-full bg-dash-border" />
+            )}
+            <span className="flex min-w-0 flex-1 flex-col py-0.5 text-left">
+              <span className="truncate text-[13px] font-medium text-dash-text">
+                {firstName ?? "Your account"}
+              </span>
+              <span className="text-[11px] text-dash-text-faint">{roleLabel(role)}</span>
             </span>
-            <span className="text-[11px] text-dash-text-faint">{roleLabel(role)}</span>
-          </div>
+          </Link>
           <ThemeToggle />
         </div>
       </aside>
