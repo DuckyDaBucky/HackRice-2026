@@ -6,12 +6,13 @@ import { provisionOrganization, requireOrgMembership, getProvisionedOrganization
 import { createJob, listJobs, getJob } from "@/lib/hiring/jobs-service";
 import {
   createCandidacyDraft,
+  uploadHiringResume,
   confirmCandidateIdentity,
   getCandidacy,
 } from "@/lib/hiring/candidacies";
 import { generateCandidateQuestions, saveDraftQuestions, approveQuestionPack, getLatestApprovedPack } from "@/lib/hiring/questions";
 import { issueInvitation, buildInvitationMessage, revokeInvitation } from "@/lib/hiring/invitations";
-import { getHrReport, updatePrivateNotes, releaseReportSections } from "@/lib/hiring/reports";
+import { getHrReport, updatePrivateNotes, releaseReportSections, getHrAnswerGuide } from "@/lib/hiring/reports";
 import type { ApprovedQuestion, ReportReleaseMask } from "@/lib/hiring/contracts";
 
 export async function setupOrganization(clerkOrgId: string, displayName: string) {
@@ -111,6 +112,11 @@ export async function hrRevokeInvitation(organizationId: string, invitationId: s
 export async function hrGetReport(organizationId: string, sessionId: string) {
   requireHiringEnabled();
   return getHrReport(sessionId, organizationId);
+}
+
+export async function hrGetAnswerGuide(organizationId: string, sessionId: string) {
+  requireHiringEnabled();
+  return getHrAnswerGuide(sessionId, organizationId);
 }
 
 export async function hrUpdateNotes(organizationId: string, sessionId: string, notes: string) {

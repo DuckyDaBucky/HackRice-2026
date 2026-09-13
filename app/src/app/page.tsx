@@ -6,12 +6,17 @@ import { EmployerShowcase } from "@/components/marketing/EmployerShowcase";
 import { TrustSection } from "@/components/marketing/TrustSection";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { FinalCta } from "@/components/marketing/FinalCta";
+import { cookies } from "next/headers";
 import { clerkEnabled } from "@/lib/clerk";
 import { currentUser } from "@clerk/nextjs/server";
 import { Dashboard } from "@/components/Dashboard";
+import { HrDashboard } from "@/components/dashboard/HrDashboard";
 import { getSessionStats, listRecentSessions, type SessionStats } from "@/lib/sessions";
 import { getProfile } from "@/lib/profiles";
 import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
+import { resolveAppUserRole } from "@/lib/user-roles";
+import { DASHBOARD_VIEW_COOKIE, resolveDashboardView } from "@/lib/dashboard/view-mode";
+import { loadHrDashboardData } from "@/lib/hiring/hr-dashboard-data";
 
 const EMPTY_STATS: SessionStats = { totalSessions: 0, completedSessions: 0, last7Days: 0 };
 
@@ -31,6 +36,39 @@ export default async function Home() {
         <Footer />
       </div>
     );
+  }
+
+  const cookieStore = await cookies();
+  let role: Awaited<ReturnType<typeof resolveAppUserRole>> = "candidate";
+  try {
+    role = await resolveAppUserRole(user.id);
+  } catch (error) {
+    console.error("Unable to resolve app user role, defaulting to candidate", error);
+  }
+
+  const dashboardView = resolveDashboardView(role, cookieStore.get(DASHBOARD_VIEW_COOKIE)?.value);
+
+  if (dashboardView === "hr") {
+    let hrData: Awaited<ReturnType<typeof loadHrDashboardData>> | null = null;
+    try {
+      hrData = await loadHrDashboardData();
+    } catch (error) {
+      console.error("HR dashboard unavailable, falling back to practice view", error);
+    }
+
+    if (hrData) {
+      return (
+        <HrDashboard
+          firstName={user.firstName}
+          role={role}
+          dashboardView={dashboardView}
+          orgName={hrData.org?.display_name ?? null}
+          orgId={hrData.orgId}
+          jobs={hrData.jobs}
+          hiringEnabled={hrData.enabled}
+        />
+      );
+    }
   }
 
   // The dashboard must never 500 when the database is unreachable (bad
@@ -70,6 +108,8 @@ export default async function Home() {
         sessions={sessions}
         answeredCounts={answeredCounts}
         hasResume={profile !== null}
+        role={role}
+        dashboardView={dashboardView}
       />
     </>
   );

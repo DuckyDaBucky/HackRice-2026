@@ -3,6 +3,7 @@
 :root {
   --background: #09090b;
   --foreground: #fafafa;
+  color-scheme: light only;
 
   /* Dashboard theme tokens — light (default) */
   --dash-bg: #fafbfc;
@@ -23,11 +24,19 @@
   --dash-blue: #3b82f6;
   --dash-solid: #0b1120;
   --dash-solid-text: #ffffff;
+
+  /* HR workspace identity — dark green. Light-mode values. */
+  --hr-accent: #2f6b3c;
+  --hr-accent-hover: #38814a;
+  --hr-accent-deep: #245c31;
+  --hr-on-accent: #ffffff;
+  --dash-nav-active-hr: color-mix(in srgb, #ffffff 88%, var(--hr-accent) 12%);
 }
 
 /* Dashboard theme tokens — dark. Neutral navy/charcoal, teal reserved for
    small emphasis (active states, primary actions), never a background wash. */
 [data-theme="dark"] {
+  color-scheme: dark only;
   --dash-bg: #0b1220;
   --dash-sidebar: #111b2e;
   --dash-surface: #131d2d;
@@ -46,6 +55,13 @@
   --dash-blue: #3b82f6;
   --dash-solid: #f8fafc;
   --dash-solid-text: #0b1220;
+
+  /* HR workspace identity — dark green. Dark-mode values (brightened for contrast). */
+  --hr-accent: #6fb583;
+  --hr-accent-hover: #82c795;
+  --hr-accent-deep: #9ad6ab;
+  --hr-on-accent: #0b2417;
+  --dash-nav-active-hr: color-mix(in srgb, #182235 86%, var(--hr-accent) 14%);
 }
 
 @theme inline {
@@ -79,12 +95,38 @@
   --color-dash-blue: var(--dash-blue);
   --color-dash-solid: var(--dash-solid);
   --color-dash-solid-text: var(--dash-solid-text);
+  --color-hr-accent: var(--hr-accent);
+  --color-hr-accent-hover: var(--hr-accent-hover);
+  --color-hr-accent-deep: var(--hr-accent-deep);
+  --color-hr-on-accent: var(--hr-on-accent);
+  --color-dash-nav-active-hr: var(--dash-nav-active-hr);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--dash-bg);
+  color: var(--dash-text);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}
+
+/* Native inputs/selects follow OS color-scheme unless overridden — keep
+   dashboard forms visually aligned with dash-* tokens in light mode. */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background-color: var(--dash-surface);
+  color: var(--dash-text);
+  color-scheme: light only;
+}
+
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  color-scheme: dark only;
+}
+
+select option {
+  background-color: var(--dash-surface);
+  color: var(--dash-text);
 }
 
 .marketing {
@@ -92,12 +134,42 @@ body {
   --foreground: #f4f7fa;
   background: var(--background);
   color: var(--foreground);
+  color-scheme: dark only;
 }
+/* Motion: honor the OS signal site-wide, plus the manual Settings toggle
+   (data-motion="reduced") which covers users whose OS exposes no setting. */
 @media (prefers-reduced-motion: reduce) {
-  .marketing *, .marketing *::before, .marketing *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+[data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast viewing (Settings → Accessibility): strengthen text,
+   borders, and active states in both themes. */
+[data-contrast="high"] {
+  --dash-text-muted: #3d4654;
+  --dash-text-faint: #55606e;
+  --dash-border: #bfc9d6;
+  --dash-border-strong: #93a1b3;
+  --dash-nav-active: color-mix(in srgb, #ffffff 78%, var(--color-accent) 22%);
+  --dash-nav-active-hr: color-mix(in srgb, #ffffff 78%, var(--hr-accent) 22%);
+}
+
+[data-theme="dark"][data-contrast="high"] {
+  --dash-text-muted: #c9d2df;
+  --dash-text-faint: #a9b4c4;
+  --dash-border: #4c5e78;
+  --dash-border-strong: #6e819c;
+  --dash-nav-active: color-mix(in srgb, #182235 72%, var(--color-accent) 28%);
+  --dash-nav-active-hr: color-mix(in srgb, #182235 72%, var(--hr-accent) 28%);
 }

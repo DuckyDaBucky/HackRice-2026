@@ -1,15 +1,18 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { hrGetReport, hrReleaseReport, hrUpdateNotes } from "@/app/hr/actions";
+import { hrGetAnswerGuide, hrGetReport, hrReleaseReport, hrUpdateNotes } from "@/app/hr/actions";
+import type { AnswerGuideEntry } from "@/lib/hiring/answer-guide";
 
 export function HrReportPanel({ sessionId, organizationId }: { sessionId: string; organizationId: string }) {
   const [report, setReport] = useState<Record<string, unknown> | null>(null);
+  const [guide, setGuide] = useState<AnswerGuideEntry[] | null>(null);
   const [notes, setNotes] = useState("");
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
     void hrGetReport(organizationId, sessionId).then(setReport).catch(() => setReport(null));
+    void hrGetAnswerGuide(organizationId, sessionId).then(setGuide).catch(() => setGuide([]));
   }, [organizationId, sessionId]);
 
   if (!report) return <p className="mt-6 text-sm text-zinc-500">Report not available or still processing.</p>;
@@ -33,6 +36,42 @@ export function HrReportPanel({ sessionId, organizationId }: { sessionId: string
             {item.rating != null && <p className="mt-1 text-zinc-400">Rating: {String(item.rating)}</p>}
           </div>
         ))}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-sm font-medium text-zinc-400">
+          Answer guide <span className="font-normal text-zinc-600">· private, never shown to candidates</span>
+        </h2>
+        {guide === null ? (
+          <p className="text-sm text-zinc-600">Loading guide…</p>
+        ) : guide.length === 0 ? (
+          <p className="text-sm text-zinc-600">
+            No guide for this session — it was approved before expected answers were saved.
+          </p>
+        ) : (
+          guide.map((entry) => (
+            <div key={entry.position} className="rounded border border-zinc-900 p-3 text-sm">
+              <p className="text-zinc-500">
+                Q{entry.position}{entry.competency ? ` · ${entry.competency}` : ""}
+                {entry.coverage ? ` · ${entry.coverage}` : ""}
+                {entry.rating != null ? ` · rating ${entry.rating}` : ""}
+              </p>
+              <p className="mt-1 text-zinc-200">{entry.prompt}</p>
+              {entry.intent && <p className="mt-1 text-zinc-400">Probing: {entry.intent}</p>}
+              {entry.indicators.length > 0 && (
+                <div className="mt-1.5">
+                  <p className="text-xs font-medium text-zinc-500">Listen for</p>
+                  <ul className="mt-0.5 list-disc space-y-0.5 pl-5 text-zinc-300">
+                    {entry.indicators.map((indicator) => (
+                      <li key={indicator}>{indicator}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {entry.finding && <p className="mt-1.5 text-zinc-400">Observed: {entry.finding}</p>}
+            </div>
+          ))
+        )}
       </section>
 
       <section className="space-y-2">

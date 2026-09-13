@@ -1,17 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
-import { orm } from "@/lib/db";
-import {
-  candidacies,
-  hiringJobs,
-  hiringSessionBindings,
-  interviewPlanQuestions,
-  interviewSessionConfigs,
-  interviewSessions,
-  mediaArtifacts,
-  organizations,
-} from "@/lib/db/schema";
+import { db } from "@/lib/db";
 import type { ApprovedQuestion } from "./contracts";
 import { DEFAULT_HIRING_POLICY } from "./contracts";
 import { getLatestApprovedPack } from "./questions";
@@ -22,36 +11,25 @@ export async function createHiringInterviewSession(params: {
   invitationId: string;
   clerkUserId: string;
 }) {
-  const candidacyRows = await orm
-    .select({
-      status: candidacies.status,
-      job_title: hiringJobs.title,
-      org_name: organizations.displayName,
-      time_budget_seconds: hiringJobs.timeBudgetSeconds,
-    })
-    .from(candidacies)
-    .innerJoin(hiringJobs, eq(hiringJobs.id, candidacies.jobId))
-    .innerJoin(organizations, eq(organizations.id, candidacies.organizationId))
-    .where(
-      and(
-        eq(candidacies.id, params.candidacyId),
-        eq(candidacies.clerkUserId, params.clerkUserId),
-        inArray(candidacies.status, ["verified", "interview_in_progress"]),
-      ),
-    )
-    .limit(1);
-  const row = candidacyRows[0];
+  const candidacy = await db.query(
+    `SELECT c.*, j.time_budget_seconds, j.title AS job_title, o.display_name AS org_name
+     FROM candidacies c
+     JOIN hiring_jobs j ON j.id = c.job_id
+     JOIN organizations o ON o.id = c.organization_id
+     WHERE c.id = $1 AND c.clerk_user_id = $2 AND c.status IN ('verified', 'interview_in_progress')`,
+    [params.candidacyId, params.clerkUserId],
+  );
+  const row = candidacy.rows[0];
   if (!row) throw new Error("Interview access is not available.");
 
   const pack = await getLatestApprovedPack(params.candidacyId);
   if (!pack) throw new Error("Approved question pack not found.");
 
-  const existing = await orm
-    .select({ interviewSessionId: hiringSessionBindings.interviewSessionId })
-    .from(hiringSessionBindings)
-    .where(eq(hiringSessionBindings.candidacyId, params.candidacyId))
-    .limit(1);
-  if (existing[0]) return existing[0].interviewSessionId;
+  const existing = await db.query(
+    `SELECT interview_session_id FROM hiring_session_bindings WHERE candidacy_id = $1`,
+    [params.candidacyId],
+  );
+  if (existing.rows[0]) return existing.rows[0].interview_session_id as string;
 
   const solanaKey = `activate:${params.invitationId}`;
   try {
@@ -64,50 +42,42 @@ export async function createHiringInterviewSession(params: {
   const sessionId = randomUUID();
   const questions = pack.questions as ApprovedQuestion[];
 
-  await orm.transaction(async (tx) => {
-    await tx.insert(interviewSessions).values({
-      id: sessionId,
-      clerkUserId: params.clerkUserId,
-      mode: "behavioral",
-      status: "planned",
-      sessionMode: "hiring_recorded",
-      activeConfigRevision: 1,
-    });
-    await tx.insert(interviewSessionConfigs).values({
+  await db.query(
+    `INSERT INTO interview_sessions (id, clerk_user_id, mode, status, session_mode, active_config_revision)
+     VALUES ($1, $2, 'behavioral', 'planned', 'hiring_recorded', 1)`,
+    [sessionId, params.clerkUserId],
+  );
+  await db.query(
+    `INSERT INTO interview_session_configs
+       (session_id, revision, content_types, target_role, seniority, focus_area, time_budget_seconds, voice_id, mood)
+     VALUES ($1, 1, $2, $3, 'mid_level', $4, $5, null, 'neutral')`,
+    [
       sessionId,
-      revision: 1,
-      contentTypes: ["behavioral", "technical_concepts"],
-      targetRole: row.job_title,
-      seniority: "mid_level",
-      focusArea: row.org_name,
-      timeBudgetSeconds: row.time_budget_seconds ?? 1200,
-      voiceId: null,
-      mood: "neutral",
-    });
-    for (const q of questions) {
-      await tx.insert(interviewPlanQuestions).values({
+      ["behavioral", "technical_concepts"],
+      row.job_title,
+      row.org_name,
+      row.time_budget_seconds ?? 1200,
+    ],
+  );
+  for (const q of questions) {
+    await db.query(
+      `INSERT INTO interview_plan_questions
+         (session_id, config_revision, position, content_type, prompt, intent, max_follow_ups, status)
+       VALUES ($1, 1, $2, 'behavioral', $3, $4::jsonb, 0, 'pending')`,
+      [
         sessionId,
-        configRevision: 1,
-        position: q.position,
-        contentType: "behavioral",
-        prompt: q.prompt,
-        intent: { competency: q.competency, category: q.category, evidence: q.profileEvidence },
-        maxFollowUps: 0,
-        status: "pending",
-      });
-    }
-    await tx.insert(hiringSessionBindings).values({
-      interviewSessionId: sessionId,
-      candidacyId: params.candidacyId,
-      invitationId: params.invitationId,
-      packRevision: pack.revision,
-      policy: DEFAULT_HIRING_POLICY,
-    });
-    await tx
-      .update(candidacies)
-      .set({ status: "interview_in_progress", updatedAt: new Date() })
-      .where(eq(candidacies.id, params.candidacyId));
-  });
+        q.position,
+        q.prompt,
+        JSON.stringify({ competency: q.competency, category: q.category, evidence: q.profileEvidence }),
+      ],
+    );
+  }
+  await db.query(
+    `INSERT INTO hiring_session_bindings (interview_session_id, candidacy_id, invitation_id, pack_revision, policy)
+     VALUES ($1, $2, $3, $4, $5::jsonb)`,
+    [sessionId, params.candidacyId, params.invitationId, pack.revision, JSON.stringify(DEFAULT_HIRING_POLICY)],
+  );
+  await db.query(`UPDATE candidacies SET status = 'interview_in_progress', updated_at = now() WHERE id = $1`, [params.candidacyId]);
 
   await enqueueSolanaAction({
     action: "activate_access",
@@ -121,46 +91,30 @@ export async function createHiringInterviewSession(params: {
 }
 
 export async function completeHiringInterview(sessionId: string, clerkUserId: string) {
-  const binding = await orm
-    .select({ candidacy_id: candidacies.id })
-    .from(hiringSessionBindings)
-    .innerJoin(candidacies, eq(candidacies.id, hiringSessionBindings.candidacyId))
-    .where(
-      and(
-        eq(hiringSessionBindings.interviewSessionId, sessionId),
-        eq(candidacies.clerkUserId, clerkUserId),
-      ),
-    )
-    .limit(1);
-  const row = binding[0];
+  const binding = await db.query<{ candidacy_id: string }>(
+    `SELECT candidacy_id FROM hiring_session_bindings b
+     JOIN candidacies c ON c.id = b.candidacy_id
+     WHERE b.interview_session_id = $1 AND c.clerk_user_id = $2`,
+    [sessionId, clerkUserId],
+  );
+  const row = binding.rows[0];
   if (!row) throw new Error("Session not found.");
 
-  await orm.transaction(async (tx) => {
-    await tx
-      .update(interviewSessions)
-      .set({ status: "completed", completedAt: new Date() })
-      .where(eq(interviewSessions.id, sessionId));
-    await tx
-      .update(candidacies)
-      .set({
-        status: "processing",
-        deleteAfter: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        updatedAt: new Date(),
-      })
-      .where(eq(candidacies.id, row.candidacy_id));
-  });
+  await db.query(
+    `UPDATE interview_sessions SET status = 'completed', completed_at = now() WHERE id = $1`,
+    [sessionId],
+  );
+  await db.query(
+    `UPDATE candidacies SET status = 'processing', delete_after = now() + interval '30 days', updated_at = now() WHERE id = $1`,
+    [row.candidacy_id],
+  );
 
   const { enqueueProcessingJob } = await import("@/lib/processing/worker");
-  const artifacts = await orm
-    .select({ id: mediaArtifacts.id })
-    .from(mediaArtifacts)
-    .where(
-      and(
-        eq(mediaArtifacts.sessionId, sessionId),
-        eq(mediaArtifacts.uploadStatus, "uploaded"),
-      ),
-    );
-  for (const artifact of artifacts) {
+  const artifacts = await db.query<{ id: string }>(
+    `SELECT id FROM media_artifacts WHERE session_id = $1 AND upload_status = 'uploaded'`,
+    [sessionId],
+  );
+  for (const artifact of artifacts.rows) {
     await enqueueProcessingJob({ jobType: "transcription", targetId: artifact.id, targetKind: "artifact" });
   }
   await enqueueProcessingJob({ jobType: "evaluation", targetId: sessionId, targetKind: "session" });

@@ -124,14 +124,21 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
 
   if (done) {
     return (
-      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-4 bg-zinc-950 px-6 text-center text-zinc-50">
-        <CheckCircleIcon size={40} weight="fill" className="text-sky-400" />
-        <h1 className="text-2xl font-semibold tracking-tight">Interview complete</h1>
-        <p className="max-w-md text-sm leading-relaxed text-zinc-400">
-          Your recording and saved caption evidence are ready for review.
-        </p>
+      <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-5 bg-[#0c0e12] px-6 py-12 text-center text-zinc-50">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-500/10 ring-1 ring-inset ring-sky-500/30">
+          <CheckCircleIcon size={32} weight="fill" className="text-sky-400" />
+        </div>
+        <div>
+          <p className="text-[13px] font-medium tracking-wide text-sky-400/90">
+            {uploadCount} of {questions.length} answered
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">Interview complete</h1>
+          <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-zinc-400">
+            Your recording and saved caption evidence are ready for review.
+          </p>
+        </div>
         {timeBudgetReached && (
-          <p role="status" className="max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
+          <p role="status" className="max-w-md rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             Time budget was reached — the interview closed automatically after your last answer.
           </p>
         )}
@@ -139,14 +146,14 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
           <button
             type="button"
             onClick={() => router.push(`/interview/session/${initialState.session.id}/report`)}
-            className="rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]"
+            className="rounded-full bg-sky-500 px-7 py-3.5 text-sm font-semibold text-zinc-950 shadow-[0_12px_40px_-12px_rgba(14,165,233,0.55)] transition hover:bg-sky-400 active:scale-[0.98]"
           >
             Answer review
           </button>
           <button
             type="button"
             onClick={() => router.push(`/reports/${initialState.session.id}`)}
-            className="rounded-full border border-zinc-700 px-6 py-3 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.98]"
+            className="rounded-full border border-zinc-700 bg-zinc-900/60 px-7 py-3.5 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.98]"
           >
             Evidence
           </button>
@@ -164,9 +171,9 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
 
   if (!joined || recorder.stream === null) {
     return (
-      <div className="relative">
+      <div className="relative min-h-[100dvh] bg-[#0c0e12]">
         {joinError && (
-          <p className="absolute left-4 right-4 top-4 z-10 rounded-lg bg-red-950/90 px-4 py-3 text-center text-sm text-red-200">
+          <p className="absolute left-4 right-4 top-4 z-10 mx-auto max-w-xl rounded-2xl border border-red-900/80 bg-red-950/80 px-4 py-3 text-center text-sm text-red-200 backdrop-blur-sm">
             {joinError}
           </p>
         )}
@@ -186,11 +193,11 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
     ? (followUpPrompt ?? initialState.activeFollowUp.wording)
     : (followUpPrompt ?? currentQuestion.prompt);
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-[100dvh] flex-col bg-[#0c0e12]">
       {timeBudgetReached && !done && (
-        <p role="status" className="mx-auto mt-4 w-fit rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-medium text-amber-200">
+        <div className="border-b border-amber-400/20 bg-amber-500/10 px-4 py-2.5 text-center text-xs font-medium text-amber-200" role="status">
           Time budget reached — finish this answer and the interview will close automatically.
-        </p>
+        </div>
       )}
     <CameraRecorder
       recorder={recorder}

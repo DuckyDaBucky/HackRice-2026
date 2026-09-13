@@ -31,7 +31,7 @@ export function VoicePicker({
             onChange(event.target.value);
           }
         }}
-        className="rounded-lg border border-dash-border-strong bg-dash-surface px-3 py-2 text-sm text-dash-text"
+        className="h-10 w-full cursor-pointer rounded-lg border border-dash-border-strong bg-white px-3 text-sm text-dash-text outline-none focus:border-accent [color-scheme:light]"
       >
         {VOICE_PRESETS.map((preset) => (
           <option key={preset.id} value={preset.id}>
@@ -47,7 +47,7 @@ export function VoicePicker({
           value={matchesPreset ? "" : voiceId}
           onChange={(event) => onChange(event.target.value.trim())}
           placeholder="Paste an ElevenLabs voice ID"
-          className="rounded-lg border border-dash-border-strong bg-dash-surface px-3 py-2 text-sm text-dash-text placeholder:text-dash-text-faint"
+          className="h-10 rounded-lg border border-dash-border-strong bg-white px-3 text-sm text-dash-text outline-none placeholder:text-dash-text-faint focus:border-accent [color-scheme:light]"
         />
       )}
     </div>

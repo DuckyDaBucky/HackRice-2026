@@ -1,12 +1,5 @@
 import "server-only";
-import { and, desc, eq, sql } from "drizzle-orm";
-import { orm } from "@/lib/db";
-import {
-  approvedQuestionPacks,
-  candidacies,
-  hiringJobs,
-  hiringResumes,
-} from "@/lib/db/schema";
+import { db } from "@/lib/db";
 import { generateQuestions } from "@/lib/workbench/ai/service";
 import { requireOrgAccess } from "./access";
 import { approvedQuestionSchema, type ApprovedQuestion } from "./contracts";
@@ -28,23 +21,18 @@ export async function generateCandidateQuestions(params: {
   interviewTemplate?: InterviewTemplate;
 }) {
   await requireOrgAccess(params.organizationId);
-  const rows = await orm
-    .select({
-      role_family: hiringJobs.roleFamily,
-      specialty: hiringJobs.specialty,
-      structured_facts: hiringResumes.structuredFacts,
-      extracted_text: hiringResumes.extractedText,
-    })
-    .from(candidacies)
-    .innerJoin(hiringJobs, eq(hiringJobs.id, candidacies.jobId))
-    .leftJoin(hiringResumes, eq(hiringResumes.id, candidacies.resumeId))
-    .where(and(eq(candidacies.id, params.candidacyId), eq(candidacies.organizationId, params.organizationId)))
-    .limit(1);
-  const row = rows[0];
+  const candidacy = await db.query(
+    `SELECT c.*, j.role_family, j.specialty, j.competencies, r.structured_facts, r.extracted_text
+     FROM candidacies c
+     JOIN hiring_jobs j ON j.id = c.job_id
+     LEFT JOIN hiring_resumes r ON r.id = c.resume_id
+     WHERE c.id = $1 AND c.organization_id = $2`,
+    [params.candidacyId, params.organizationId],
+  );
+  const row = candidacy.rows[0];
   if (!row) throw new Error("Candidacy not found.");
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const profile = (row.structured_facts as any) ?? {
+  const profile = row.structured_facts ?? {
     experienceLevel: "unknown",
     experienceReason: "Not classified",
     sections: [],
@@ -64,7 +52,7 @@ export async function generateCandidateQuestions(params: {
         specialtyId: row.specialty ?? "",
         level: profile.experienceLevel ?? "unknown",
         technologies: [],
-        description: "",
+        description: row.title ?? "",
       },
     },
   });
@@ -80,6 +68,8 @@ export async function generateCandidateQuestions(params: {
     sourceQuestionId: q.sourceQuestionId,
     origin: q.origin,
     rubricId: undefined,
+    intent: q.intent,
+    strongAnswerIndicators: q.strongAnswerIndicators,
   }));
 
   return { questions, packId: pack.id };
@@ -92,10 +82,10 @@ export async function saveDraftQuestions(params: {
 }) {
   await requireOrgAccess(params.organizationId);
   const parsed = z.array(approvedQuestionSchema).parse(params.questions);
-  await orm
-    .update(candidacies)
-    .set({ status: "questions_pending", updatedAt: new Date() })
-    .where(and(eq(candidacies.id, params.candidacyId), eq(candidacies.organizationId, params.organizationId)));
+  await db.query(
+    `UPDATE candidacies SET status = 'questions_pending', updated_at = now() WHERE id = $1 AND organization_id = $2`,
+    [params.candidacyId, params.organizationId],
+  );
   return parsed;
 }
 
@@ -107,51 +97,35 @@ export async function approveQuestionPack(params: {
 }) {
   await requireOrgAccess(params.organizationId);
   const parsed = z.array(approvedQuestionSchema).min(1).parse(params.questions);
-  const candidacyRows = await orm
-    .select({ resume_version: candidacies.resumeVersion })
-    .from(candidacies)
-    .where(and(eq(candidacies.id, params.candidacyId), eq(candidacies.organizationId, params.organizationId)))
-    .limit(1);
-  const resumeVersion = candidacyRows[0]?.resume_version ?? 1;
-  const revisionRows = await orm
-    .select({
-      next: sql<number>`coalesce(max(${approvedQuestionPacks.revision}), 0) + 1`,
-    })
-    .from(approvedQuestionPacks)
-    .where(eq(approvedQuestionPacks.candidacyId, params.candidacyId));
-  const revision = revisionRows[0]?.next ?? 1;
+  const candidacy = await db.query<{ resume_version: number }>(
+    `SELECT resume_version FROM candidacies WHERE id = $1 AND organization_id = $2`,
+    [params.candidacyId, params.organizationId],
+  );
+  const resumeVersion = candidacy.rows[0]?.resume_version ?? 1;
+  const revisionResult = await db.query<{ next: number }>(
+    `SELECT coalesce(max(revision), 0) + 1 AS next FROM approved_question_packs WHERE candidacy_id = $1`,
+    [params.candidacyId],
+  );
+  const revision = revisionResult.rows[0]?.next ?? 1;
   const commitment = packCommitment(parsed, resumeVersion, revision);
 
-  await orm.insert(approvedQuestionPacks).values({
-    candidacyId: params.candidacyId,
-    revision,
-    resumeVersion,
-    questions: parsed,
-    packCommitment: commitment,
-    approvedByClerkUserId: params.approvedByClerkUserId,
-  });
-  await orm
-    .update(candidacies)
-    .set({ status: "ready_to_invite", updatedAt: new Date() })
-    .where(eq(candidacies.id, params.candidacyId));
+  await db.query(
+    `INSERT INTO approved_question_packs
+       (candidacy_id, revision, resume_version, questions, pack_commitment, approved_by_clerk_user_id)
+     VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+    [params.candidacyId, revision, resumeVersion, JSON.stringify(parsed), commitment, params.approvedByClerkUserId],
+  );
+  await db.query(
+    `UPDATE candidacies SET status = 'ready_to_invite', updated_at = now() WHERE id = $1`,
+    [params.candidacyId],
+  );
   return { revision, commitment };
 }
 
 export async function getLatestApprovedPack(candidacyId: string) {
-  const rows = await orm
-    .select({
-      id: approvedQuestionPacks.id,
-      candidacy_id: approvedQuestionPacks.candidacyId,
-      revision: approvedQuestionPacks.revision,
-      resume_version: approvedQuestionPacks.resumeVersion,
-      questions: approvedQuestionPacks.questions,
-      pack_commitment: approvedQuestionPacks.packCommitment,
-      approved_by_clerk_user_id: approvedQuestionPacks.approvedByClerkUserId,
-      approved_at: approvedQuestionPacks.approvedAt,
-    })
-    .from(approvedQuestionPacks)
-    .where(eq(approvedQuestionPacks.candidacyId, candidacyId))
-    .orderBy(desc(approvedQuestionPacks.revision))
-    .limit(1);
-  return rows[0] ?? null;
+  const result = await db.query(
+    `SELECT * FROM approved_question_packs WHERE candidacy_id = $1 ORDER BY revision DESC LIMIT 1`,
+    [candidacyId],
+  );
+  return result.rows[0] ?? null;
 }

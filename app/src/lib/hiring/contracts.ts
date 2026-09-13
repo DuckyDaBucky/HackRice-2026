@@ -21,6 +21,10 @@ export const approvedQuestionSchema = z.object({
   sourceQuestionId: z.string().nullable().default(null),
   origin: z.string(),
   rubricId: z.string().optional(),
+  // Rich generator metadata (Phase C). Optional so packs approved before
+  // this field existed still parse — the overlay simply shows less for them.
+  intent: z.string().optional(),
+  strongAnswerIndicators: z.array(z.string()).min(1).max(6).optional(),
 });
 
 export type ApprovedQuestion = z.infer<typeof approvedQuestionSchema>;

@@ -1,8 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
-import { orm } from "@/lib/db";
-import { candidacies, invitations, personaWebhookEvents, verificationAttempts } from "@/lib/db/schema";
+import { db } from "@/lib/db";
 import { personaEnvironment } from "@/lib/hiring/config";
 import { enqueueSolanaAction } from "@/lib/solana/outbox";
 
@@ -70,26 +68,17 @@ export async function applyPersonaInquiryDecision(inquiry: InquiryRecord) {
   const inquiryId = inquiry.id;
   const referenceId = attrs["reference-id"];
 
-  const rows = await orm
-    .select({
-      id: verificationAttempts.id,
-      confirmedName: candidacies.confirmedName,
-      organizationId: candidacies.organizationId,
-      candidacyId: candidacies.id,
-      invitationId: invitations.id,
-    })
-    .from(verificationAttempts)
-    .innerJoin(candidacies, eq(candidacies.id, verificationAttempts.candidacyId))
-    .innerJoin(invitations, eq(invitations.id, verificationAttempts.invitationId))
-    .where(
-      and(
-        eq(verificationAttempts.environment, personaEnvironment()),
-        inArray(verificationAttempts.personaInquiryRef, [inquiryId, referenceId ?? inquiryId, referenceId ?? ""]),
-      ),
-    )
-    .orderBy(desc(verificationAttempts.createdAt))
-    .limit(1);
-  const row = rows[0];
+  const attempt = await db.query(
+    `SELECT v.*, c.confirmed_name, c.organization_id, c.id AS candidacy_id, i.id AS invitation_id
+     FROM verification_attempts v
+     JOIN candidacies c ON c.id = v.candidacy_id
+     JOIN invitations i ON i.id = v.invitation_id
+     WHERE v.environment = $3
+       AND (v.persona_inquiry_ref = $1 OR v.persona_inquiry_ref = $2 OR v.persona_inquiry_ref = $4)
+     ORDER BY v.created_at DESC LIMIT 1`,
+    [inquiryId, referenceId ?? inquiryId, personaEnvironment(), referenceId ?? ""],
+  );
+  const row = attempt.rows[0];
   if (!row) throw new Error("Verification attempt not found for inquiry.");
 
   const status = attrs.status;
@@ -98,7 +87,7 @@ export async function applyPersonaInquiryDecision(inquiry: InquiryRecord) {
 
   if (status === "approved" || status === "completed") {
     const idName = `${attrs["name-first"] ?? ""} ${attrs["name-last"] ?? ""}`.trim().toLowerCase();
-    const expected = String(row.confirmedName).trim().toLowerCase();
+    const expected = String(row.confirmed_name).trim().toLowerCase();
     if (idName && expected && (idName.includes(expected.split(" ")[0]!) || expected.includes(idName.split(" ")[0]!))) {
       verificationStatus = "verified";
       nameMatch = "match";
@@ -116,38 +105,25 @@ export async function applyPersonaInquiryDecision(inquiry: InquiryRecord) {
     return { pending: true as const, verificationStatus: status ?? "pending" };
   }
 
-  await orm
-    .update(verificationAttempts)
-    .set({
-      status: verificationStatus,
-      nameMatch,
-      updatedAt: new Date(),
-      ...(verificationStatus === "verified" ? { boundAt: new Date() } : {}),
-    })
-    .where(eq(verificationAttempts.id, row.id));
+  await db.query(
+    `UPDATE verification_attempts SET status = $2, name_match = $3, bound_at = CASE WHEN $2 = 'verified' THEN now() ELSE bound_at END, updated_at = now()
+     WHERE id = $1`,
+    [row.id, verificationStatus, nameMatch],
+  );
 
   if (verificationStatus === "verified") {
-    await orm
-      .update(candidacies)
-      .set({ status: "verified", updatedAt: new Date() })
-      .where(eq(candidacies.id, row.candidacyId));
+    await db.query(`UPDATE candidacies SET status = 'verified', updated_at = now() WHERE id = $1`, [row.candidacy_id]);
     await enqueueSolanaAction({
       action: "attest_identity",
-      organizationId: row.organizationId,
-      candidacyId: row.candidacyId,
-      invitationId: row.invitationId,
+      organizationId: row.organization_id,
+      candidacyId: row.candidacy_id,
+      invitationId: row.invitation_id,
       payload: { verificationAttemptId: row.id },
     });
   } else if (verificationStatus === "review") {
-    await orm
-      .update(candidacies)
-      .set({ status: "verification_review", updatedAt: new Date() })
-      .where(eq(candidacies.id, row.candidacyId));
+    await db.query(`UPDATE candidacies SET status = 'verification_review', updated_at = now() WHERE id = $1`, [row.candidacy_id]);
   } else {
-    await orm
-      .update(candidacies)
-      .set({ status: "verification_pending", updatedAt: new Date() })
-      .where(eq(candidacies.id, row.candidacyId));
+    await db.query(`UPDATE candidacies SET status = 'verification_pending', updated_at = now() WHERE id = $1`, [row.candidacy_id]);
   }
 
   return { verificationStatus, nameMatch };
@@ -167,17 +143,14 @@ export async function handlePersonaWebhook(rawBody: string, signature: string | 
   const eventId = extracted.eventId;
   const inquiryRef = extracted.inquiry.attributes?.["reference-id"] ?? extracted.inquiry.id;
 
-  const dedupe = await orm
-    .insert(personaWebhookEvents)
-    .values({ eventId, inquiryRef })
-    .onConflictDoNothing({ target: personaWebhookEvents.eventId })
-    .returning({ id: personaWebhookEvents.id });
-  if (dedupe.length === 0) return { duplicate: true, eventName: extracted.eventName };
+  const dedupe = await db.query(
+    `INSERT INTO persona_webhook_events (event_id, inquiry_ref)
+     VALUES ($1, $2) ON CONFLICT (event_id) DO NOTHING RETURNING id`,
+    [eventId, inquiryRef],
+  );
+  if (dedupe.rowCount === 0) return { duplicate: true, eventName: extracted.eventName };
 
   const result = await applyPersonaInquiryDecision(extracted.inquiry);
-  await orm
-    .update(personaWebhookEvents)
-    .set({ processedAt: new Date() })
-    .where(eq(personaWebhookEvents.eventId, eventId));
+  await db.query(`UPDATE persona_webhook_events SET processed_at = now() WHERE event_id = $1`, [eventId]);
   return { ...result, eventName: extracted.eventName };
 }

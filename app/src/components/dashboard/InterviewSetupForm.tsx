@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRightIcon, CheckIcon } from "@phosphor-icons/react";
+import { RoleCombobox } from "@/components/RoleCombobox";
 import { VoicePicker } from "@/components/VoicePicker";
 import { useVoicePreference } from "@/hooks/useVoicePreference";
 import {
@@ -176,14 +177,10 @@ function SetupFormBody() {
         <h2 id="interview-context" className="text-sm font-medium text-dash-text">Interview context</h2>
         <div className="flex flex-col gap-2">
           <label htmlFor="target-role" className="text-sm text-dash-text-muted">Target role</label>
-          <input
-            id="target-role"
-            value={targetRole}
-            onChange={(event) => setTargetRole(event.target.value)}
-            placeholder="e.g. Backend engineer"
-            maxLength={160}
-            className="rounded-lg border border-dash-border-strong bg-dash-surface px-3 py-2.5 text-sm text-dash-text outline-none placeholder:text-dash-text-faint focus:border-accent"
-          />
+          <RoleCombobox value={targetRole} onChange={setTargetRole} />
+          <p className="text-xs text-dash-text-faint">
+            Pick a popular role or type your own.
+          </p>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {SENIORITY_OPTIONS.map((option) => {

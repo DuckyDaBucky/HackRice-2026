@@ -1,8 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { asc, eq, inArray } from "drizzle-orm";
-import { orm } from "@/lib/db";
-import { solanaOutbox } from "@/lib/db/schema";
+import { db } from "@/lib/db";
 import { opaqueCommitment } from "@/lib/hiring/crypto";
 import { solanaConfigured } from "./config";
 
@@ -19,24 +17,23 @@ export interface SolanaActionInput {
 export async function enqueueSolanaAction(input: SolanaActionInput) {
   const idempotencyKey = input.idempotencyKey ?? `${input.action}:${randomUUID()}`;
   const commitment = opaqueCommitment(input.payload);
-  const rows = await orm
-    .insert(solanaOutbox)
-    .values({
-      action: input.action,
+  const result = await db.query<{ id: string }>(
+    `INSERT INTO solana_outbox
+       (action, idempotency_key, expected_revision, payload_commitment, organization_id, candidacy_id, invitation_id, state)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued')
+     ON CONFLICT (idempotency_key) DO UPDATE SET updated_at = now()
+     RETURNING id`,
+    [
+      input.action,
       idempotencyKey,
-      expectedRevision: input.expectedRevision ?? null,
-      payloadCommitment: commitment,
-      organizationId: input.organizationId ?? null,
-      candidacyId: input.candidacyId ?? null,
-      invitationId: input.invitationId ?? null,
-      state: "queued",
-    })
-    .onConflictDoUpdate({
-      target: solanaOutbox.idempotencyKey,
-      set: { updatedAt: new Date() },
-    })
-    .returning({ id: solanaOutbox.id });
-  return rows[0]?.id;
+      input.expectedRevision ?? null,
+      commitment,
+      input.organizationId ?? null,
+      input.candidacyId ?? null,
+      input.invitationId ?? null,
+    ],
+  );
+  return result.rows[0]?.id;
 }
 
 export async function processSolanaOutboxBatch(limit = 10) {
@@ -44,65 +41,54 @@ export async function processSolanaOutboxBatch(limit = 10) {
     return { processed: 0, blocked: true, reason: "Solana not configured" };
   }
   const { submitSolanaTransaction, reconcileSolanaTransaction } = await import("./client");
-  const jobs = await orm
-    .select()
-    .from(solanaOutbox)
-    .where(inArray(solanaOutbox.state, ["queued", "reconcile_required"]))
-    .orderBy(asc(solanaOutbox.createdAt))
-    .limit(limit)
-    .for("update", { skipLocked: true });
+  const jobs = await db.query(
+    `SELECT * FROM solana_outbox
+     WHERE state IN ('queued', 'reconcile_required')
+     ORDER BY created_at ASC LIMIT $1 FOR UPDATE SKIP LOCKED`,
+    [limit],
+  );
   let processed = 0;
-  for (const job of jobs) {
+  for (const job of jobs.rows) {
     try {
-      if (job.state === "reconcile_required" && job.txSignature) {
-        const finalized = await reconcileSolanaTransaction(job.txSignature);
+      if (job.state === "reconcile_required" && job.tx_signature) {
+        const finalized = await reconcileSolanaTransaction(job.tx_signature);
         if (finalized) {
-          await orm
-            .update(solanaOutbox)
-            .set({ state: "finalized", finalizedAt: new Date(), updatedAt: new Date() })
-            .where(eq(solanaOutbox.id, job.id));
+          await db.query(
+            `UPDATE solana_outbox SET state = 'finalized', finalized_at = now(), updated_at = now() WHERE id = $1`,
+            [job.id],
+          );
         }
       } else {
-        const sig = await submitSolanaTransaction({
-          id: job.id,
-          action: job.action,
-          payload_commitment: job.payloadCommitment,
-          expected_revision: job.expectedRevision,
-        });
-        await orm
-          .update(solanaOutbox)
-          .set({ state: "submitted", txSignature: sig, updatedAt: new Date() })
-          .where(eq(solanaOutbox.id, job.id));
+        const sig = await submitSolanaTransaction(job);
+        await db.query(
+          `UPDATE solana_outbox SET state = 'submitted', tx_signature = $2, updated_at = now() WHERE id = $1`,
+          [job.id, sig],
+        );
         const finalized = await reconcileSolanaTransaction(sig);
         if (finalized) {
-          await orm
-            .update(solanaOutbox)
-            .set({ state: "finalized", finalizedAt: new Date(), updatedAt: new Date() })
-            .where(eq(solanaOutbox.id, job.id));
+          await db.query(
+            `UPDATE solana_outbox SET state = 'finalized', finalized_at = now(), updated_at = now() WHERE id = $1`,
+            [job.id],
+          );
         }
       }
       processed += 1;
     } catch (error) {
-      await orm
-        .update(solanaOutbox)
-        .set({
-          state: "failed",
-          errorMessage: error instanceof Error ? error.message : "Unknown error",
-          updatedAt: new Date(),
-        })
-        .where(eq(solanaOutbox.id, job.id));
+      await db.query(
+        `UPDATE solana_outbox SET state = 'failed', error_message = $2, updated_at = now() WHERE id = $1`,
+        [job.id, error instanceof Error ? error.message : "Unknown error"],
+      );
     }
   }
   return { processed, blocked: false };
 }
 
 export async function requireFinalizedSolanaAction(idempotencyKey: string) {
-  const rows = await orm
-    .select({ state: solanaOutbox.state })
-    .from(solanaOutbox)
-    .where(eq(solanaOutbox.idempotencyKey, idempotencyKey))
-    .limit(1);
-  const row = rows[0];
+  const result = await db.query(
+    `SELECT state FROM solana_outbox WHERE idempotency_key = $1`,
+    [idempotencyKey],
+  );
+  const row = result.rows[0];
   if (!row || row.state !== "finalized") {
     throw new Error("On-chain confirmation is required before granting this access.");
   }

@@ -1,70 +1,34 @@
 import "server-only";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
-import { orm } from "@/lib/db";
-import {
-  candidacies,
-  hiringJobs,
-  hiringSessionBindings,
-  reportReleases,
-  reportRevisions,
-  verificationAttempts,
-} from "@/lib/db/schema";
+import { db } from "@/lib/db";
 import { requireOrgAccess } from "./access";
-import type { ReportReleaseMask } from "./contracts";
+import type { ApprovedQuestion, ReportReleaseMask } from "./contracts";
+import { buildAnswerGuide, type AnswerGuideEntry } from "./answer-guide";
 import { enqueueSolanaAction } from "@/lib/solana/outbox";
 
 export async function getHrReport(sessionId: string, organizationId: string) {
   await requireOrgAccess(organizationId);
-  const rows = await orm
-    .select({
-      id: reportRevisions.id,
-      session_id: reportRevisions.sessionId,
-      candidacy_id: reportRevisions.candidacyId,
-      revision: reportRevisions.revision,
-      revision_commitment: reportRevisions.revisionCommitment,
-      status: reportRevisions.status,
-      summary: reportRevisions.summary,
-      private_notes: reportRevisions.privateNotes,
-      generated_at: reportRevisions.generatedAt,
-      created_at: reportRevisions.createdAt,
-      confirmed_name: candidacies.confirmedName,
-      confirmed_email: candidacies.confirmedEmail,
-      job_title: hiringJobs.title,
-      verification_status: verificationAttempts.status,
-      name_match: verificationAttempts.nameMatch,
-    })
-    .from(reportRevisions)
-    .innerJoin(candidacies, eq(candidacies.id, reportRevisions.candidacyId))
-    .innerJoin(hiringJobs, eq(hiringJobs.id, candidacies.jobId))
-    .leftJoin(verificationAttempts, eq(verificationAttempts.candidacyId, candidacies.id))
-    .where(
-      and(
-        eq(reportRevisions.sessionId, sessionId),
-        eq(candidacies.organizationId, organizationId),
-      ),
-    )
-    .orderBy(desc(reportRevisions.revision))
-    .limit(1);
-  return rows[0] ?? null;
+  const result = await db.query(
+    `SELECT rr.*, c.confirmed_name, c.confirmed_email, j.title AS job_title,
+            v.status AS verification_status, v.name_match
+     FROM report_revisions rr
+     JOIN candidacies c ON c.id = rr.candidacy_id
+     JOIN hiring_jobs j ON j.id = c.job_id
+     LEFT JOIN verification_attempts v ON v.candidacy_id = c.id
+     WHERE rr.session_id = $1 AND c.organization_id = $2
+     ORDER BY rr.revision DESC LIMIT 1`,
+    [sessionId, organizationId],
+  );
+  return result.rows[0] ?? null;
 }
 
 export async function updatePrivateNotes(sessionId: string, organizationId: string, notes: string) {
   await requireOrgAccess(organizationId);
-  await orm
-    .update(reportRevisions)
-    .set({ privateNotes: notes })
-    .where(
-      and(
-        eq(reportRevisions.sessionId, sessionId),
-        inArray(
-          reportRevisions.candidacyId,
-          orm
-            .select({ id: candidacies.id })
-            .from(candidacies)
-            .where(eq(candidacies.organizationId, organizationId)),
-        ),
-      ),
-    );
+  await db.query(
+    `UPDATE report_revisions rr SET private_notes = $3
+     FROM candidacies c
+     WHERE rr.session_id = $1 AND rr.candidacy_id = c.id AND c.organization_id = $2`,
+    [sessionId, organizationId, notes],
+  );
 }
 
 export async function releaseReportSections(params: {
@@ -77,27 +41,26 @@ export async function releaseReportSections(params: {
   const report = await getHrReport(params.sessionId, params.organizationId);
   if (!report) throw new Error("Report not found.");
 
-  await orm.transaction(async (tx) => {
-    await tx
-      .update(reportReleases)
-      .set({ revokedAt: new Date() })
-      .where(
-        and(
-          eq(reportReleases.reportRevisionId, report.id),
-          isNull(reportReleases.revokedAt),
-        ),
-      );
+  await db.query(
+    `UPDATE report_releases SET revoked_at = now()
+     WHERE report_revision_id = $1 AND revoked_at IS NULL`,
+    [report.id],
+  );
 
-    await tx.insert(reportReleases).values({
-      reportRevisionId: report.id,
-      releaseSummary: params.mask.summary,
-      releaseRubric: params.mask.rubric,
-      releasePerQuestion: params.mask.perQuestion,
-      releaseTranscript: params.mask.transcript,
-      releaseRecordings: params.mask.recordings,
-      releasedByClerkUserId: params.releasedByClerkUserId,
-    });
-  });
+  await db.query(
+    `INSERT INTO report_releases
+       (report_revision_id, release_summary, release_rubric, release_per_question, release_transcript, release_recordings, released_by_clerk_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      report.id,
+      params.mask.summary,
+      params.mask.rubric,
+      params.mask.perQuestion,
+      params.mask.transcript,
+      params.mask.recordings,
+      params.releasedByClerkUserId,
+    ],
+  );
 
   await enqueueSolanaAction({
     action: "update_report_permissions",
@@ -108,59 +71,34 @@ export async function releaseReportSections(params: {
 }
 
 export async function getCandidateVisibleReport(sessionId: string, clerkUserId: string) {
-  const bindings = await orm
-    .select({ candidacy_id: candidacies.id })
-    .from(hiringSessionBindings)
-    .innerJoin(candidacies, eq(candidacies.id, hiringSessionBindings.candidacyId))
-    .where(
-      and(
-        eq(hiringSessionBindings.interviewSessionId, sessionId),
-        eq(candidacies.clerkUserId, clerkUserId),
-      ),
-    )
-    .limit(1);
-  if (!bindings[0]) return null;
+  const binding = await db.query(
+    `SELECT c.id AS candidacy_id FROM hiring_session_bindings b
+     JOIN candidacies c ON c.id = b.candidacy_id
+     WHERE b.interview_session_id = $1 AND c.clerk_user_id = $2`,
+    [sessionId, clerkUserId],
+  );
+  if (!binding.rows[0]) return null;
 
-  const revisions = await orm
-    .select()
-    .from(reportRevisions)
-    .where(eq(reportRevisions.sessionId, sessionId))
-    .orderBy(desc(reportRevisions.revision))
-    .limit(1);
-  const row = revisions[0];
-  if (!row) return null;
-
-  const releases = await orm
-    .select()
-    .from(reportReleases)
-    .where(
-      and(
-        eq(reportReleases.reportRevisionId, row.id),
-        isNull(reportReleases.revokedAt),
-      ),
-    )
-    .orderBy(desc(reportReleases.releasedAt))
-    .limit(1);
-  const release = releases[0] ?? null;
-  if (!release) {
-    // A revision with releases that are all revoked must read as unshared,
-    // not as an empty report. No releases at all keeps the legacy empty shape.
-    const anyRelease = await orm
-      .select({ id: reportReleases.id })
-      .from(reportReleases)
-      .where(eq(reportReleases.reportRevisionId, row.id))
-      .limit(1);
-    if (anyRelease.length) return null;
-  }
+  const report = await db.query(
+    `SELECT rr.*, rel.*
+     FROM report_revisions rr
+     LEFT JOIN LATERAL (
+        SELECT * FROM report_releases r WHERE r.report_revision_id = rr.id AND r.revoked_at IS NULL ORDER BY r.released_at DESC LIMIT 1
+     ) rel ON true
+     WHERE rr.session_id = $1 ORDER BY rr.revision DESC LIMIT 1`,
+    [sessionId],
+  );
+  const row = report.rows[0];
+  if (!row || row.revoked_at) return null;
 
   const summary = row.summary as Record<string, unknown>;
   const filtered: Record<string, unknown> = { sessionId };
 
-  if (release?.releaseSummary) filtered.summary = summary;
-  if (release?.releaseRubric) filtered.rubric = (summary.items as unknown[])?.filter((i) => (i as { rating?: number }).rating != null);
-  if (release?.releasePerQuestion) filtered.perQuestion = summary.items;
-  if (release?.releaseTranscript) filtered.transcripts = "available";
-  if (release?.releaseRecordings) filtered.recordings = "available";
+  if (row.release_summary) filtered.summary = summary;
+  if (row.release_rubric) filtered.rubric = (summary.items as unknown[])?.filter((i) => (i as { rating?: number }).rating != null);
+  if (row.release_per_question) filtered.perQuestion = summary.items;
+  if (row.release_transcript) filtered.transcripts = "available";
+  if (row.release_recordings) filtered.recordings = "available";
 
   return filtered;
 }
@@ -177,4 +115,48 @@ ${params.organizationName} has shared interview feedback with you.
 View your permitted feedback here: ${params.feedbackUrl}
 
 Sign in with the email address your recruiter confirmed.`;
+}
+
+/**
+ * HR-only answer guide: approved pack expectations joined to the frozen
+ * plan and latest evaluation items. Never exposed to candidates —
+ * `getCandidateVisibleReport` selects no pack metadata.
+ */
+export async function getHrAnswerGuide(
+  sessionId: string,
+  organizationId: string,
+): Promise<AnswerGuideEntry[]> {
+  await requireOrgAccess(organizationId);
+
+  const binding = await db.query<{ candidacy_id: string }>(
+    `SELECT b.candidacy_id FROM hiring_session_bindings b
+     JOIN candidacies c ON c.id = b.candidacy_id
+     WHERE b.interview_session_id = $1 AND c.organization_id = $2`,
+    [sessionId, organizationId],
+  );
+  const candidacyId = binding.rows[0]?.candidacy_id;
+  if (!candidacyId) return [];
+
+  const pack = await db.query<{ questions: unknown }>(
+    `SELECT questions FROM approved_question_packs
+     WHERE candidacy_id = $1 ORDER BY revision DESC LIMIT 1`,
+    [candidacyId],
+  );
+  const rawQuestions = pack.rows[0]?.questions;
+  const packQuestions: ApprovedQuestion[] = Array.isArray(rawQuestions) ? (rawQuestions as ApprovedQuestion[]) : [];
+
+  const plan = await db.query<{ id: string; position: number; prompt: string }>(
+    `SELECT id, position, prompt FROM interview_plan_questions
+     WHERE session_id = $1 AND deleted_at IS NULL ORDER BY position`,
+    [sessionId],
+  );
+
+  const report = await db.query<{ summary: unknown }>(
+    `SELECT summary FROM report_revisions
+     WHERE session_id = $1 AND candidacy_id = $2 ORDER BY revision DESC LIMIT 1`,
+    [sessionId, candidacyId],
+  );
+  const summary = report.rows[0]?.summary as { items?: Array<Record<string, unknown>> } | undefined;
+
+  return buildAnswerGuide(packQuestions, plan.rows, summary?.items ?? []);
 }

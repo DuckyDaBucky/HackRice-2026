@@ -1,7 +1,5 @@
 import "server-only";
-import { and, count, desc, eq, isNull, ne } from "drizzle-orm";
-import { orm } from "@/lib/db";
-import { candidacies, hiringJobs } from "@/lib/db/schema";
+import { db } from "@/lib/db";
 import { requireOrgAccess } from "./access";
 
 export interface CreateJobInput {
@@ -16,85 +14,43 @@ export interface CreateJobInput {
 
 export async function createJob(input: CreateJobInput) {
   await requireOrgAccess(input.organizationId);
-  const rows = await orm
-    .insert(hiringJobs)
-    .values({
-      organizationId: input.organizationId,
-      title: input.title.trim(),
-      description: (input.description ?? "").trim(),
-      roleFamily: input.roleFamily.trim(),
-      specialty: input.specialty?.trim() ?? null,
-      competencies: input.competencies ?? [],
-      createdByClerkUserId: input.createdByClerkUserId,
-    })
-    .returning({ id: hiringJobs.id });
-  return rows[0]?.id;
+  const result = await db.query<{ id: string }>(
+    `INSERT INTO hiring_jobs
+       (organization_id, title, description, role_family, specialty, competencies, created_by_clerk_user_id)
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+     RETURNING id`,
+    [
+      input.organizationId,
+      input.title.trim(),
+      (input.description ?? "").trim(),
+      input.roleFamily.trim(),
+      input.specialty?.trim() ?? null,
+      JSON.stringify(input.competencies ?? []),
+      input.createdByClerkUserId,
+    ],
+  );
+  return result.rows[0]?.id;
 }
 
 export async function listJobs(organizationId: string) {
   await requireOrgAccess(organizationId);
-  const rows = await orm
-    .select({
-      id: hiringJobs.id,
-      organization_id: hiringJobs.organizationId,
-      title: hiringJobs.title,
-      description: hiringJobs.description,
-      role_family: hiringJobs.roleFamily,
-      specialty: hiringJobs.specialty,
-      competencies: hiringJobs.competencies,
-      question_count: hiringJobs.questionCount,
-      time_budget_seconds: hiringJobs.timeBudgetSeconds,
-      language: hiringJobs.language,
-      shared_question_count: hiringJobs.sharedQuestionCount,
-      personalized_question_count: hiringJobs.personalizedQuestionCount,
-      allow_live_follow_ups: hiringJobs.allowLiveFollowUps,
-      created_by_clerk_user_id: hiringJobs.createdByClerkUserId,
-      created_at: hiringJobs.createdAt,
-      updated_at: hiringJobs.updatedAt,
-      deleted_at: hiringJobs.deletedAt,
-      candidate_count: count(candidacies.id),
-    })
-    .from(hiringJobs)
-    .leftJoin(
-      candidacies,
-      and(eq(candidacies.jobId, hiringJobs.id), ne(candidacies.status, "deleted")),
-    )
-    .where(and(eq(hiringJobs.organizationId, organizationId), isNull(hiringJobs.deletedAt)))
-    .groupBy(hiringJobs.id)
-    .orderBy(desc(hiringJobs.createdAt));
-  return rows;
+  const result = await db.query(
+    `SELECT j.*, count(c.id)::int AS candidate_count
+     FROM hiring_jobs j
+     LEFT JOIN candidacies c ON c.job_id = j.id AND c.status <> 'deleted'
+     WHERE j.organization_id = $1 AND j.deleted_at IS NULL
+     GROUP BY j.id
+     ORDER BY j.created_at DESC`,
+    [organizationId],
+  );
+  return result.rows;
 }
 
 export async function getJob(jobId: string, organizationId: string) {
   await requireOrgAccess(organizationId);
-  const rows = await orm
-    .select({
-      id: hiringJobs.id,
-      organization_id: hiringJobs.organizationId,
-      title: hiringJobs.title,
-      description: hiringJobs.description,
-      role_family: hiringJobs.roleFamily,
-      specialty: hiringJobs.specialty,
-      competencies: hiringJobs.competencies,
-      question_count: hiringJobs.questionCount,
-      time_budget_seconds: hiringJobs.timeBudgetSeconds,
-      language: hiringJobs.language,
-      shared_question_count: hiringJobs.sharedQuestionCount,
-      personalized_question_count: hiringJobs.personalizedQuestionCount,
-      allow_live_follow_ups: hiringJobs.allowLiveFollowUps,
-      created_by_clerk_user_id: hiringJobs.createdByClerkUserId,
-      created_at: hiringJobs.createdAt,
-      updated_at: hiringJobs.updatedAt,
-      deleted_at: hiringJobs.deletedAt,
-    })
-    .from(hiringJobs)
-    .where(
-      and(
-        eq(hiringJobs.id, jobId),
-        eq(hiringJobs.organizationId, organizationId),
-        isNull(hiringJobs.deletedAt),
-      ),
-    )
-    .limit(1);
-  return rows[0] ?? null;
+  const result = await db.query(
+    `SELECT * FROM hiring_jobs WHERE id = $1 AND organization_id = $2 AND deleted_at IS NULL`,
+    [jobId, organizationId],
+  );
+  return result.rows[0] ?? null;
 }

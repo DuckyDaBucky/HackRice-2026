@@ -3,6 +3,7 @@ import { currentUser } from "@clerk/nextjs/server";
 import { FileArrowUpIcon } from "@phosphor-icons/react/ssr";
 import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { getDashboardShellContext } from "@/lib/dashboard/shell-props";
 import { ResumeUploadButton } from "@/components/dashboard/ResumeUploadButton";
 import { getProfile } from "@/lib/profiles";
 
@@ -22,9 +23,10 @@ export default async function ResumePage() {
   if (!user) redirect("/sign-in?redirect_url=%2Fresume");
 
   const account = await getProfile(user.id);
+  const shell = await getDashboardShellContext(user.id);
 
   return (
-    <DashboardShell active="Resume" firstName={user.firstName}>
+    <DashboardShell active="Resume" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
         {!account ? (
           <>

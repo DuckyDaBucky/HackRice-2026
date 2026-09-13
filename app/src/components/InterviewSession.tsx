@@ -129,7 +129,7 @@ export function InterviewSession(props: InterviewSessionProps) {
   const activeQuestions = questions.slice(0, resolved.config.questionCount);
   if (activeQuestions.length === 0) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-zinc-950 text-zinc-400">
+      <div className="flex h-[100dvh] items-center justify-center bg-[#0c0e12] px-6 text-center text-sm text-zinc-400">
         No questions are available for this mode yet.
       </div>
     );
@@ -158,8 +158,9 @@ export function InterviewSession(props: InterviewSessionProps) {
 
 function LoadingState() {
   return (
-    <div className="flex h-[100dvh] items-center justify-center bg-zinc-950 text-zinc-400">
-      Loading questions…
+    <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[#0c0e12] text-zinc-400">
+      <span className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-700 border-t-sky-400" aria-hidden="true" />
+      <p className="text-sm">Loading questions…</p>
     </div>
   );
 }
@@ -207,33 +208,35 @@ function ActiveInterview({
   if (done) {
     const totalMs = answers.reduce((sum, answer) => sum + answer.durationMs, 0);
     return (
-      <div className="flex h-[100dvh] flex-col items-center gap-8 overflow-y-auto bg-zinc-950 px-4 py-16 text-zinc-50">
+      <div className="flex h-[100dvh] flex-col items-center gap-8 overflow-y-auto bg-[#0c0e12] px-4 py-12 text-zinc-50 sm:py-16">
         <div className="flex flex-col items-center gap-3 text-center">
-          <CheckCircleIcon size={40} weight="fill" className="text-sky-400" />
-          <h1 className="text-2xl font-semibold tracking-tight">Interview complete</h1>
-          <p className="max-w-sm text-sm text-zinc-400">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-500/10 ring-1 ring-inset ring-sky-500/30">
+            <CheckCircleIcon size={32} weight="fill" className="text-sky-400" />
+          </div>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Interview complete</h1>
+          <p className="max-w-sm text-[15px] leading-relaxed text-zinc-400">
             {answers.length} answers uploaded in {formatDuration(totalMs)}. Transcripts below
             were refined from the recordings — fix anything misheard before review.
             Analysis isn&apos;t wired up yet, so no feedback is available for this session.
           </p>
         </div>
 
-        <ul className="flex w-full max-w-lg flex-col gap-2">
+        <ul className="flex w-full max-w-xl flex-col gap-3">
           {answers.map((answer, answerIndex) => (
-            <li key={answer.question.id} className="flex flex-col gap-2 rounded-2xl bg-zinc-900 px-4 py-3 ring-1 ring-inset ring-zinc-800">
+            <li key={answer.question.id} className="flex flex-col gap-3 rounded-2xl border border-zinc-800/90 bg-zinc-900/40 p-5">
               <div className="flex items-center justify-between gap-4">
-                <div className="flex flex-col gap-0.5">
-                  <span className="text-xs text-zinc-500">Question {answerIndex + 1}</span>
-                  <span className="text-sm text-zinc-200">{answer.question.prompt}</span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">Question {answerIndex + 1}</span>
+                  <span className="text-[15px] leading-relaxed text-zinc-100">{answer.question.prompt}</span>
                 </div>
                 <div className="flex shrink-0 items-center gap-2 text-xs text-zinc-500">
-                  <span>{formatDuration(answer.durationMs)}</span>
-                  <span className={`rounded-full px-2 py-0.5 font-medium ${answer.status === "uploaded" ? "bg-sky-500/10 text-sky-400" : "bg-red-500/10 text-red-400"}`}>
+                  <span className="tabular-nums">{formatDuration(answer.durationMs)}</span>
+                  <span className={`rounded-full px-2.5 py-1 font-medium ${answer.status === "uploaded" ? "bg-sky-500/10 text-sky-300" : "bg-red-500/10 text-red-300"}`}>
                     {answer.status}
                   </span>
                 </div>
               </div>
-              <label className="flex flex-col gap-1 text-xs text-zinc-500">
+              <label className="flex flex-col gap-2 text-xs font-medium text-zinc-400">
                 Transcript (editable)
                 <textarea
                   rows={3}
@@ -248,7 +251,7 @@ function ActiveInterview({
                       ),
                     );
                   }}
-                  className="w-full resize-y rounded-xl bg-zinc-950 px-3 py-2 text-sm text-zinc-100 ring-1 ring-inset ring-zinc-800 placeholder:text-zinc-600 focus:outline-none focus:ring-sky-500"
+                  className="w-full resize-y rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm leading-relaxed text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none"
                   placeholder="No speech was transcribed for this answer."
                 />
               </label>
@@ -256,7 +259,7 @@ function ActiveInterview({
           ))}
         </ul>
 
-        <button type="button" onClick={() => router.push("/")} className="rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]">
+        <button type="button" onClick={() => router.push("/")} className="rounded-full bg-sky-500 px-8 py-3.5 text-sm font-semibold text-zinc-950 shadow-[0_12px_40px_-12px_rgba(14,165,233,0.55)] transition hover:bg-sky-400 active:scale-[0.98]">
           Return home
         </button>
       </div>
