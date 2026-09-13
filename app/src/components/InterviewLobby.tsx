@@ -11,8 +11,7 @@ import {
   VideoCameraSlashIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react";
-import { getVoiceLabel } from "@/lib/voice/presets";
-import { MOOD_OPTIONS, type InterviewMood } from "@/lib/interview-config";
+import type { InterviewMood } from "@/lib/interview-config";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
 import { useMediaDeviceList } from "@/hooks/useMediaDeviceList";
 import type { InterviewMode } from "@/lib/questions/types";
@@ -36,8 +35,8 @@ const MODE_LABEL: Record<InterviewMode, string> = {
 export function InterviewLobby({
   mode,
   recorder,
-  voiceId,
-  mood,
+  voiceId: _voiceId,
+  mood: _mood,
   resumeProgress,
 }: {
   mode: InterviewMode;
@@ -60,7 +59,6 @@ export function InterviewLobby({
 
   const isJoining = recorder.state === "requesting-permission";
   const joinError = recorder.state === "error";
-  const moodLabel = MOOD_OPTIONS.find((option) => option.id === mood)?.label ?? "Neutral";
 
   const handleBack = () => {
     if (typeof window !== "undefined" && window.history.length > 1) {
@@ -143,8 +141,8 @@ export function InterviewLobby({
 
   return (
     <div className="min-h-[100dvh] bg-[#0c0e12] text-zinc-50">
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-5 py-8 sm:px-8 sm:py-10 lg:gap-10 lg:py-12">
-        <header className="flex flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-5 px-5 py-5 sm:px-8 sm:py-6 lg:gap-6">
+        <header className="flex flex-col gap-4">
           <button
             type="button"
             onClick={handleBack}
@@ -158,37 +156,25 @@ export function InterviewLobby({
             <p className="text-[13px] font-medium tracking-wide text-sky-400/90">
               {MODE_LABEL[mode]} practice interview
             </p>
-            <h1 className="mt-2 text-balance text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
+            <h1 className="mt-1 text-balance text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
               {resumeProgress ? "Resume your interview" : "Check your setup"}
             </h1>
-            <p className="mt-3 max-w-xl text-pretty text-[15px] leading-relaxed text-zinc-400">
-              Preview your camera, confirm audio, then join. We only record answer clips for review —
-              nothing biometric is analyzed, and recording stops when you leave.
-            </p>
             {resumeProgress && (
-              <p className="mt-4 inline-flex rounded-full bg-amber-500/10 px-3.5 py-1.5 text-sm font-medium text-amber-300">
+              <p className="mt-3 inline-flex rounded-full bg-amber-500/10 px-3.5 py-1.5 text-sm font-medium text-amber-300">
                 {resumeProgress.answered} of {resumeProgress.total} answered — continuing from
                 question {resumeProgress.answered + 1}
               </p>
             )}
-            <div className="mt-5 flex flex-wrap gap-2 text-xs text-zinc-500">
-              <span className="rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5">
-                Voice · {getVoiceLabel(voiceId)}
-              </span>
-              <span className="rounded-full border border-zinc-800 bg-zinc-900/60 px-3 py-1.5">
-                Mood · {moodLabel}
-              </span>
-            </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.85fr)] lg:gap-10">
-          <div className="flex flex-col gap-5">
+        <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.85fr)] lg:gap-6">
+          <div className="flex flex-col gap-4">
             <section
               aria-labelledby="camera-preview"
               className="overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-900/40 shadow-[0_24px_80px_-40px_rgba(0,0,0,0.8)]"
             >
-              <div className="relative aspect-video w-full bg-black sm:min-h-[22rem] lg:min-h-[28rem] lg:aspect-auto">
+              <div className="relative aspect-video w-full bg-black lg:min-h-[22rem] lg:aspect-auto">
                 {previewStream ? (
                   <video
                     ref={videoRef}
@@ -320,11 +306,6 @@ export function InterviewLobby({
             <MicCheck stream={previewStream} />
             <SpeakerCheck outputDeviceId={outputId} />
             <SubtitlePicker />
-            {!previewStream && (
-              <p className="rounded-2xl border border-dashed border-zinc-800 px-5 py-4 text-center text-sm leading-relaxed text-zinc-500">
-                Mic and speaker checks unlock once preview is on — they use your live devices.
-              </p>
-            )}
           </aside>
         </div>
 
