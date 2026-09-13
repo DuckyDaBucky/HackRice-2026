@@ -136,11 +136,40 @@ select option {
   color: var(--foreground);
   color-scheme: dark only;
 }
+/* Motion: honor the OS signal site-wide, plus the manual Settings toggle
+   (data-motion="reduced") which covers users whose OS exposes no setting. */
 @media (prefers-reduced-motion: reduce) {
-  .marketing *, .marketing *::before, .marketing *::after {
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+[data-motion="reduced"] *, [data-motion="reduced"] *::before, [data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* High contrast viewing (Settings → Accessibility): strengthen text,
+   borders, and active states in both themes. */
+[data-contrast="high"] {
+  --dash-text-muted: #3d4654;
+  --dash-text-faint: #55606e;
+  --dash-border: #bfc9d6;
+  --dash-border-strong: #93a1b3;
+  --dash-nav-active: color-mix(in srgb, #ffffff 78%, var(--color-accent) 22%);
+  --dash-nav-active-hr: color-mix(in srgb, #ffffff 78%, var(--hr-accent) 22%);
+}
+
+[data-theme="dark"][data-contrast="high"] {
+  --dash-text-muted: #c9d2df;
+  --dash-text-faint: #a9b4c4;
+  --dash-border: #4c5e78;
+  --dash-border-strong: #6e819c;
+  --dash-nav-active: color-mix(in srgb, #182235 72%, var(--color-accent) 28%);
+  --dash-nav-active-hr: color-mix(in srgb, #182235 72%, var(--hr-accent) 28%);
 }

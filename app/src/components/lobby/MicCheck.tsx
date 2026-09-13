@@ -23,8 +23,17 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
   const chunksRef = useRef<Blob[]>([]);
 
   // Live level meter — drives the bar directly, no re-renders per frame.
+  // Skipped entirely under reduced motion (OS setting or site toggle).
   useEffect(() => {
     if (!stream || stream.getAudioTracks().length === 0) return;
+    const reduced =
+      document.documentElement.hasAttribute("data-motion") ||
+      (typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    if (reduced) {
+      if (barRef.current) barRef.current.style.transform = "scaleX(0.4)";
+      return;
+    }
     let context: AudioContext | null = null;
     let raf = 0;
     try {

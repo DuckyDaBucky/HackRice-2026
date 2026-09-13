@@ -12,7 +12,16 @@ import {
 import { getVoiceLabel } from "@/lib/voice/presets";
 import { MOOD_OPTIONS, type InterviewMood } from "@/lib/interview-config";
 import type { UseCameraRecorder } from "@/hooks/useCameraRecorder";
+import { useMediaDeviceList } from "@/hooks/useMediaDeviceList";
 import type { InterviewMode } from "@/lib/questions/types";
+import {
+  AUDIO_DEVICE_KEY,
+  OUTPUT_DEVICE_KEY,
+  VIDEO_DEVICE_KEY,
+  friendlyDeviceLabel,
+  readDeviceId,
+  storeDeviceId,
+} from "@/lib/media/devices";
 import { MicCheck } from "@/components/lobby/MicCheck";
 import { SpeakerCheck } from "@/components/lobby/SpeakerCheck";
 import { SubtitlePicker } from "@/components/lobby/SubtitlePicker";
@@ -21,31 +30,6 @@ const MODE_LABEL: Record<InterviewMode, string> = {
   technical: "Technical",
   behavioral: "Behavioral",
 };
-
-/** Labels are empty until camera/mic permission is granted — fall back to numbered names. */
-export function friendlyDeviceLabel(device: MediaDeviceInfo, index: number): string {
-  if (device.label) return device.label;
-  if (device.kind === "videoinput") return `Camera ${index + 1}`;
-  if (device.kind === "audiooutput") return `Speaker ${index + 1}`;
-  return `Microphone ${index + 1}`;
-}
-
-function readStored(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function store(key: string, value: string | null) {
-  try {
-    if (value) window.localStorage.setItem(key, value);
-    else window.localStorage.removeItem(key);
-  } catch {
-    // Non-fatal; the choice still applies to this visit.
-  }
-}
 
 export function InterviewLobby({
   mode,
@@ -63,10 +47,10 @@ export function InterviewLobby({
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [previewStream, setPreviewStream] = useState<MediaStream | null>(null);
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
-  const [videoId, setVideoId] = useState<string | null>(() => readStored("gmh-video-device"));
-  const [audioId, setAudioId] = useState<string | null>(() => readStored("gmh-audio-device"));
-  const [outputId, setOutputId] = useState<string | null>(() => readStored("gmh-output-device"));
+  const { devices, refresh: refreshDevices } = useMediaDeviceList();
+  const [videoId, setVideoId] = useState<string | null>(() => readDeviceId(VIDEO_DEVICE_KEY));
+  const [audioId, setAudioId] = useState<string | null>(() => readDeviceId(AUDIO_DEVICE_KEY));
+  const [outputId, setOutputId] = useState<string | null>(() => readDeviceId(OUTPUT_DEVICE_KEY));
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [requestingPreview, setRequestingPreview] = useState(false);
   const previewRef = useRef<MediaStream | null>(null);
@@ -86,19 +70,6 @@ export function InterviewLobby({
   useEffect(() => {
     if (videoRef.current) videoRef.current.srcObject = previewStream;
   }, [previewStream]);
-
-  const refreshDevices = useCallback(async () => {
-    try {
-      setDevices(await navigator.mediaDevices.enumerateDevices());
-    } catch {
-      // Leave the last-known list in place.
-    }
-  }, []);
-
-  useEffect(() => {
-    navigator.mediaDevices?.addEventListener?.("devicechange", refreshDevices);
-    return () => navigator.mediaDevices?.removeEventListener?.("devicechange", refreshDevices);
-  }, [refreshDevices]);
 
   const acquire = useCallback(
     async (nextVideoId: string | null, nextAudioId: string | null) => {
@@ -124,11 +95,11 @@ export function InterviewLobby({
           if (err instanceof OverconstrainedError || (err instanceof Error && err.name === "OverconstrainedError")) {
             if (nextVideoId) {
               setVideoId(null);
-              store("gmh-video-device", null);
+              storeDeviceId(VIDEO_DEVICE_KEY, null);
             }
             if (nextAudioId) {
               setAudioId(null);
-              store("gmh-audio-device", null);
+              storeDeviceId(AUDIO_DEVICE_KEY, null);
             }
             previewRef.current = await navigator.mediaDevices.getUserMedia(constraints(false));
           } else {
@@ -235,7 +206,7 @@ export function InterviewLobby({
                     onChange={(e) => {
                       const next = e.target.value || null;
                       setVideoId(next);
-                      store("gmh-video-device", next);
+                      storeDeviceId(VIDEO_DEVICE_KEY, next);
                       void acquire(next, audioId);
                     }}
                     className={selectClass}
@@ -254,7 +225,7 @@ export function InterviewLobby({
                     onChange={(e) => {
                       const next = e.target.value || null;
                       setAudioId(next);
-                      store("gmh-audio-device", next);
+                      storeDeviceId(AUDIO_DEVICE_KEY, next);
                       void acquire(videoId, next);
                     }}
                     className={selectClass}
@@ -273,7 +244,7 @@ export function InterviewLobby({
                     onChange={(e) => {
                       const next = e.target.value || null;
                       setOutputId(next);
-                      store("gmh-output-device", next);
+                      storeDeviceId(OUTPUT_DEVICE_KEY, next);
                     }}
                     className={selectClass}
                   >

@@ -7,6 +7,7 @@ import {
   ChartBarIcon,
   ClockCounterClockwiseIcon,
   FileTextIcon,
+  GearSixIcon,
   HouseIcon,
   TargetIcon,
 } from "@phosphor-icons/react";
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/interviews", label: "Interviews", icon: ClockCounterClockwiseIcon },
   { href: "/resume", label: "Resume", icon: FileTextIcon },
   { href: "/analytics", label: "Analytics", icon: ChartBarIcon },
+  { href: "/settings", label: "Settings", icon: GearSixIcon },
 ] as const;
 
 export function DashboardShell({

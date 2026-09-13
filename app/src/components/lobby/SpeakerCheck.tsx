@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { SpeakerHighIcon } from "@phosphor-icons/react";
-
-type SinkableAudio = HTMLAudioElement & { setSinkId?: (deviceId: string) => Promise<void> };
+import { playTestTone } from "@/lib/media/test-tone";
 
 /**
  * Speaker check: plays a short tone through the selected output device.
@@ -16,37 +15,13 @@ export function SpeakerCheck({ outputDeviceId }: { outputDeviceId: string | null
   const playTone = async () => {
     setNote(null);
     setPlaying(true);
-    try {
-      const Context = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!Context) throw new Error("unsupported");
-      const context = new Context();
-      const oscillator = context.createOscillator();
-      oscillator.frequency.value = 660;
-      const gain = context.createGain();
-      gain.gain.value = 0.12;
-      oscillator.connect(gain);
-      const destination = context.createMediaStreamDestination();
-      gain.connect(destination);
-      const audio: SinkableAudio = new Audio();
-      audio.srcObject = destination.stream;
-      if (outputDeviceId) {
-        if (typeof audio.setSinkId === "function") {
-          await audio.setSinkId(outputDeviceId);
-        } else {
-          setNote("This browser can't switch speakers, so the tone plays on your default output.");
-        }
-      }
-      await audio.play().catch(() => undefined);
-      oscillator.start();
-      oscillator.stop(context.currentTime + 0.6);
-      window.setTimeout(() => {
-        void context.close().catch(() => undefined);
-        setPlaying(false);
-      }, 900);
-    } catch {
+    const result = await playTestTone(outputDeviceId);
+    if (!result.played) {
       setNote("Could not play the test sound.");
-      setPlaying(false);
+    } else if (result.usedFallbackOutput) {
+      setNote("This browser can't switch speakers, so the tone plays on your default output.");
     }
+    setPlaying(false);
   };
 
   return (

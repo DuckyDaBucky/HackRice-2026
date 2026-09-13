@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SUBTITLE_SIZE_CLASS } from "@/hooks/useSubtitleSize";
-import { friendlyDeviceLabel } from "@/components/InterviewLobby";
+import { friendlyDeviceLabel } from "@/lib/media/devices";
 
 function device(kind: MediaDeviceKind, label: string): MediaDeviceInfo {
   return { deviceId: "id", groupId: "g", kind, label } as MediaDeviceInfo;

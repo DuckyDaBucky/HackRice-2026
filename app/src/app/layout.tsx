@@ -31,11 +31,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <script
-          // Applies the saved dashboard theme before paint, avoiding a
-          // light-mode flash for users who picked dark. Scoped to the
-          // dash-* tokens only — doesn't affect the marketing pages.
+          // Applies the saved dashboard theme + accessibility prefs before
+          // paint, avoiding a light-mode flash for users who picked dark.
+          // Scoped to dash-* tokens and a11y attributes only — doesn't
+          // affect the marketing pages.
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem("dashboard-theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");}catch(e){}})();`,
+            __html: `(function(){try{var d=document.documentElement;if(localStorage.getItem("dashboard-theme")==="dark")d.setAttribute("data-theme","dark");if(localStorage.getItem("gmh-contrast")==="high")d.setAttribute("data-contrast","high");if(localStorage.getItem("gmh-motion")==="reduced")d.setAttribute("data-motion","reduced");}catch(e){}})();`,
           }}
         />
         <AppProviders>
