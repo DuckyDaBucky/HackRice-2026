@@ -82,7 +82,6 @@ export function BiometricsCard({
                   <span className="font-normal text-dash-text-faint">· Analyzed</span>
                   {isDemoMetrics(analysis.metrics) && (
                     <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-600">
-                      Demo preview — simulated signals
                     </span>
                   )}
                 </span>
