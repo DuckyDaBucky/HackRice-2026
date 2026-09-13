@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import type { ProcessMistake } from "@/lib/analytics/process-events";
 import type { ReportOverview } from "@/lib/reports/contracts";
 import type { ReviewAnswer, SessionReview } from "@/lib/reports/timeline";
@@ -95,6 +96,8 @@ function StepButton({ label, disabled, onClick, children }: {
 
 function AnswerDetail({ answer, total, onStep }: { answer: ReviewAnswer; total: number; onStep: (delta: number) => void }) {
   const meta = verdictOf(answer);
+  const router = useRouter();
+  const [clipExpired, setClipExpired] = useState(false);
   return (
     <section className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex items-center justify-between gap-3">
@@ -117,14 +120,28 @@ function AnswerDetail({ answer, total, onStep }: { answer: ReviewAnswer; total: 
       </div>
 
       {answer.clip ? (
-        <video
-          key={answer.turnId}
-          src={answer.clip.url}
-          controls
-          preload="metadata"
-          playsInline
-          className="aspect-video w-full rounded-xl bg-black"
-        />
+        clipExpired ? (
+          <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500">
+            <span>Recording link expired (signed URLs last ~1h).</span>
+            <button
+              type="button"
+              onClick={() => router.refresh()}
+              className="rounded-full border border-sky-400/40 px-3 py-1.5 text-xs font-medium text-sky-200 hover:bg-sky-500/10"
+            >
+              Refresh links
+            </button>
+          </div>
+        ) : (
+          <video
+            key={answer.turnId}
+            src={answer.clip.url}
+            controls
+            preload="metadata"
+            playsInline
+            onError={() => setClipExpired(true)}
+            className="aspect-video w-full rounded-xl bg-black"
+          />
+        )
       ) : (
         <div className="flex aspect-video w-full items-center justify-center rounded-xl border border-dashed border-zinc-800 text-sm text-zinc-500">
           No recording was saved for this answer
@@ -508,7 +525,7 @@ export function InterviewReview({ review, overview, aside }: {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-6">
-        <AnswerDetail answer={review.answers[current]} total={count} onStep={step} />
+        <AnswerDetail key={review.answers[current].turnId} answer={review.answers[current]} total={count} onStep={step} />
         <SessionTimelineStrip answers={review.answers} selected={current} onSelect={setSelected} />
         <EvaluationGraph answers={review.answers} selected={current} onSelect={setSelected} />
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRightIcon, CheckIcon } from "@phosphor-icons/react";
 import { VoicePicker } from "@/components/VoicePicker";
 import { useVoicePreference } from "@/hooks/useVoicePreference";
@@ -33,7 +33,17 @@ const SENIORITY_OPTIONS: Array<{ id: Seniority; label: string; description: stri
 ];
 
 export default function InterviewSetupPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto w-full max-w-2xl px-6 py-12 text-sm text-zinc-400">Loading setup…</div>}>
+      <InterviewSetupForm />
+    </Suspense>
+  );
+}
+
+function InterviewSetupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteCode = searchParams.get("code")?.trim() ?? "";
   const { voiceId, setVoiceId } = useVoicePreference();
   const [contentTypes, setContentTypes] = useState<InterviewContentType[]>(["technical_concepts"]);
   const [timeBudgetSeconds, setTimeBudgetSeconds] = useState<600 | 1200 | 1800>(1200);
@@ -91,6 +101,12 @@ export default function InterviewSetupPage() {
       <div className="flex flex-col gap-2">
         <span className="text-xs font-medium tracking-wide text-sky-400 uppercase">New session</span>
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-50">Build your practice interview</h1>
+        {inviteCode && (
+          <p role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            Invite code “{inviteCode}” isn&apos;t redeemable yet — corporate invites haven&apos;t landed.
+            Continue below to start a personal practice session instead.
+          </p>
+        )}
         <p className="max-w-xl text-base leading-relaxed text-zinc-400">
           Choose what you want to practice. Your interviewer creates a saved plan before you join,
           so you can safely leave and resume later.

@@ -5,12 +5,17 @@ import {LocalAssistantRegistry} from "./registry";
 import {memorySchema,type Memory,type PracticeMemory,type memoryMutationSchema} from "./contracts";
 const base="https://app.backboard.io/api";
 const safeId=(id:string)=>encodeURIComponent(id);
+// Accepts legacy BACKBOARD as fallback (old .env.local name) but prefers BACKBOARD_API_KEY.
+function backboardApiKey(): string | undefined {
+  return process.env.BACKBOARD_API_KEY ?? process.env.BACKBOARD;
+}
 export class BackboardMemory implements PracticeMemory {
   constructor(private registry=new LocalAssistantRegistry(),private transport:typeof fetch=fetch){}
   private async call(path:string,method="GET",body?:unknown) {
-    if(!process.env.BACKBOARD_API_KEY)throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured. Add BACKBOARD_API_KEY locally to enable memory.",503);
+    const apiKey = backboardApiKey();
+    if(!apiKey)throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured. Add BACKBOARD_API_KEY locally to enable memory.",503);
     let response:Response;
-    try{response=await this.transport(`${base}${path}`,{method,headers:{"X-API-Key":process.env.BACKBOARD_API_KEY,"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(20000),cache:"no-store"});}
+    try{response=await this.transport(`${base}${path}`,{method,headers:{"X-API-Key":apiKey,"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(20000),cache:"no-store"});}
     catch{throw new WorkbenchError("BACKBOARD_UNAVAILABLE",method==="GET"?"Backboard could not be reached. Try again.":"Backboard did not confirm this operation. Refresh saved notes before retrying; it may have completed.",503);}
     if(!response.ok)throw new WorkbenchError("BACKBOARD_FAILED",response.status===429?"Backboard rate limit reached. Retry later.":"Backboard rejected the request. Check its key, account access and service status.",response.status===429?429:502);
     if(response.status===204)return {};
@@ -28,12 +33,12 @@ export class BackboardMemory implements PracticeMemory {
     throw new WorkbenchError("MEMORY_LIMIT","Too many notes to load safely. Manage the assistant in Backboard before retrying.",409);
   }
   async list(userId:string):Promise<Memory[]> {
-    if(!process.env.BACKBOARD_API_KEY)throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured. Add BACKBOARD_API_KEY locally.",503);
+    if(!backboardApiKey())throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured. Add BACKBOARD_API_KEY locally.",503);
     const assistant=await this.registry.get(userId);
     return assistant?(await this.rows(assistant)).map(({id,content})=>({id,content})):[];
   }
   async search(userId:string,query:string):Promise<Memory[]> {
-    if(!process.env.BACKBOARD_API_KEY)throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured; no saved notes were used.",503);
+    if(!backboardApiKey())throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured; no saved notes were used.",503);
     const assistant=await this.registry.get(userId);if(!assistant)return [];
     const data=await this.call(`/assistants/${safeId(assistant)}/memories/search`,"POST",{query:query.slice(0,3000),limit:5});
     const parsed=z.object({memories:z.array(memorySchema)}).safeParse(data);
@@ -42,7 +47,7 @@ export class BackboardMemory implements PracticeMemory {
   }
   async check(){await this.call("/assistants?page=1&page_size=1");return {verifiedAt:new Date().toISOString()};}
   async mutate(userId:string,input:z.infer<typeof memoryMutationSchema>):Promise<void> {
-    if(!process.env.BACKBOARD_API_KEY)throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured. Add BACKBOARD_API_KEY locally.",503);
+    if(!backboardApiKey())throw new WorkbenchError("BACKBOARD_MISSING_KEY","Backboard is not configured. Add BACKBOARD_API_KEY locally.",503);
     await this.registry.locked(userId,async()=>{
       let assistant=await this.registry.get(userId);
       if(!assistant&&input.operation!=="save"){if(input.operation==="reset")return;throw new WorkbenchError("MEMORY_NOT_FOUND","No saved note exists for this user.",404);}

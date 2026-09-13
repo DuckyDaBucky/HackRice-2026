@@ -153,6 +153,7 @@ export function CameraRecorder({
   const [skipConfirmationVisible, setSkipConfirmationVisible] = useState(false);
   const [controlError, setControlError] = useState<string | null>(null);
   const [refiningTranscript, setRefiningTranscript] = useState(false);
+  const [transcriptNotice, setTranscriptNotice] = useState<string | null>(null);
   const transcriptPanelRef = useRef<HTMLDivElement | null>(null);
   const currentQuestionRef = useRef<string | null>(null);
   const isRecording = recorderState === "recording";
@@ -178,6 +179,7 @@ export function CameraRecorder({
   const completeAnswer = useCallback(async () => {
     if (saving) return;
     setSaving(true);
+    setTranscriptNotice(null);
     stopCaptions();
     try {
       const artifact = await stop();
@@ -211,9 +213,12 @@ export function CameraRecorder({
           if (reconciled.source === "batch" && reconciled.text) {
             correctTranscript(reconciled.text);
           }
+        } else {
+          setTranscriptNotice("Batch transcription was unavailable — saved live captions instead (lower accuracy).");
         }
       } catch {
         // Batch correction is best-effort — fall back to live finals.
+        setTranscriptNotice("Batch transcription was unavailable — saved live captions instead (lower accuracy).");
       } finally {
         setRefiningTranscript(false);
       }
@@ -445,7 +450,7 @@ export function CameraRecorder({
       <footer className="flex h-[92px] shrink-0 items-center justify-start gap-3 overflow-x-auto bg-[#171717] px-4 sm:justify-center">
         <button type="button" onClick={() => toggleTrack("audio")} aria-label="Toggle microphone" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${micEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><MicrophoneIcon size={21} weight="fill" /></button>
         <button type="button" onClick={() => toggleTrack("video")} aria-label="Toggle camera" className={`flex h-12 w-12 items-center justify-center rounded-full border border-white/15 ${cameraEnabled ? "bg-[#2d2d2d] hover:bg-[#3b3b3b]" : "bg-[#5d2630] text-red-100"}`}><VideoCameraIcon size={21} weight="fill" /></button>
-        <div aria-live="polite" className="min-w-32 text-center text-sm text-zinc-300">{controlError ?? (saving || finishRequested ? (refiningTranscript ? "Refining transcript…" : "Interviewer is reviewing…") : recorderState === "paused" ? "Interview paused" : tts.isSpeaking ? "Interviewer is asking…" : finishSuggestionVisible ? "Finished answering?" : isRecording ? "Listening…" : "Preparing next question…")}</div>
+        <div aria-live="polite" className="min-w-32 text-center text-sm text-zinc-300">{controlError ?? transcriptNotice ?? (saving || finishRequested ? (refiningTranscript ? "Refining transcript…" : "Interviewer is reviewing…") : recorderState === "paused" ? "Interview paused" : tts.isSpeaking ? "Interviewer is asking…" : finishSuggestionVisible ? "Finished answering?" : isRecording ? "Listening…" : "Preparing next question…")}</div>
         {controlError && <button type="button" onClick={() => window.location.reload()} className="h-12 rounded-full border border-amber-400/50 px-4 text-sm font-medium text-amber-100 transition hover:bg-amber-400/10">Reload</button>}
         <button type="button" onClick={() => void togglePause()} disabled={saving || tts.isSpeaking || (!isRecording && recorderState !== "paused")} className="h-12 rounded-full border border-white/15 px-4 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">{recorderState === "paused" ? "Resume" : "Pause"}</button>
         <button type="button" onClick={() => void replayQuestion(followUp ?? rephrasedQuestion ?? questionPrompt)} disabled={!isRecording || saving || tts.isSpeaking} className="h-12 rounded-full border border-white/15 px-4 text-sm font-medium transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">Repeat</button>

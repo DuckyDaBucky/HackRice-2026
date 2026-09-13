@@ -1,7 +1,7 @@
 import "server-only";
 import { and, count, eq, inArray } from "drizzle-orm";
 import { orm } from "./db";
-import { answerAttempts } from "./db/schema";
+import { answerAttempts, mediaArtifacts } from "./db/schema";
 import type { InterviewMode } from "./questions/types";
 
 export async function recordAttemptUploaded(params: {
@@ -61,20 +61,38 @@ export async function listUploadedQuestionIds(sessionId: string): Promise<string
   return rows.map((row) => row.questionId);
 }
 
-/** Answered-question counts per session, for the dashboard's "2 of 3 answered" progress. */
+/** Answered-question counts per session, for the dashboard's "2 of 3 answered" progress.
+ *  Counts legacy answer_attempts plus V2 media_artifacts (uploaded durable clips),
+ *  so durable sessions no longer show 0 of N. Sums both sources; callers cap by
+ *  questionCount when rendering. */
 export async function countUploadedAttemptsBySession(
   sessionIds: string[],
 ): Promise<Record<string, number>> {
   if (sessionIds.length === 0) return {};
-  const rows = await orm
-    .select({ sessionId: answerAttempts.sessionId, count: count() })
-    .from(answerAttempts)
-    .where(
-      and(
-        inArray(answerAttempts.sessionId, sessionIds),
-        eq(answerAttempts.uploadStatus, "uploaded"),
-      ),
-    )
-    .groupBy(answerAttempts.sessionId);
-  return Object.fromEntries(rows.map((row) => [row.sessionId, row.count]));
+  const [legacyRows, durableRows] = await Promise.all([
+    orm
+      .select({ sessionId: answerAttempts.sessionId, count: count() })
+      .from(answerAttempts)
+      .where(
+        and(
+          inArray(answerAttempts.sessionId, sessionIds),
+          eq(answerAttempts.uploadStatus, "uploaded"),
+        ),
+      )
+      .groupBy(answerAttempts.sessionId),
+    orm
+      .select({ sessionId: mediaArtifacts.sessionId, count: count() })
+      .from(mediaArtifacts)
+      .where(
+        and(
+          inArray(mediaArtifacts.sessionId, sessionIds),
+          eq(mediaArtifacts.uploadStatus, "uploaded"),
+        ),
+      )
+      .groupBy(mediaArtifacts.sessionId),
+  ]);
+  const merged: Record<string, number> = {};
+  for (const row of legacyRows) merged[row.sessionId] = (merged[row.sessionId] ?? 0) + row.count;
+  for (const row of durableRows) merged[row.sessionId] = (merged[row.sessionId] ?? 0) + row.count;
+  return merged;
 }

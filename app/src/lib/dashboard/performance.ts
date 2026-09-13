@@ -1,9 +1,10 @@
 /**
- * Placeholder scoring. Rubric-based evaluation (docs/04) isn't wired up yet —
+ * Preview scoring (placeholder). Rubric-based evaluation (docs/04) isn't wired up yet —
  * these are deterministic stand-in numbers derived from each session id, so
- * they're stable across reloads instead of a live rubric score. Swap this
- * module out once scored transcripts exist; nothing else should need to
- * change since callers only see the shape below.
+ * they're stable across reloads instead of a live rubric score. Every caller
+ * must label these as "preview" in the UI. Swap this module out once scored
+ * transcripts exist; nothing else should need to change since callers only
+ * see the shape below.
  */
 
 export const SKILL_CATEGORIES = ["Technical", "Communication", "Confidence", "Structure"] as const;

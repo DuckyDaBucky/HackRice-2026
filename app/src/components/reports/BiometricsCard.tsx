@@ -56,11 +56,23 @@ export function BiometricsCard({
       )}
       {completed.length > 0 && (
         <ul className="flex flex-col gap-2">
-          {completed.map((analysis) => (
-            <li key={analysis.id} className="text-sm text-zinc-300">
-              <code className="text-xs text-zinc-500">{JSON.stringify(analysis.metrics.eventCounts ?? {})}</code>
-            </li>
-          ))}
+          {completed.map((analysis) => {
+            const counts = analysis.metrics.eventCounts ?? {};
+            const entries = Object.entries(counts);
+            const total = entries.reduce((sum, [, n]) => sum + (typeof n === "number" ? n : 0), 0);
+            return (
+              <li key={analysis.id} className="text-sm text-zinc-300">
+                <span className="font-medium text-zinc-100">
+                  {total > 0 ? `${total} biometric events` : "Biometric analysis complete"}
+                </span>{" "}
+                <span className="text-zinc-500">
+                  {entries.length > 0
+                    ? entries.map(([k, v]) => `${k}: ${v}`).join(" · ")
+                    : "heart-rate/breathing summary pending vendor detail"}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
       {error && <p className="text-sm text-red-400">{error}</p>}

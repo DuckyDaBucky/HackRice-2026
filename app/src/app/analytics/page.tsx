@@ -69,9 +69,9 @@ export default async function AnalyticsPage() {
     <DashboardShell active="Analytics" firstName={user.firstName}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics</h1>
+          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 align-middle text-[11px] font-medium text-amber-600">preview scores</span></h1>
           <p className="mt-1 text-sm text-dash-text-muted">
-            Based on your last {completed.length} completed interview{completed.length === 1 ? "" : "s"}.
+            Based on your last {completed.length} completed interview{completed.length === 1 ? "" : "s"}. Scores are placeholders until rubric evaluation lands.
           </p>
         </div>
 
