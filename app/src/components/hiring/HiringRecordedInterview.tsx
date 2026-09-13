@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { CameraRecorder } from "@/components/CameraRecorder";

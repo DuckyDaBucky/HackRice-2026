@@ -35,8 +35,6 @@ const MODE_LABEL: Record<InterviewMode, string> = {
 export function InterviewLobby({
   mode,
   recorder,
-  voiceId: _voiceId,
-  mood: _mood,
   resumeProgress,
 }: {
   mode: InterviewMode;

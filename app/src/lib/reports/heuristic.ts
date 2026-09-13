@@ -14,40 +14,49 @@ function scoreOne(text: string): { verdict: ReportFindingInput["verdict"]; expla
   const words = trimmed ? trimmed.split(/\s+/).length : 0;
   const sentences = trimmed ? trimmed.split(/[.!?]+/).filter((s) => s.trim().length > 0).length : 0;
   const fillerHits = (trimmed.match(FILLERS) ?? []).length;
-  const hasStar = /situation|task|action|result|outcome|learned|impact|metric|percent|%\b|\d+/i.test(trimmed);
-  const hasStructure = sentences >= 3 && words >= 60;
+  const normalizedWords = trimmed.toLowerCase().match(/[a-z0-9']+/g) ?? [];
+  const lexicalDiversity = normalizedWords.length > 0
+    ? new Set(normalizedWords).size / normalizedWords.length
+    : 0;
+  const hasPersonalAction = /\b(i|we)\s+(built|changed|chose|created|debugged|decided|designed|implemented|investigated|led|measured|owned|proposed|reduced|resolved|tested|wrote)\b/i.test(trimmed);
+  const hasSituation = /\b(when|during|at my|on a|the problem|the issue|the goal|we needed|i was responsible)\b/i.test(trimmed);
+  const hasOutcome = /\b(result|outcome|impact|improved|reduced|increased|saved|shipped|resolved|learned)\b/i.test(trimmed);
+  const hasMeasuredDetail = /\b\d+(?:\.\d+)?\s*(?:%|percent|ms|seconds?|minutes?|hours?|days?|weeks?|users?|customers?|requests?)\b/i.test(trimmed);
+  const incoherent = words >= 20 && lexicalDiversity < 0.35;
 
-  if (words < 10) {
+  if (words < 15 || incoherent) {
     return {
       verdict: "insufficient_evidence",
-      explanation: `Only ${words} words were captured, so there isn't enough to judge fairly.`,
+      explanation: incoherent
+        ? "The answer is highly repetitive or incoherent, so it does not provide usable evidence."
+        : `Only ${words} words were captured, so there isn't enough to judge fairly.`,
       improvement: null,
     };
   }
-  if (words < 30 || fillerHits > Math.max(3, words * 0.08)) {
+  if (words < 35 || fillerHits > Math.max(3, words * 0.08)) {
     return {
-      verdict: "inaccuracy",
+      verdict: "mistake",
       explanation: `Short or filler-heavy answer (${words} words, ~${fillerHits} filler words) that misses a concrete example.`,
       improvement: "Restate the question, give one specific example with what you did, and end with the outcome.",
     };
   }
-  if (!hasStar || !hasStructure) {
+  if (!hasPersonalAction || !hasSituation || !hasOutcome || sentences < 3) {
     return {
       verdict: "mistake",
-      explanation: `Answer has substance (${words} words) but lacks a clear situation-action-outcome structure.`,
-      improvement: "Use STAR: 1 sentence of context, 2-3 on your actions, 1 on measured outcome.",
+      explanation: `The answer has some substance (${words} words) but does not establish a specific situation, personal action, and outcome.`,
+      improvement: "Give one real example: identify the situation, explain exactly what you personally did and why, then state the result.",
     };
   }
-  if (words >= 120 && hasStar && fillerHits <= 2) {
+  if (words >= 90 && hasMeasuredDetail && fillerHits <= 2) {
     return {
       verdict: "best",
-      explanation: `Thorough, structured answer (${words} words) with a concrete example and outcome.`,
+      explanation: `Detailed, structured answer (${words} words) with personal actions and a measured outcome.`,
       improvement: null,
     };
   }
   return {
     verdict: "good",
-    explanation: `Solid answer (${words} words) with a relevant example; could tighten wording and quantify impact.`,
+    explanation: `Solid answer (${words} words) with a concrete situation, personal actions, and an outcome; the impact is not yet measured.`,
     improvement: "Add one number (time saved, users, latency) to make the impact concrete.",
   };
 }

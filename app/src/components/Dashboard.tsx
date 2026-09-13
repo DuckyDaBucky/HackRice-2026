@@ -6,22 +6,11 @@ import {
   CodeIcon,
 } from "@phosphor-icons/react/ssr";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { SkillBars } from "@/components/dashboard/SkillBars";
 import { JoinInterview } from "@/components/dashboard/JoinInterview";
 import { WaveformAccent } from "@/components/dashboard/WaveformAccent";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import CountUp from "@/components/dashboard/CountUp";
-import {
-  focusCopy,
-  overallScore,
-  readinessDelta,
-  sessionDurationMinutes,
-  sessionScoreWithSkips,
-  shortDate,
-  skillBreakdownWithSkips,
-  skippedCountFor,
-  weakestCategory,
-} from "@/lib/dashboard/performance";
+import { readinessDelta, sessionDurationMinutes, shortDate } from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord, SessionStats } from "@/lib/sessions";
 import type { InterviewMode } from "@/lib/questions/types";
@@ -56,11 +45,8 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "abandoned") {
     return { label: "Try again", href: "/interview/setup" };
   }
-  if (session.isDurable && session.reportStatus === "completed") {
-    return { label: "Review report", href: `/interview/session/${session.id}/report` };
-  }
-  if (session.isDurable && session.reportStatus === "processing") {
-    return { label: "Report preparing", href: `/interview/session/${session.id}/report` };
+  if (session.isDurable && session.status === "completed") {
+    return { label: session.score === null ? "Open report" : "View report", href: `/interview/session/${session.id}/report` };
   }
   return { label: "Practice again", href: "/interview/setup" };
 }
@@ -100,7 +86,6 @@ export function Dashboard({
   firstName,
   stats,
   sessions,
-  answeredCounts,
   hasResume,
   role = "candidate",
   dashboardView = "practice",
@@ -108,23 +93,17 @@ export function Dashboard({
   firstName: string | null;
   stats: SessionStats;
   sessions: SessionRecord[];
-  answeredCounts: Record<string, number>;
   hasResume: boolean;
   role?: AppUserRole;
   dashboardView?: DashboardView;
 }) {
   const hasCompleted = stats.completedSessions > 0;
   const completed = sessions.filter((s) => s.status === "completed");
-
-  const scoresFor = (session: SessionRecord) => {
-    const answered = answeredCounts[session.id] ?? 0;
-    return skillBreakdownWithSkips(session.id, answered, session.questionCount);
-  };
-  const currentScores = completed[0] ? scoresFor(completed[0]) : null;
-  const overall = currentScores ? overallScore(currentScores) : null;
-  const previousOverall = completed[1] ? overallScore(scoresFor(completed[1])) : null;
+  const scored = completed.filter((session) => session.score !== null);
+  const latestScored = scored[0] ?? null;
+  const overall = scored[0]?.score ?? null;
+  const previousOverall = scored[1]?.score ?? null;
   const delta = overall !== null ? readinessDelta(previousOverall, overall) : null;
-  const focus = currentScores ? weakestCategory(currentScores) : null;
 
   return (
     <DashboardShell active="Home" firstName={firstName} role={role} dashboardView={dashboardView}>
@@ -173,27 +152,37 @@ export function Dashboard({
           />
         ) : (
           <>
-            {currentScores && overall !== null && (
-              <section className="rounded-xl border border-dash-border bg-dash-surface p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
-                  Performance <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] normal-case text-amber-600">preview</span>
-                </h2>
-                <p className="mt-1 text-xs text-dash-text-faint">Placeholder scores — rubric-based evaluation isn&apos;t wired up yet.</p>
-                <div className="mt-4 grid grid-cols-1 gap-8 sm:grid-cols-[160px_1fr]">
+            {overall !== null && (
+              <section className="relative overflow-hidden rounded-2xl bg-[#101817] p-6 text-white shadow-[0_18px_45px_rgba(18,55,50,0.16)] sm:p-7">
+                <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-accent/15 blur-3xl" aria-hidden="true" />
+                <div className="relative grid gap-6 sm:grid-cols-[1fr_auto] sm:items-end">
                   <div>
-                    <CountUp
-                      to={overall}
-                      duration={1}
-                      className="text-4xl font-bold tabular-nums text-dash-text"
-                    />
-                    <div className="mt-1 text-xs text-dash-text-muted">Interview readiness</div>
+                    <p className="text-xs font-semibold tracking-[0.16em] text-emerald-200/65 uppercase">Latest interview report</p>
+                    <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">Your evidence-based result</h2>
+                    <p className="mt-1 max-w-xl text-sm leading-6 text-white/55">One score everywhere, calculated from the verdicts in your report. Skipped or unsupported answers count as zero.</p>
+                    <div className="mt-5 flex items-end gap-2">
+                      <CountUp
+                        to={overall}
+                        duration={1}
+                        className="text-6xl font-semibold leading-none tracking-[-0.06em] tabular-nums text-white"
+                      />
+                      <span className="pb-1 text-sm text-white/40">/100 accuracy</span>
+                    </div>
                     {delta !== null && (
-                      <div className={`mt-1.5 text-xs font-medium ${delta >= 0 ? "text-accent-deep" : "text-dash-text-faint"}`}>
+                      <div className={`mt-2 text-xs font-medium ${delta >= 0 ? "text-emerald-300" : "text-white/45"}`}>
                         {delta >= 0 ? "↑" : "↓"} {Math.abs(delta)}% vs. your previous interview
                       </div>
                     )}
                   </div>
-                  <SkillBars scores={currentScores} className="max-w-sm" />
+                  {latestScored && (
+                    <Link
+                      href={`/interview/session/${latestScored.id}/report`}
+                      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-dash-on-accent transition duration-200 hover:-translate-y-0.5 hover:bg-accent-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white active:translate-y-0"
+                    >
+                      Open full report
+                      <ArrowRightIcon size={13} weight="bold" />
+                    </Link>
+                  )}
                 </div>
               </section>
             )}
@@ -218,14 +207,13 @@ export function Dashboard({
                   const action = actionFor(session);
                   const evidenceHref = evidenceHrefFor(session);
                   const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
-                  const answered = answeredCounts[session.id] ?? 0;
+                  const answered = session.answeredCount;
                   const isScored = session.status === "completed";
-                  const skipped = skippedCountFor(answered, session.questionCount);
-                  const score = isScored ? sessionScoreWithSkips(session.id, answered, session.questionCount) : null;
+                  const score = isScored ? session.score : null;
                   return (
                     <li
                       key={session.id}
-                      className="flex flex-col gap-2 px-4 py-3.5 transition-colors duration-150 hover:bg-dash-surface-hover sm:flex-row sm:items-center sm:gap-4"
+                      className="grid gap-3 px-4 py-4 transition-colors duration-200 hover:bg-dash-surface-hover sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5"
                     >
                       <div className="flex min-w-0 flex-1 items-center gap-3">
                         <Icon size={16} weight="light" className="shrink-0 text-dash-text-faint" />
@@ -240,28 +228,32 @@ export function Dashboard({
                           </div>
                         </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-4 pl-7 sm:pl-0">
-                        <span className={`text-xs font-medium ${STATUS_STYLE[session.status]}`}>
+                      <div className="flex flex-wrap items-center gap-2 pl-7 sm:justify-end sm:pl-0">
+                        <span className={`mr-1 text-xs font-medium ${STATUS_STYLE[session.status]}`}>
                           {STATUS_LABEL[session.status]}
                         </span>
                         {score !== null && (
                           <span
-                            className="text-sm font-semibold tabular-nums text-dash-text"
-                            title={
-                              skipped > 0
-                                ? `Preview score — penalized ${skipped} skipped question${skipped === 1 ? "" : "s"} (each skip scores 0)`
-                                : "Preview score — rubric-based scoring is not wired up yet"
-                            }
+                            className="rounded-md bg-dash-surface-muted px-2.5 py-1 text-sm font-semibold tabular-nums text-dash-text"
+                            title="Report score; skipped questions count as zero"
                           >
-                            {score} <span className="text-[10px] font-normal text-dash-text-faint">preview</span>
+                            {score}<span className="ml-0.5 text-[10px] font-medium text-dash-text-faint">/100</span>
                           </span>
                         )}
                         <Link
                           href={action.href}
-                          className="text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
+                          className={`inline-flex h-8 items-center rounded-md px-3 text-sm font-semibold transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.98] ${session.status === "completed" && session.isDurable ? "bg-accent text-dash-on-accent hover:bg-accent-hover" : "text-accent-deep hover:bg-dash-surface-muted hover:text-accent"}`}
                         >
                           {action.label}
                         </Link>
+                        {session.status === "completed" && (
+                          <Link
+                            href="/interview/setup"
+                            className="px-2 text-xs font-medium text-dash-text-muted transition-colors duration-200 hover:text-accent-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                          >
+                            Practice again
+                          </Link>
+                        )}
                         {evidenceHref && (
                           <Link
                             href={evidenceHref}
@@ -277,22 +269,6 @@ export function Dashboard({
               </ul>
             </section>
 
-            {focus && (
-              <section className="rounded-xl border border-dash-border bg-dash-surface-muted px-5 py-4">
-                <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
-                  Next focus
-                </h2>
-                <p className="mt-2 text-sm font-medium text-dash-text">{focus}</p>
-                <p className="mt-1 text-sm leading-relaxed text-dash-text-muted">{focusCopy(focus)}</p>
-                <Link
-                  href="/interview/setup"
-                  className="mt-2.5 inline-flex items-center gap-1 text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
-                >
-                  Practice this skill
-                  <ArrowRightIcon size={11} />
-                </Link>
-              </section>
-            )}
           </>
         )}
 

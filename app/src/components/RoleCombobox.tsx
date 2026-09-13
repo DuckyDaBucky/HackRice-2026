@@ -45,7 +45,7 @@ export function RoleCombobox({
   }
 
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
   }, []);
 
   const updateListPosition = () => {
@@ -84,7 +84,7 @@ export function RoleCombobox({
   }, [listId]);
 
   useEffect(() => {
-    setHighlight(0);
+    queueMicrotask(() => setHighlight(0));
   }, [value]);
 
   const choose = (option: Option) => {

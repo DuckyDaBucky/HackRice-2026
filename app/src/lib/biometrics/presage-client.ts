@@ -3,7 +3,12 @@ import { getObjectBuffer } from "@/lib/storage/r2";
 import { PresageBusyError, videoAnalysisSchema, type VideoAnalysis } from "./contracts";
 
 function presageApiUrl() {
-  return process.env.PRESAGE_API_URL || "http://presage-api:8080";
+  if (process.env.PRESAGE_API_URL) return process.env.PRESAGE_API_URL;
+  // `presage-api` resolves on the Compose network; local Next development
+  // reaches the same container through docker-compose.local.yml instead.
+  return process.env.NODE_ENV === "production"
+    ? "http://presage-api:8080"
+    : "http://localhost:8181";
 }
 
 /**
@@ -18,8 +23,9 @@ export async function analyzeArtifactClip(r2Key: string): Promise<VideoAnalysis>
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
+  const baseUrl = presageApiUrl();
   try {
-    const response = await fetch(`${presageApiUrl()}/v1/videos/analyze?includeRawProtobuf=false`, {
+    const response = await fetch(`${baseUrl}/v1/videos/analyze?includeRawProtobuf=false`, {
       method: "POST",
       body: form,
       signal: controller.signal,
@@ -32,6 +38,14 @@ export async function analyzeArtifactClip(r2Key: string): Promise<VideoAnalysis>
       throw new Error(`presage-api analysis failed with status ${response.status}.`);
     }
     return videoAnalysisSchema.parse(await response.json());
+  } catch (error) {
+    if (error instanceof PresageBusyError) throw error;
+    if (error instanceof TypeError) {
+      throw new Error(
+        `presage-api is unreachable at ${baseUrl}. Start it with "docker compose -f docker-compose.yml -f docker-compose.local.yml up -d presage-api" or set PRESAGE_API_URL.`,
+      );
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }

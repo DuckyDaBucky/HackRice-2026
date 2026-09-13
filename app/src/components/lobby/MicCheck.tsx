@@ -11,6 +11,7 @@ const TEST_SECONDS = 3;
  * Mic check: live level meter, short record/playback, optional transcription demo.
  */
 export function MicCheck({ stream }: { stream: MediaStream | null }) {
+  const meterRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const [phase, setPhase] = useState<"idle" | "recording" | "ready">("idle");
   const [clipUrl, setClipUrl] = useState<string | null>(null);
@@ -29,6 +30,7 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
         window.matchMedia("(prefers-reduced-motion: reduce)").matches);
     if (reduced) {
       if (barRef.current) barRef.current.style.transform = "scaleX(0.4)";
+      meterRef.current?.setAttribute("aria-valuenow", "40");
       return;
     }
     let context: AudioContext | null = null;
@@ -44,7 +46,9 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
         analyser.getByteTimeDomainData(data);
         let peak = 0;
         for (const value of data) peak = Math.max(peak, Math.abs(value - 128) / 128);
-        if (barRef.current) barRef.current.style.transform = `scaleX(${Math.min(1, peak * 2.2)})`;
+        const level = Math.min(1, peak * 2.2);
+        if (barRef.current) barRef.current.style.transform = `scaleX(${level})`;
+        meterRef.current?.setAttribute("aria-valuenow", String(Math.round(level * 100)));
         raf = requestAnimationFrame(tick);
       };
       tick();
@@ -139,11 +143,13 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
           </p>
         </div>
         <div
+          ref={meterRef}
           className="mt-3 h-5 overflow-hidden rounded-full bg-zinc-950 ring-1 ring-inset ring-zinc-800"
           role="meter"
           aria-label="Microphone input level"
           aria-valuemin={0}
           aria-valuemax={100}
+          aria-valuenow={0}
           aria-valuetext={phase === "recording" ? "Listening" : "Speak to see your level"}
         >
           <div

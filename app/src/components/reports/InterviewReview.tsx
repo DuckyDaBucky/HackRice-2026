@@ -3,6 +3,7 @@
 import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { ProcessMistake } from "@/lib/analytics/process-events";
 import type { ReportOverview } from "@/lib/reports/contracts";
+import { REPORT_VERDICT_SCORES, reportScoreFromVerdicts } from "@/lib/reports/scoring";
 import type { ReviewAnswer, SessionReview } from "@/lib/reports/timeline";
 import { formatDuration } from "@/lib/recording/format-duration";
 import { AnswerVideo } from "@/components/reports/AnswerVideo";
@@ -17,12 +18,12 @@ interface VerdictMeta {
 // Status palette (good / warning / serious / critical): color never carries a verdict alone — the
 // chess glyph and text label always ride with it, and the graph encodes quality by position.
 const VERDICTS: Record<string, VerdictMeta> = {
-  best: { label: "Best", glyph: "!!", color: "#0ca30c", score: 100 },
-  good: { label: "Good", glyph: "!", color: "#0ca30c", score: 80 },
-  inaccuracy: { label: "Inaccuracy", glyph: "?!", color: "#fab219", score: 55 },
-  mistake: { label: "Mistake", glyph: "?", color: "#ec835a", score: 30 },
-  blunder: { label: "Blunder", glyph: "??", color: "#d03b3b", score: 5 },
-  insufficient_evidence: { label: "Not evaluated", glyph: "–", color: "#898781", score: null },
+  best: { label: "Best", glyph: "!!", color: "#0ca30c", score: REPORT_VERDICT_SCORES.best },
+  good: { label: "Good", glyph: "!", color: "#0ca30c", score: REPORT_VERDICT_SCORES.good },
+  inaccuracy: { label: "Inaccuracy", glyph: "?!", color: "#fab219", score: REPORT_VERDICT_SCORES.inaccuracy },
+  mistake: { label: "Mistake", glyph: "?", color: "#ec835a", score: REPORT_VERDICT_SCORES.mistake },
+  blunder: { label: "Blunder", glyph: "??", color: "#d03b3b", score: REPORT_VERDICT_SCORES.blunder },
+  insufficient_evidence: { label: "Insufficient evidence", glyph: "–", color: "#898781", score: REPORT_VERDICT_SCORES.insufficient_evidence },
 };
 const NOT_REVIEWED: VerdictMeta = { label: "Not reviewed", glyph: "·", color: "#52514e", score: null };
 const SUMMARY_ORDER = ["best", "good", "inaccuracy", "mistake", "blunder", "insufficient_evidence"];
@@ -487,16 +488,13 @@ function EvaluationGraph({ answers, selected, onSelect }: {
 }
 
 function AccuracySummary({ answers, skippedCount = 0 }: { answers: ReviewAnswer[]; skippedCount?: number }) {
-  const scores = answers
-    .map((answer) => verdictOf(answer).score)
-    .filter((score): score is number => score !== null);
+  const scoredAnswers = answers.filter((answer) => verdictOf(answer).score !== null);
   const skipped = Math.max(0, Math.floor(skippedCount));
-  // Each skipped question scores 0 — skipping drags accuracy down proportionally.
-  const denominator = scores.length + skipped;
-  const accuracy =
-    denominator === 0
-      ? null
-      : Math.round(scores.reduce((sum, score) => sum + score, 0) / denominator);
+  const denominator = scoredAnswers.length + skipped;
+  const accuracy = reportScoreFromVerdicts(
+    answers.flatMap((answer) => answer.finding?.verdict ? [answer.finding.verdict] : []),
+    skipped,
+  );
   const rows = SUMMARY_ORDER.map((verdict) => ({
     verdict,
     meta: VERDICTS[verdict],
@@ -512,8 +510,8 @@ function AccuracySummary({ answers, skippedCount = 0 }: { answers: ReviewAnswer[
           {denominator === 0
             ? "No answers have been reviewed yet"
             : skipped > 0
-              ? `Across ${scores.length} reviewed + ${skipped} skipped (0 pts each)`
-              : `Across ${scores.length} reviewed ${scores.length === 1 ? "answer" : "answers"}`}
+              ? `Across ${scoredAnswers.length} scored + ${skipped} skipped (0 pts each)`
+              : `Across ${scoredAnswers.length} scored ${scoredAnswers.length === 1 ? "answer" : "answers"}`}
         </p>
       </div>
       <ul className="flex flex-col gap-2">

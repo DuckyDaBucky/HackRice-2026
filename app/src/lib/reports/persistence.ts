@@ -84,7 +84,13 @@ export async function getSessionTimelineContext(
       status: interviewPlanQuestions.status,
     })
     .from(interviewPlanQuestions)
-    .where(and(eq(interviewPlanQuestions.sessionId, sessionId), isNull(interviewPlanQuestions.deletedAt)))
+    .where(
+      and(
+        eq(interviewPlanQuestions.sessionId, sessionId),
+        isNull(interviewPlanQuestions.deletedAt),
+        isNull(interviewPlanQuestions.supersededAt),
+      ),
+    )
     .orderBy(asc(interviewPlanQuestions.position));
 
   const turns = await orm

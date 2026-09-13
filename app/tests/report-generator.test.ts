@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createFallbackReport, reportInputHash } from "../src/lib/reports/generator";
 import { rawReportSchema, REPORT_VERDICTS } from "../src/lib/reports/contracts";
 import type { ReportTranscriptTurn } from "../src/lib/reports/contracts";
+import { reportScoreFromVerdicts } from "../src/lib/reports/scoring";
 
 const turns: ReportTranscriptTurn[] = [
   {
@@ -31,9 +32,26 @@ describe("report fallback", () => {
     expect(fallback.findings).toHaveLength(0);
   });
 
+  it("does not reward a long repetitive answer", () => {
+    const fallback = createFallbackReport([
+      { ...turns[0], text: Array.from({ length: 60 }, () => "synergy").join(" ") },
+    ]);
+    expect(fallback.findings[0].verdict).toBe("insufficient_evidence");
+  });
+
   it("hashes transcript input deterministically", () => {
     expect(reportInputHash(turns)).toHaveLength(64);
     expect(reportInputHash(turns)).toBe(reportInputHash(turns));
+  });
+});
+
+describe("canonical report score", () => {
+  it("uses the report verdict values and counts skips as zero", () => {
+    expect(reportScoreFromVerdicts(["best", "good"], 1)).toBe(60);
+  });
+
+  it("counts an attempted answer with insufficient evidence as zero", () => {
+    expect(reportScoreFromVerdicts(["insufficient_evidence"], 0)).toBe(0);
   });
 });
 

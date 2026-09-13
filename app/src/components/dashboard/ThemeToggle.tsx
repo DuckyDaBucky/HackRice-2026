@@ -1,5 +1,6 @@
 "use client";
 
+import { useLayoutEffect } from "react";
 import { MoonIcon, SunIcon } from "@phosphor-icons/react";
 
 const STORAGE_KEY = "dashboard-theme";
@@ -7,12 +8,23 @@ const STORAGE_KEY = "dashboard-theme";
 /**
  * The icon swap is driven purely by the `[data-theme=dark]` CSS selector
  * (both icons always render; CSS decides which is visible) rather than
- * React state — that state would start wrong on the server (no access to
- * localStorage) and have to correct itself after hydration, which is
- * exactly the synchronize-external-state-via-effect pattern React's hooks
- * lint now flags. Reading + writing the DOM attribute directly avoids it.
+ * React state. A layout effect restores the persisted DOM attribute during
+ * hydration; subsequent toggles update the attribute directly, so there is
+ * no server/client state mismatch and no render-time script element.
  */
 export function ThemeToggle() {
+  useLayoutEffect(() => {
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === "dark") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
+    } catch {
+      // The pre-paint default remains valid when storage is unavailable.
+    }
+  }, []);
+
   function toggle() {
     const isDark = document.documentElement.getAttribute("data-theme") === "dark";
     const next = isDark ? "light" : "dark";

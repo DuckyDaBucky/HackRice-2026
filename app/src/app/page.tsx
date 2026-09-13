@@ -13,7 +13,6 @@ import { Dashboard } from "@/components/Dashboard";
 import { HrDashboard } from "@/components/dashboard/HrDashboard";
 import { getSessionStats, listRecentSessions, type SessionStats } from "@/lib/sessions";
 import { getProfile } from "@/lib/profiles";
-import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
 import { resolveAppUserRole } from "@/lib/user-roles";
 import { DASHBOARD_VIEW_COOKIE, resolveDashboardView } from "@/lib/dashboard/view-mode";
 import { loadHrDashboardData } from "@/lib/hiring/hr-dashboard-data";
@@ -77,7 +76,6 @@ export default async function Home() {
   let stats: SessionStats = EMPTY_STATS;
   let sessions: Awaited<ReturnType<typeof listRecentSessions>> = [];
   let profile: Awaited<ReturnType<typeof getProfile>> = null;
-  let answeredCounts: Record<string, number> = {};
   let dbDown = false;
   try {
     const [loadedStats, loadedSessions, loadedProfile] = await Promise.all([
@@ -88,7 +86,6 @@ export default async function Home() {
     stats = loadedStats;
     sessions = loadedSessions;
     profile = loadedProfile;
-    answeredCounts = await countUploadedAttemptsBySession(sessions.map((s) => s.id));
   } catch (error) {
     console.error("Dashboard database unavailable, rendering empty state", error);
     dbDown = true;
@@ -106,7 +103,6 @@ export default async function Home() {
         firstName={user.firstName}
         stats={stats}
         sessions={sessions}
-        answeredCounts={answeredCounts}
         hasResume={profile !== null}
         role={role}
         dashboardView={dashboardView}

@@ -7,8 +7,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getDashboardShellContext } from "@/lib/dashboard/shell-props";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { listRecentSessions } from "@/lib/sessions";
-import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
-import { sessionDurationMinutes, sessionScoreWithSkips, shortDate } from "@/lib/dashboard/performance";
+import { sessionDurationMinutes, shortDate } from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
 import type { SessionRecord } from "@/lib/sessions";
 
@@ -52,11 +51,8 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "abandoned") {
     return { label: "Try again", href: "/interview/setup" };
   }
-  if (session.isDurable && session.reportStatus === "completed") {
-    return { label: "Review report", href: `/interview/session/${session.id}/report` };
-  }
-  if (session.isDurable && session.reportStatus === "processing") {
-    return { label: "Report preparing", href: `/interview/session/${session.id}/report` };
+  if (session.isDurable && session.status === "completed") {
+    return { label: session.score === null ? "Open report" : "View report", href: `/interview/session/${session.id}/report` };
   }
   return { label: "Practice again", href: "/interview/setup" };
 }
@@ -68,7 +64,6 @@ export default async function InterviewsPage() {
 
   const sessions = await listRecentSessions(user.id, 50);
   const shell = await getDashboardShellContext(user.id);
-  const answeredCounts = await countUploadedAttemptsBySession(sessions.map((s) => s.id));
 
   return (
     <DashboardShell active="Interviews" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
@@ -98,7 +93,7 @@ export default async function InterviewsPage() {
                     <th className="px-4 py-2.5 font-medium">Date</th>
                     <th className="px-4 py-2.5 font-medium">Duration</th>
                     <th className="px-4 py-2.5 font-medium">Questions</th>
-                    <th className="px-4 py-2.5 font-medium">Score (preview)</th>
+                    <th className="px-4 py-2.5 font-medium">Report score</th>
                     <th className="px-4 py-2.5 font-medium">Status</th>
                     <th className="px-4 py-2.5 font-medium" />
                   </tr>
@@ -107,8 +102,7 @@ export default async function InterviewsPage() {
                   {sessions.map((session) => {
                     const action = actionFor(session);
                     const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
-                    const answered = answeredCounts[session.id] ?? 0;
-                    const score = session.status === "completed" ? sessionScoreWithSkips(session.id, answered, session.questionCount) : null;
+                    const score = session.status === "completed" ? session.score : null;
                     return (
                       <tr key={session.id} className="transition-colors duration-150 hover:bg-dash-surface-hover">
                         <td className="px-4 py-3 text-dash-text">
@@ -121,7 +115,7 @@ export default async function InterviewsPage() {
                           {duration ? `${duration}m` : "—"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-dash-text-muted tabular-nums">
-                          {session.questionCount}
+                          {session.answeredCount} / {session.questionCount}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 font-semibold tabular-nums text-dash-text">
                           {score ?? "—"}
@@ -132,7 +126,7 @@ export default async function InterviewsPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-right">
                           <Link
                             href={action.href}
-                            className="font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
+                            className={`inline-flex h-8 items-center rounded-md px-3 font-semibold transition duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent active:scale-[0.98] ${session.status === "completed" && session.isDurable ? "bg-accent text-dash-on-accent hover:bg-accent-hover" : "text-accent-deep hover:bg-dash-surface-muted hover:text-accent"}`}
                           >
                             {action.label}
                           </Link>

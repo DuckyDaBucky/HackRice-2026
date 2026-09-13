@@ -5,20 +5,10 @@ import { clerkEnabled } from "@/lib/clerk";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getDashboardShellContext } from "@/lib/dashboard/shell-props";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-import { SkillBars } from "@/components/dashboard/SkillBars";
 import { Sparkline } from "@/components/dashboard/Sparkline";
 import CountUp from "@/components/dashboard/CountUp";
 import { listRecentSessions } from "@/lib/sessions";
-import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
-import {
-  SKILL_CATEGORIES,
-  overallScore,
-  readinessDelta,
-  readinessLabel,
-  sessionScoreWithSkips,
-  skillBreakdownWithSkips,
-  type SkillScores,
-} from "@/lib/dashboard/performance";
+import { readinessDelta, readinessLabel } from "@/lib/dashboard/performance";
 
 export default async function AnalyticsPage() {
   if (!clerkEnabled) redirect("/");
@@ -28,9 +18,11 @@ export default async function AnalyticsPage() {
   const sessions = await listRecentSessions(user.id, 50);
   const completed = sessions.filter((s) => s.status === "completed");
   const shell = await getDashboardShellContext(user.id);
-  const answeredCounts = await countUploadedAttemptsBySession(completed.map((s) => s.id));
+  const scored = completed.filter(
+    (session): session is (typeof completed)[number] & { score: number } => session.score !== null,
+  );
 
-  if (completed.length === 0) {
+  if (scored.length === 0) {
     return (
       <DashboardShell active="Analytics" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
         <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6">
@@ -41,7 +33,9 @@ export default async function AnalyticsPage() {
           <EmptyState
             icon={ChartBarIcon}
             title="No completed interviews yet"
-            body="Finish a practice interview to see your score and skill breakdown here."
+            body={completed.length > 0
+              ? "Your interview review is still preparing. Scores appear here once the report is ready."
+              : "Finish a practice interview to see its report score here."}
             ctaLabel="Start practicing"
             ctaHref="/interview/setup"
           />
@@ -50,35 +44,21 @@ export default async function AnalyticsPage() {
     );
   }
 
-  // Oldest → newest, for the trend line; reversed for the "recent" list below.
-  // Each skipped question scores 0, so skipping drags history + aggregates down.
-  const chronological = [...completed].reverse();
-  const answeredFor = (s: (typeof completed)[number]) => answeredCounts[s.id] ?? 0;
-  const history = chronological.map((s) => sessionScoreWithSkips(s.id, answeredFor(s), s.questionCount));
+  // Oldest → newest, using the exact score persisted for each report.
+  const chronological = [...scored].reverse();
+  const history = chronological.map((session) => session.score);
   const currentScore = history[history.length - 1];
   const previousScore = history.length > 1 ? history[history.length - 2] : null;
   const delta = readinessDelta(previousScore, currentScore);
-
-  const perSessionScores = completed.map((s) => skillBreakdownWithSkips(s.id, answeredFor(s), s.questionCount));
-  const aggregate = SKILL_CATEGORIES.reduce((acc, category) => {
-    acc[category] = Math.round(
-      perSessionScores.reduce((sum, s) => sum + s[category], 0) / perSessionScores.length,
-    );
-    return acc;
-  }, {} as SkillScores);
-  const aggregateOverall = overallScore(aggregate);
-
-  const ranked = [...SKILL_CATEGORIES].sort((a, b) => aggregate[b] - aggregate[a]);
-  const strengths = ranked.slice(0, 2);
-  const needsImprovement = ranked.slice(-2).reverse();
+  const aggregateOverall = Math.round(history.reduce((sum, score) => sum + score, 0) / history.length);
 
   return (
     <DashboardShell active="Analytics" firstName={user.firstName} role={shell.role} dashboardView={shell.dashboardView}>
       <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 align-middle text-[11px] font-medium text-amber-600">preview scores</span></h1>
+          <h1 className="text-[28px] font-semibold tracking-tight text-dash-text">Analytics</h1>
           <p className="mt-1 text-sm text-dash-text-muted">
-            Based on your last {completed.length} completed interview{completed.length === 1 ? "" : "s"}. Scores are placeholders until rubric evaluation lands.
+            Based on {scored.length} completed interview report{scored.length === 1 ? "" : "s"}. These are the same scores shown in each report.
           </p>
         </div>
 
@@ -113,36 +93,6 @@ export default async function AnalyticsPage() {
                 </div>
               </div>
             )}
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
-            Skill breakdown
-          </h2>
-          <SkillBars scores={aggregate} className="mt-3 max-w-sm" />
-        </section>
-
-        <section className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-          <div className="rounded-xl border border-dash-border bg-dash-surface-muted p-5">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
-              Strengths
-            </h2>
-            <ul className="mt-3 flex flex-col gap-1.5 text-sm text-dash-text">
-              {strengths.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-xl border border-dash-border bg-dash-surface-muted p-5">
-            <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
-              Needs work
-            </h2>
-            <ul className="mt-3 flex flex-col gap-1.5 text-sm text-dash-text">
-              {needsImprovement.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
           </div>
         </section>
 

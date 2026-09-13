@@ -36,8 +36,11 @@ export default async function InterviewReportPage({
             between answers.
           </p>
         </div>
-        {needsReview && (
-          <GenerateReportButton sessionId={sessionId} label={report ? "Retry review" : "Generate review"} />
+        {canReview && (
+          <GenerateReportButton
+            sessionId={sessionId}
+            label={needsReview ? (report ? "Retry review" : "Generate review") : "Re-evaluate strictly"}
+          />
         )}
       </div>
 
@@ -61,7 +64,7 @@ export default async function InterviewReportPage({
         review={review}
         overview={report && !report.usedFallback ? report.overview : report?.overview ?? null}
         sessionId={sessionId}
-        aside={<BiometricsCard sessionId={sessionId} analyses={biometrics} />}
+        aside={<BiometricsCard key="biometrics" sessionId={sessionId} analyses={biometrics} />}
       />
     </div>
   );

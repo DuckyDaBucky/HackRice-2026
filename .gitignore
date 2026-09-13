@@ -17,6 +17,7 @@ build/
 
 # IDE / local
 .cursor/
+.claude/worktrees/
 .DS_Store
 *.pem
 

@@ -3,22 +3,32 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
+import { clerkEnabled } from "@/lib/clerk";
 import { candidateExchangeInvitation, candidateBindEmail } from "../actions";
 
 export default function CandidateInvitePage() {
-  const router = useRouter();
+  return clerkEnabled ? <ClerkCandidateInvite /> : <CandidateInvite isSignedIn={false} />;
+}
+
+// useAuth throws outside <ClerkProvider>, which AuthProvider omits when Clerk is unconfigured.
+function ClerkCandidateInvite() {
   const { isSignedIn } = useAuth();
-  const [status, setStatus] = useState<"loading" | "ready" | "error" | "redirecting">("loading");
+  return <CandidateInvite isSignedIn={Boolean(isSignedIn)} />;
+}
+
+function CandidateInvite({ isSignedIn }: { isSignedIn: boolean }) {
+  const router = useRouter();
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "redirecting">(() =>
+    typeof window !== "undefined" && window.location.hash ? "loading" : "error",
+  );
   const [details, setDetails] = useState<{ invitationId: string; candidacyId: string; jobTitle: string; orgName: string; sandboxLabel: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    typeof window !== "undefined" && window.location.hash ? null : "Missing invitation link.",
+  );
 
   useEffect(() => {
     const hash = window.location.hash.slice(1);
-    if (!hash) {
-      setStatus("error");
-      setError("Missing invitation link.");
-      return;
-    }
+    if (!hash) return;
     history.replaceState(null, "", window.location.pathname);
     void candidateExchangeInvitation(hash)
       .then(async (d) => {

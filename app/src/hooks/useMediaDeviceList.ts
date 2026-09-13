@@ -33,7 +33,7 @@ export function useMediaDeviceList() {
   }, [refresh]);
 
   useEffect(() => {
-    void refresh();
+    queueMicrotask(() => void refresh());
     navigator.mediaDevices?.addEventListener?.("devicechange", refresh);
     return () => navigator.mediaDevices?.removeEventListener?.("devicechange", refresh);
   }, [refresh]);

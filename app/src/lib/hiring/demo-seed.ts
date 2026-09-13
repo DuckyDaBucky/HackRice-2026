@@ -269,10 +269,8 @@ export async function seedDemoHiringLinks(params: {
   }
 
   let interviewSessionId: string | null = null;
-  let verifiedCandidacyId: string | null = null;
   if (params.clerkUserId) {
     const interviewFlow = await ensureCandidacy(interviewEmail, name, "verified");
-    verifiedCandidacyId = interviewFlow.candidacyId;
     const interviewInvite = await ensureInvitation(interviewFlow.candidacyId, interviewFlow.packRevision);
     await db.query(`UPDATE candidacies SET clerk_user_id = $2 WHERE id = $1`, [interviewFlow.candidacyId, params.clerkUserId]);
     await db.query(
