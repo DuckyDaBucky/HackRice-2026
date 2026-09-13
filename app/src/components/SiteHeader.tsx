@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { clerkEnabled } from "@/lib/clerk";
 import { usePathname } from "next/navigation";
 import { SignInButton, SignUpButton, Show, UserButton } from "@clerk/nextjs";
+import { Logo } from "@/components/marketing/Logo";
 
 // Routes that own their full chrome (the marketing nav, or DashboardShell's
 // sidebar + user menu) and therefore don't need this generic top bar.
@@ -15,13 +17,16 @@ export function SiteHeader() {
     !clerkEnabled ||
     pathname === "/interview" ||
     pathname.startsWith("/interview/") ||
+    pathname.startsWith("/reports/") ||
     OWN_HEADER_ROUTES.includes(pathname)
   )
     return null;
 
   return (
     <header className="flex items-center justify-between gap-4 px-6 py-4">
-      <span className="text-sm font-medium tracking-tight text-zinc-100">HackRice</span>
+      <Link href="/">
+        <Logo size="sm" />
+      </Link>
       <div className="flex items-center gap-3">
         <Show when="signed-out">
           <SignInButton>
