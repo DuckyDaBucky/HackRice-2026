@@ -130,17 +130,31 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
         <p className="max-w-md text-sm leading-relaxed text-zinc-400">
           Your recording and saved caption evidence are ready for review.
         </p>
-        <button
-          type="button"
-          onClick={() => router.push(`/interview/session/${initialState.session.id}/report`)}
-          className="rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]"
-        >
-          Review report
-        </button>
+        {timeBudgetReached && (
+          <p role="status" className="max-w-md rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200">
+            Time budget was reached — the interview closed automatically after your last answer.
+          </p>
+        )}
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push(`/interview/session/${initialState.session.id}/report`)}
+            className="rounded-full bg-sky-500 px-6 py-3 text-sm font-medium text-zinc-950 transition active:scale-[0.98]"
+          >
+            Answer review
+          </button>
+          <button
+            type="button"
+            onClick={() => router.push(`/reports/${initialState.session.id}`)}
+            className="rounded-full border border-zinc-700 px-6 py-3 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.98]"
+          >
+            Evidence
+          </button>
+        </div>
         <button
           type="button"
           onClick={() => router.push("/")}
-          className="rounded-full border border-zinc-700 px-6 py-3 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"
+          className="text-sm text-zinc-500 underline-offset-4 transition hover:text-zinc-300 hover:underline"
         >
           Back to dashboard
         </button>
@@ -172,6 +186,12 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
     ? (followUpPrompt ?? initialState.activeFollowUp.wording)
     : (followUpPrompt ?? currentQuestion.prompt);
   return (
+    <div className="flex flex-col">
+      {timeBudgetReached && !done && (
+        <p role="status" className="mx-auto mt-4 w-fit rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-medium text-amber-200">
+          Time budget reached — finish this answer and the interview will close automatically.
+        </p>
+      )}
     <CameraRecorder
       recorder={recorder}
       mode={mode}
@@ -258,5 +278,6 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
         setIndex(nextIndex);
       }}
     />
+    </div>
   );
 }

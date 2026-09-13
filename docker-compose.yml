@@ -19,6 +19,12 @@ services:
       PORT: 3000
     expose:
       - "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   presage-api:
     build:
@@ -48,9 +54,11 @@ services:
     build:
       context: ./deploy/nginx
     restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:-getmehired.today}
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
       presage-api:
         condition: service_healthy
     ports:

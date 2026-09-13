@@ -15,9 +15,10 @@ import {
   overallScore,
   readinessDelta,
   sessionDurationMinutes,
-  sessionScore,
+  sessionScoreWithSkips,
   shortDate,
-  skillBreakdown,
+  skillBreakdownWithSkips,
+  skippedCountFor,
   weakestCategory,
 } from "@/lib/dashboard/performance";
 import { MOOD_OPTIONS } from "@/lib/interview-config";
@@ -38,7 +39,8 @@ const MOOD_LABEL: Record<string, string> = Object.fromEntries(
   MOOD_OPTIONS.map((option) => [option.id, option.label]),
 );
 
-/** Mirrors the durable-session/report lifecycle from src/components/Dashboard.tsx on main. */
+/** Canonical report route is the chess-style answer review.
+ *  Evidence-only /reports/:id remains available as a secondary link. */
 function actionFor(session: SessionRecord): { label: string; href: string } {
   if (session.status === "in_progress" || session.status === "paused" || session.status === "planned") {
     return {
@@ -60,26 +62,28 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
   return { label: "Practice again", href: "/interview/setup" };
 }
 
-/** Only durable (v2) sessions have the turn/transcript history a report needs. */
-function reportHrefFor(session: SessionRecord): string | null {
+/** Evidence-only report (clips + captions), secondary to the canonical review. */
+function evidenceHrefFor(session: SessionRecord): string | null {
   if (session.status !== "completed" || !session.isDurable) return null;
-  return `/interview/session/${session.id}/report`;
+  return `/reports/${session.id}`;
 }
 
-const STATUS_LABEL: Record<SessionRecord["status"], string> = {
+const STATUS_LABEL: Record<SessionRecord["status"] | "deleted", string> = {
   completed: "Completed",
   in_progress: "In progress",
   paused: "Paused",
   planned: "Ready to start",
   abandoned: "Abandoned",
+  deleted: "Deleted",
 };
 
-const STATUS_STYLE: Record<SessionRecord["status"], string> = {
+const STATUS_STYLE: Record<SessionRecord["status"] | "deleted", string> = {
   completed: "text-dash-success",
   in_progress: "text-amber-600",
   paused: "text-amber-600",
   planned: "text-dash-blue",
   abandoned: "text-dash-text-faint",
+  deleted: "text-dash-text-faint",
 };
 
 function greeting(): string {
@@ -105,9 +109,13 @@ export function Dashboard({
   const hasCompleted = stats.completedSessions > 0;
   const completed = sessions.filter((s) => s.status === "completed");
 
-  const currentScores = completed[0] ? skillBreakdown(completed[0].id) : null;
+  const scoresFor = (session: SessionRecord) => {
+    const answered = answeredCounts[session.id] ?? 0;
+    return skillBreakdownWithSkips(session.id, answered, session.questionCount);
+  };
+  const currentScores = completed[0] ? scoresFor(completed[0]) : null;
   const overall = currentScores ? overallScore(currentScores) : null;
-  const previousOverall = completed[1] ? overallScore(skillBreakdown(completed[1].id)) : null;
+  const previousOverall = completed[1] ? overallScore(scoresFor(completed[1])) : null;
   const delta = overall !== null ? readinessDelta(previousOverall, overall) : null;
   const focus = currentScores ? weakestCategory(currentScores) : null;
 
@@ -161,8 +169,9 @@ export function Dashboard({
             {currentScores && overall !== null && (
               <section className="rounded-xl border border-dash-border bg-dash-surface p-6 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                 <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dash-text-muted">
-                  Performance
+                  Performance <span className="ml-1 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] normal-case text-amber-600">preview</span>
                 </h2>
+                <p className="mt-1 text-xs text-dash-text-faint">Placeholder scores — rubric-based evaluation isn&apos;t wired up yet.</p>
                 <div className="mt-4 grid grid-cols-1 gap-8 sm:grid-cols-[160px_1fr]">
                   <div>
                     <div className="text-4xl font-bold tabular-nums text-dash-text">{overall}</div>
@@ -196,11 +205,12 @@ export function Dashboard({
                 {sessions.slice(0, 4).map((session) => {
                   const Icon = MODE_ICON[session.mode];
                   const action = actionFor(session);
-                  const reportHref = reportHrefFor(session);
+                  const evidenceHref = evidenceHrefFor(session);
                   const duration = sessionDurationMinutes(session.createdAt, session.completedAt);
                   const answered = answeredCounts[session.id] ?? 0;
                   const isScored = session.status === "completed";
-                  const score = isScored ? sessionScore(session.id) : null;
+                  const skipped = skippedCountFor(answered, session.questionCount);
+                  const score = isScored ? sessionScoreWithSkips(session.id, answered, session.questionCount) : null;
                   return (
                     <li
                       key={session.id}
@@ -224,17 +234,16 @@ export function Dashboard({
                           {STATUS_LABEL[session.status]}
                         </span>
                         {score !== null && (
-                          <span className="text-sm font-semibold tabular-nums text-dash-text">
-                            {score}
-                          </span>
-                        )}
-                        {reportHref && (
-                          <Link
-                            href={reportHref}
-                            className="text-sm font-medium text-accent-deep transition-colors duration-150 hover:text-accent"
+                          <span
+                            className="text-sm font-semibold tabular-nums text-dash-text"
+                            title={
+                              skipped > 0
+                                ? `Preview score — penalized ${skipped} skipped question${skipped === 1 ? "" : "s"} (each skip scores 0)`
+                                : "Preview score — rubric-based scoring is not wired up yet"
+                            }
                           >
-                            Answer review
-                          </Link>
+                            {score} <span className="text-[10px] font-normal text-dash-text-faint">preview</span>
+                          </span>
                         )}
                         <Link
                           href={action.href}
@@ -242,6 +251,14 @@ export function Dashboard({
                         >
                           {action.label}
                         </Link>
+                        {evidenceHref && (
+                          <Link
+                            href={evidenceHref}
+                            className="text-xs text-dash-text-faint transition-colors duration-150 hover:text-accent"
+                          >
+                            Evidence
+                          </Link>
+                        )}
                       </div>
                     </li>
                   );

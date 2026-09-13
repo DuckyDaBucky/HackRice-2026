@@ -16,6 +16,12 @@ export default async function InterviewReportPage({ params }: PageProps<"/report
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-6 py-12 sm:px-10">
       <Link href="/" className="inline-flex w-fit items-center gap-2 text-sm text-zinc-400 hover:text-zinc-100"><ArrowLeftIcon size={16} /> Dashboard</Link>
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3 text-sm text-sky-100">
+        <span>Looking for verdicts and what to say instead?</span>
+        <Link href={`/interview/session/${sessionId}/report`} className="font-medium underline underline-offset-4 hover:text-white">
+          Open answer review (canonical)
+        </Link>
+      </div>
       <header className="flex flex-col gap-3">
         <span className="text-xs font-medium uppercase tracking-wide text-sky-400">Practice report</span>
         <h1 className="text-3xl font-semibold tracking-tight text-zinc-50">Evidence from this interview</h1>

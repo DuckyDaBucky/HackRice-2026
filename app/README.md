@@ -34,10 +34,11 @@ const sessions = await orm
   .where(eq(interviewSessions.clerkUserId, userId));
 ```
 
-Use `pnpm db:generate` after schema changes. `pnpm db:migrate`, `pnpm db:push`,
-and `pnpm db:studio` target the database in `DATABASE_URL`. The existing DEV
-database already has migrations `0001` and `0002`; do not replay Drizzle's
-`0000` baseline against it.
+Use `pnpm db:studio` to inspect the database in `DATABASE_URL`. Do NOT run
+`db:generate / db:migrate / db:push` against shared DEV (see AGENTS.md) —
+migrations in `migrations/0001-0012` are applied by hand via
+`psql "$DATABASE_URL" -f migrations/<file>.sql`. Never replay Drizzle's
+`drizzle/0000` baseline against a DB that already applied `0001+`.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 

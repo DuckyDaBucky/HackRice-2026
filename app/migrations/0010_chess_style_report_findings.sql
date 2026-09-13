@@ -9,7 +9,7 @@ BEGIN;
 
 DROP TABLE IF EXISTS report_findings;
 
-CREATE TABLE report_findings (
+CREATE TABLE IF NOT EXISTS report_findings (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     session_id uuid NOT NULL REFERENCES interview_sessions(id) ON DELETE CASCADE,
     generation_id uuid NOT NULL REFERENCES ai_generations(id) ON DELETE CASCADE,
@@ -21,8 +21,9 @@ CREATE TABLE report_findings (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX report_findings_session_idx ON report_findings (session_id, created_at DESC);
-CREATE INDEX report_findings_generation_idx ON report_findings (generation_id);
-CREATE UNIQUE INDEX report_findings_generation_turn_key ON report_findings (generation_id, turn_id);
+CREATE INDEX IF NOT EXISTS report_findings_session_idx ON report_findings (session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS report_findings_generation_idx ON report_findings (generation_id);
+DROP INDEX IF EXISTS report_findings_generation_turn_key;
+CREATE UNIQUE INDEX IF NOT EXISTS report_findings_generation_turn_key ON report_findings (generation_id, turn_id);
 
 COMMIT;

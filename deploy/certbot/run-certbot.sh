@@ -1,7 +1,7 @@
 #!/bin/sh
 set -u
 
-domain="getmehired.today"
+domain="${DOMAIN:-getmehired.today}"
 
 if [ -n "${CERTBOT_EMAIL:-}" ]; then
     set -- --email "$CERTBOT_EMAIL"

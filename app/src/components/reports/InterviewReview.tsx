@@ -486,11 +486,17 @@ function EvaluationGraph({ answers, selected, onSelect }: {
   );
 }
 
-function AccuracySummary({ answers }: { answers: ReviewAnswer[] }) {
+function AccuracySummary({ answers, skippedCount = 0 }: { answers: ReviewAnswer[]; skippedCount?: number }) {
   const scores = answers
     .map((answer) => verdictOf(answer).score)
     .filter((score): score is number => score !== null);
-  const accuracy = scores.length ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length) : null;
+  const skipped = Math.max(0, Math.floor(skippedCount));
+  // Each skipped question scores 0 — skipping drags accuracy down proportionally.
+  const denominator = scores.length + skipped;
+  const accuracy =
+    denominator === 0
+      ? null
+      : Math.round(scores.reduce((sum, score) => sum + score, 0) / denominator);
   const rows = SUMMARY_ORDER.map((verdict) => ({
     verdict,
     meta: VERDICTS[verdict],
@@ -503,9 +509,11 @@ function AccuracySummary({ answers }: { answers: ReviewAnswer[] }) {
         <h2 className="text-sm font-medium text-zinc-400">Answer accuracy</h2>
         <p className="text-5xl font-semibold text-zinc-50">{accuracy === null ? "—" : `${accuracy}%`}</p>
         <p className="text-xs text-zinc-500">
-          {scores.length
-            ? `Across ${scores.length} reviewed ${scores.length === 1 ? "answer" : "answers"}`
-            : "No answers have been reviewed yet"}
+          {denominator === 0
+            ? "No answers have been reviewed yet"
+            : skipped > 0
+              ? `Across ${scores.length} reviewed + ${skipped} skipped (0 pts each)`
+              : `Across ${scores.length} reviewed ${scores.length === 1 ? "answer" : "answers"}`}
         </p>
       </div>
       <ul className="flex flex-col gap-2">
@@ -518,6 +526,15 @@ function AccuracySummary({ answers }: { answers: ReviewAnswer[] }) {
             <span className="text-zinc-100 tabular-nums">{row.count}</span>
           </li>
         ))}
+        {skipped > 0 && (
+          <li className="flex items-center justify-between text-sm">
+            <span className="inline-flex items-center gap-2 text-zinc-300">
+              <VerdictGlyph meta={{ label: "Skipped", glyph: "✕", color: "#52514e", score: 0 }} size="sm" />
+              Skipped (0 pts)
+            </span>
+            <span className="text-zinc-100 tabular-nums">{skipped}</span>
+          </li>
+        )}
       </ul>
     </section>
   );
@@ -598,6 +615,7 @@ export function InterviewReview({ review, overview, aside, sessionId }: {
 }) {
   const [selected, setSelected] = useState(0);
   const count = review.answers.length;
+  const skippedTotal = review.processMistakes.filter((m) => m.kind === "skipped_question").length;
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -612,19 +630,30 @@ export function InterviewReview({ review, overview, aside, sessionId }: {
 
   if (count === 0) {
     return (
-      <p className="rounded-2xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
-        No answers were recorded in this session, so there is nothing to review yet.
-      </p>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <p className="rounded-2xl border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
+          {skippedTotal > 0
+            ? `All ${skippedTotal} question${skippedTotal === 1 ? " was" : "s were"} skipped — each skip scores 0.`
+            : "No answers were recorded in this session, so there is nothing to review yet."}
+        </p>
+        <aside className="flex flex-col gap-6">
+          <AccuracySummary answers={[]} skippedCount={skippedTotal} />
+          {review.processMistakes.length > 0 && <SessionIssues mistakes={review.processMistakes} />}
+          {aside}
+        </aside>
+      </div>
     );
   }
 
   const current = Math.min(selected, count - 1);
   const step = (delta: number) => setSelected((index) => Math.min(count - 1, Math.max(0, index + delta)));
+  const skippedCount = skippedTotal;
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="flex min-w-0 flex-col gap-6">
         <AnswerDetail
+          key={review.answers[current].turnId}
           answer={review.answers[current]}
           total={count}
           answers={review.answers}
@@ -637,7 +666,7 @@ export function InterviewReview({ review, overview, aside, sessionId }: {
         <EvaluationGraph answers={review.answers} selected={current} onSelect={setSelected} />
       </div>
       <aside className="flex flex-col gap-6">
-        <AccuracySummary answers={review.answers} />
+        <AccuracySummary answers={review.answers} skippedCount={skippedCount} />
         {overview && <KeyProblems overview={overview} />}
         <MoveList answers={review.answers} selected={current} onSelect={setSelected} />
         {review.processMistakes.length > 0 && <SessionIssues mistakes={review.processMistakes} />}

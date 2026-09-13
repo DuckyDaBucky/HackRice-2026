@@ -710,9 +710,10 @@ export type NewMediaArtifact = typeof mediaArtifacts.$inferInsert;
 export type AudioTranscript = typeof audioTranscripts.$inferSelect;
 export type NewAudioTranscript = typeof audioTranscripts.$inferInsert;
 
-// Workbench schemas (gmh_accounts, gmh_research) are provisioned outside the
-// migrations/ series. Models below mirror the live tables column-for-column
-// so application queries stay typed; DDL changes there must update both.
+// Workbench schemas (gmh_accounts, gmh_research) are created by
+// migrations/0011_gmh_accounts_research.sql. Models below mirror the live tables
+// column-for-column so application queries stay typed; DDL changes there must
+// update both.
 export const gmhAccounts = pgSchema("gmh_accounts");
 
 export const accountProfiles = gmhAccounts.table("profiles", {
