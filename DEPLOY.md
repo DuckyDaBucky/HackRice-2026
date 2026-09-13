@@ -58,6 +58,10 @@ Root compose is prod (nginx 80/443 only, no direct 8080). For presage-only
 local dev with published 8080, use `presage-api/docker-compose.yml` instead:
 `docker compose -f presage-api/docker-compose.yml up --build`.
 
+The `presage-keyring` named volume retains SmartSpectra's paired device identity
+across container rebuilds. Do not remove this volume during routine deployments;
+without it, the next Presage session must register as a new device.
+
 Nginx initially uses a one-day self-signed fallback certificate. Certbot obtains
 the trusted Let's Encrypt certificate through the port-80 webroot challenge,
 and Nginx detects and loads it automatically. No second Compose command or

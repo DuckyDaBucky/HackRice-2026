@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    hostname: presage-api
     init: true
     restart: unless-stopped
     env_file:
@@ -12,6 +13,8 @@ services:
       PORT: 8080
     ports:
       - "8080:8080"
+    volumes:
+      - presage-keyring:/home/node/.local/share/keyrings
     stop_grace_period: 30s
     healthcheck:
       test:
@@ -23,3 +26,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+volumes:
+  presage-keyring:

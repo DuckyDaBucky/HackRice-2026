@@ -38,6 +38,7 @@ Start with [current codebase](14-current-codebase.md) and [development guide](15
 | [Presage feasibility spike](19-presage-feasibility-spike.md) | Historical feasibility research; native wrapper now exists in presage-api/ |
 | [Recording storage and playback](20-recording-storage-and-playback.md) | Implemented R2 upload wiring and proposed review flow and a timestamped feedback-marker timeline (depends on evaluation existing) |
 | [Live interview voice](21-live-interview-voice.md) | ElevenLabs TTS + live captions + live follow-ups, implemented; live provider availability requires separate verification |
+| [Presage Proxmox edge deployment](22-presage-proxmox-cloudflare-deployment.md) | Execution-ready handoff for moving the live Presage WSS API to `root@dev` through Cloudflare Tunnel |
 | [Change log](CHANGELOG.md) | Documentation changes and future implementation reconciliation |
 
 ## Status conventions

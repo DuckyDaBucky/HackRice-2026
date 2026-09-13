@@ -17,10 +17,12 @@ RUN apt-get update \
     && apt-get install --yes --no-install-recommends \
         dbus-x11 \
         gnome-keyring \
+        gosu \
         ca-certificates \
         libvulkan1 \
         mesa-vulkan-drivers \
     && dbus-uuidgen --ensure=/etc/machine-id \
+    && install -d -o node -g node -m 0700 /home/node/.local/share/keyrings \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build --chown=node:node /service/package.json /service/package-lock.json ./
@@ -30,7 +32,6 @@ COPY --chown=node:node docker-entrypoint.sh /usr/local/bin/presage-entrypoint
 
 RUN chmod 0755 /usr/local/bin/presage-entrypoint
 
-USER node
 EXPOSE 8080
 
 ENTRYPOINT ["/usr/local/bin/presage-entrypoint"]

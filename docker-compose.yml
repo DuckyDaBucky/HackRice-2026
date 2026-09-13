@@ -30,6 +30,7 @@ services:
   presage-api:
     build:
       context: ./presage-api
+    hostname: presage-api
     init: true
     restart: unless-stopped
     env_file:
@@ -39,6 +40,8 @@ services:
       PORT: 8080
     expose:
       - "8080"
+    volumes:
+      - presage-keyring:/home/node/.local/share/keyrings
     stop_grace_period: 30s
     healthcheck:
       test:
@@ -91,3 +94,4 @@ services:
 volumes:
   certbot-challenges:
   letsencrypt:
+  presage-keyring:

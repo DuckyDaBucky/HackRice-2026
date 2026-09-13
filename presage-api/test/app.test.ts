@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { WebSocket } from "ws";
 
 import { buildApp } from "../src/app.js";
 import type { AppConfig } from "../src/config.js";
@@ -9,7 +10,7 @@ type Callback = (...args: any[]) => void;
 
 class FakeSdk implements SdkSession {
   processingStatus = 0 as const;
-  private callbacks = new Map<string, Callback>();
+  protected callbacks = new Map<string, Callback>();
 
   useCustomInput(): this { return this; }
   useFile(): this { return this; }
@@ -29,6 +30,15 @@ class FakeSdk implements SdkSession {
   on(event: string, callback: Callback): this {
     this.callbacks.set(event, callback);
     return this;
+  }
+}
+
+class ErrorSdk extends FakeSdk {
+  override start(): void {
+    queueMicrotask(() => {
+      this.callbacks.get("processingStatus")?.(5);
+      this.callbacks.get("error")?.(7, "API key authentication failed", false);
+    });
   }
 }
 
@@ -127,4 +137,67 @@ test("video endpoint can stream long-form results as NDJSON", async (context) =>
   assert.equal(lines[0].type, "analysis_started");
   assert.ok(lines.some((line) => line.type === "accumulated_metrics"));
   assert.equal(lines.at(-1).type, "analysis_complete");
+});
+
+test("live endpoint forwards the SDK error before closing", async (context) => {
+  const errorRuntime: SdkRuntime = {
+    ...runtime,
+    create: () => new ErrorSdk(),
+    errorCode: { kOk: 0, kAuthenticationFailed: 7 },
+  };
+  const app = await buildApp({ config, runtime: errorRuntime, logger: false });
+  context.after(() => app.close());
+  await app.listen({ host: "127.0.0.1", port: 0 });
+  const address = app.server.address();
+  assert.ok(address && typeof address === "object");
+
+  const events: Array<Record<string, unknown>> = [];
+  let closeCode = 0;
+  await new Promise<void>((resolve, reject) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${address.port}/v1/live`);
+    const timeout = setTimeout(
+      () => reject(new Error("timed out waiting for the live SDK error")),
+      2_000,
+    );
+    timeout.unref();
+
+    socket.on("message", (raw) => {
+      const event = JSON.parse(raw.toString()) as Record<string, unknown>;
+      events.push(event);
+      if (event.type === "hello") {
+        socket.send(
+          JSON.stringify({
+            type: "start",
+            width: 1,
+            height: 1,
+            stride: 3,
+            pixelFormat: "BGR",
+            requestedMetrics: [0],
+          }),
+        );
+      }
+    });
+    socket.on("close", (code) => {
+      clearTimeout(timeout);
+      closeCode = code;
+      resolve();
+    });
+    socket.on("error", reject);
+  });
+
+  const statusIndex = events.findIndex(
+    (event) => event.type === "processing_status" && event.name === "kError",
+  );
+  const errorIndex = events.findIndex((event) => event.type === "sdk_error");
+  assert.ok(statusIndex >= 0, "client did not receive kError processing status");
+  assert.ok(errorIndex > statusIndex, "client did not receive the detailed SDK error");
+  assert.deepEqual(events[errorIndex], {
+    type: "sdk_error",
+    emittedAt: events[errorIndex]?.emittedAt,
+    code: 7,
+    name: "kAuthenticationFailed",
+    message: "API key authentication failed",
+    retryable: false,
+  });
+  assert.equal(closeCode, 1011);
 });

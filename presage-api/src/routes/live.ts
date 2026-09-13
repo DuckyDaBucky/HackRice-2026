@@ -37,6 +37,8 @@ interface FrameDescription {
   pixelFormat: PixelFormatValue;
 }
 
+const SDK_ERROR_EVENT_GRACE_MS = 1_000;
+
 export interface LiveRouteDependencies {
   config: AppConfig;
   coordinator: SessionCoordinator;
@@ -154,9 +156,28 @@ export async function registerLiveRoute(
       let frame: FrameDescription | null = null;
       let lastTimestampUs = -1;
       let cleanupPromise: Promise<void> | null = null;
+      let sdkErrorCloseTimer: NodeJS.Timeout | null = null;
+
+      const clearSdkErrorCloseTimer = (): void => {
+        if (!sdkErrorCloseTimer) return;
+        clearTimeout(sdkErrorCloseTimer);
+        sdkErrorCloseTimer = null;
+      };
+
+      const closeAfterSdkErrorGracePeriod = (): void => {
+        if (sdkErrorCloseTimer) return;
+        sdkErrorCloseTimer = setTimeout(() => {
+          sdkErrorCloseTimer = null;
+          if (socket.readyState === WebSocketState.OPEN) {
+            socket.close(1011, "SmartSpectra processing error");
+          }
+        }, SDK_ERROR_EVENT_GRACE_MS);
+        sdkErrorCloseTimer.unref();
+      };
 
       const cleanup = (): Promise<void> => {
         if (cleanupPromise) return cleanupPromise;
+        clearSdkErrorCloseTimer();
         cleanupPromise = (async () => {
           const current = sdk;
           sdk = null;
@@ -256,11 +277,28 @@ export async function registerLiveRoute(
                 runtime,
                 (event) => {
                   send(socket, event);
+                  if (event.type === "sdk_error") {
+                    clearSdkErrorCloseTimer();
+                    request.log.error(
+                      {
+                        sessionId,
+                        code: event.code,
+                        name: event.name,
+                        message: event.message,
+                        retryable: event.retryable,
+                      },
+                      "SmartSpectra SDK error",
+                    );
+                    socket.close(1011, "SmartSpectra SDK error");
+                    return;
+                  }
                   if (
                     event.type === "processing_status" &&
                     event.status === runtime.processingStatus.kError
                   ) {
-                    socket.close(1011, "SmartSpectra processing error");
+                    // The SDK normally emits its detailed error immediately after
+                    // kError. Keep the socket open briefly so the client receives it.
+                    closeAfterSdkErrorGracePeriod();
                   }
                 },
                 {
