@@ -26,7 +26,7 @@ export function AccessibilitySettings() {
         label="Reduce motion"
         description="Stops decorative animation and transitions. Your operating system's setting is honored automatically too."
       />
-      <SubtitlePicker />
+      <SubtitlePicker tone="light" />
     </section>
   );
 }

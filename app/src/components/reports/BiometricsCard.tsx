@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { retrySessionBiometrics } from "@/app/interview/report-actions";
+import { composureSignalsFor } from "@/lib/biometrics/contracts";
 import type { StoredBiometricAnalysis } from "@/lib/biometrics/persistence";
 
 function describeMetrics(metrics: Record<string, unknown>): string {
@@ -71,19 +72,28 @@ export function BiometricsCard({
       )}
       {completed.length > 0 && (
         <ul className="flex flex-col gap-3">
-          {completed.map((analysis, index) => (
-            <li key={analysis.id} className="flex flex-col gap-1 text-sm">
-              <span className="flex items-center gap-2 font-medium text-dash-text">
-                <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-400" />
-                Answer {index + 1}
-                <span className="font-normal text-dash-text-faint">· Analyzed</span>
-              </span>
-              <span className="pl-4 text-xs leading-relaxed text-dash-text-muted">{describeMetrics(analysis.metrics)}</span>
-              <span className="pl-4 text-xs text-dash-text-faint">
-                Feeds the “why” note on this answer&apos;s verdict — biometrics never decide the score on their own.
-              </span>
-            </li>
-          ))}
+          {completed.map((analysis, index) => {
+            const signals = composureSignalsFor(analysis.metrics);
+            return (
+              <li key={analysis.id} className="flex flex-col gap-1 text-sm">
+                <span className="flex items-center gap-2 font-medium text-dash-text">
+                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-emerald-400" />
+                  Answer {index + 1}
+                  <span className="font-normal text-dash-text-faint">· Analyzed</span>
+                </span>
+                {signals.length > 0 ? (
+                  <span className="pl-4 text-xs leading-relaxed text-dash-text-muted">
+                    Composure: {signals.join(" · ")}.
+                  </span>
+                ) : (
+                  <span className="pl-4 text-xs leading-relaxed text-dash-text-muted">{describeMetrics(analysis.metrics)}</span>
+                )}
+                <span className="pl-4 text-xs text-dash-text-faint">
+                  Delivery observations only — biometrics never decide the score on their own.
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}

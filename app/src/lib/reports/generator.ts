@@ -35,7 +35,11 @@ function buildEvaluatorPrompt(turns: ReportTranscriptTurn[], biometricContext?: 
   const transcript = answered
     .map((turn) => {
       const label = turn.position ? `Q${turn.position}` : "Follow-up";
-      return `[turnId=${turn.turnId}] ${label}${turn.prompt ? ` (${turn.prompt})` : ""}: ${turn.text}`;
+      // Bound per-answer input: long sessions would otherwise push tens of
+      // thousands of characters (slow, expensive, timeout-prone). 2000 chars
+      // keeps several minutes of speech per answer.
+      const text = (turn.text ?? "").slice(0, 2000);
+      return `[turnId=${turn.turnId}] ${label}${turn.prompt ? ` (${turn.prompt})` : ""}: ${text}`;
     })
     .join("\n");
 
@@ -125,8 +129,12 @@ function parseModelText(raw: string, turns: ReportTranscriptTurn[]): { overview:
 
 /** Calls the active LLM once for the report; persistence happens in the owning action. */
 export async function generateReport(turns: ReportTranscriptTurn[], biometricContext?: string | null): Promise<GeneratedReport> {
+  // Generous budget: full-rubric reviews over multi-answer sessions take
+  // ~10s healthy and must survive slow-provider stretches without falling
+  // back to local scores. Both the auto (post-completion) and manual retry
+  // paths tolerate the wait.
   const { text, model, provider, usage } = await completeJsonText(buildEvaluatorPrompt(turns, biometricContext), {
-    timeoutMs: 25_000,
+    timeoutMs: 90_000,
   });
   const { overview, findings } = parseModelText(text, turns);
   return {
