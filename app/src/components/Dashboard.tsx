@@ -10,6 +10,7 @@ import { SkillBars } from "@/components/dashboard/SkillBars";
 import { JoinInterview } from "@/components/dashboard/JoinInterview";
 import { WaveformAccent } from "@/components/dashboard/WaveformAccent";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import CountUp from "@/components/dashboard/CountUp";
 import {
   focusCopy,
   overallScore,
@@ -174,7 +175,11 @@ export function Dashboard({
                 <p className="mt-1 text-xs text-dash-text-faint">Placeholder scores — rubric-based evaluation isn&apos;t wired up yet.</p>
                 <div className="mt-4 grid grid-cols-1 gap-8 sm:grid-cols-[160px_1fr]">
                   <div>
-                    <div className="text-4xl font-bold tabular-nums text-dash-text">{overall}</div>
+                    <CountUp
+                      to={overall}
+                      duration={1}
+                      className="text-4xl font-bold tabular-nums text-dash-text"
+                    />
                     <div className="mt-1 text-xs text-dash-text-muted">Interview readiness</div>
                     {delta !== null && (
                       <div className={`mt-1.5 text-xs font-medium ${delta >= 0 ? "text-accent-deep" : "text-dash-text-faint"}`}>
