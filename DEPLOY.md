@@ -14,13 +14,14 @@ only ports 80 and 443:
    address. Add an `AAAA` record only if IPv6 really reaches this server.
    Set `DOMAIN` in `.env` (defaults to `getmehired.today`, `www.` alias included).
 2. Allow inbound TCP ports 80 and 443 in the host and cloud firewalls.
-3. Copy the environment template and fill in the keys used by the app:
+3. Copy the environment template and fill in the keys. Compose loads
+   `app/.env.local` into the app, presage-api, and certbot containers:
 
    ```sh
-   cp .env.example .env
+   cp app/.env.example app/.env.local
    ```
 
-   Required in `.env`: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (baked at build time —
+   Required in `app/.env.local`: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (baked at build time —
    must be set before `up --build`), `CLERK_SECRET_KEY`, `DATABASE_URL`,
    `R2_ACCOUNT_ID/R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY/R2_BUCKET`,
    `GEMINI_API_KEY` (+ `GOOGLE_API_KEY` for workbench), `ELEVENLABS_API_KEY`,
