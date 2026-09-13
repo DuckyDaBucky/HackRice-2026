@@ -1,6 +1,8 @@
-# Local development override. Publishes the native service to the host so a
-# `pnpm dev` Next.js process (outside Docker) can reach it.
+# Local development override. Publishes app + presage-api to the host.
 services:
+  app:
+    ports:
+      - "3000:3000"
   presage-api:
     ports:
       - "127.0.0.1:${PRESAGE_HOST_PORT:-8181}:8080"

@@ -812,8 +812,40 @@ export async function confirmArtifactUploaded(params: {
         ),
       ),
     )
-    .returning({ id: mediaArtifacts.id });
+    .returning({ id: mediaArtifacts.id, turnId: mediaArtifacts.turnId });
   if (updated.length !== 1) throw new Error("Recording upload cannot be confirmed.");
+  // A confirmed upload is proof the candidate answered: flip the linked plan
+  // question to answered even if the agent next-turn decision never ran
+  // (hiring flow, LLM failure, or abandoned follow-up). Best-effort only.
+  const turnId = updated[0]?.turnId;
+  if (turnId) {
+    const turns = await orm
+      .select({ planQuestionId: interviewTurns.planQuestionId })
+      .from(interviewTurns)
+      .where(
+        and(
+          eq(interviewTurns.id, turnId),
+          eq(interviewTurns.sessionId, params.sessionId),
+          isNull(interviewTurns.deletedAt),
+        ),
+      )
+      .limit(1);
+    const planQuestionId = turns[0]?.planQuestionId;
+    if (planQuestionId) {
+      await orm
+        .update(interviewPlanQuestions)
+        .set({ status: "answered" })
+        .where(
+          and(
+            eq(interviewPlanQuestions.id, planQuestionId),
+            eq(interviewPlanQuestions.sessionId, params.sessionId),
+            inArray(interviewPlanQuestions.status, ["pending", "active"]),
+            isNull(interviewPlanQuestions.deletedAt),
+            isNull(interviewPlanQuestions.supersededAt),
+          ),
+        );
+    }
+  }
 }
 
 export interface EvidenceLinkedReport {
@@ -978,7 +1010,7 @@ export async function ensureEvidenceLinkedReport(sessionId: string, clerkUserId:
         transcript: artifactId ? (latestTranscriptByArtifact.get(artifactId) ?? null) : null,
       };
     });
-    const answeredCount = rows.filter((row) => row.questionStatus === "answered").length;
+    const answeredCount = rows.filter((row) => row.questionStatus === "answered" || Boolean(row.turnId)).length;
     const skippedCount = rows.filter((row) => row.questionStatus === "skipped").length;
     const transcriptCount = rows.filter((row) => Boolean(row.transcript?.trim())).length;
     const artifactCount = rows.filter((row) => Boolean(row.artifactId)).length;

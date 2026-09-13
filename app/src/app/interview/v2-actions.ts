@@ -184,6 +184,23 @@ export async function decidePersistedInterviewNextTurn(params: {
 }): Promise<AgentDecision> {
   const { principal } = await requireOwnedV2Session(params.sessionId);
   if (principal.kind === "assigned_candidate") {
+    // Hiring flow has no agent follow-ups, but the answer is still real:
+    // persist the answered flag so list counts stay correct.
+    const { orm } = await import("@/lib/db");
+    const { interviewPlanQuestions } = await import("@/lib/db/schema");
+    const { and, eq, inArray, isNull } = await import("drizzle-orm");
+    await orm
+      .update(interviewPlanQuestions)
+      .set({ status: "answered" })
+      .where(
+        and(
+          eq(interviewPlanQuestions.id, params.planQuestionId),
+          eq(interviewPlanQuestions.sessionId, params.sessionId),
+          inArray(interviewPlanQuestions.status, ["pending", "active"]),
+          isNull(interviewPlanQuestions.deletedAt),
+          isNull(interviewPlanQuestions.supersededAt),
+        ),
+      );
     return { action: "move_to_next_question", rationale: "coverage_complete" };
   }
   const baseContext = await getAgentContextForTurn(params);
