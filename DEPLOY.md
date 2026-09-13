@@ -12,7 +12,7 @@ only ports 80 and 443:
 
 1. Point the `A` record for your domain at this server's public IPv4
    address. Add an `AAAA` record only if IPv6 really reaches this server.
-   Set `DOMAIN` in `.env` (defaults to `getmehired.today`, `www.` alias included).
+   Set `DOMAIN` in `app/.env.local` (defaults to `getmehired.today`, `www.` alias included).
 2. Allow inbound TCP ports 80 and 443 in the host and cloud firewalls.
 3. Copy the environment template and fill in the keys. Compose loads
    `app/.env.local` into the app, presage-api, and certbot containers:
@@ -46,8 +46,13 @@ only ports 80 and 443:
 From the repository root:
 
 ```sh
-docker compose up --build -d
+docker compose --env-file app/.env.local up --build -d
 ```
+
+`--env-file` is required: `.dockerignore` keeps `.env*` out of the build
+context, so the `NEXT_PUBLIC_CLERK_*` build args and `DOMAIN` must come from
+Compose interpolation. Without it the Next.js build fails prerendering pages
+that call Clerk hooks.
 
 Root compose is prod (nginx 80/443 only, no direct 8080). For presage-only
 local dev with published 8080, use `presage-api/docker-compose.yml` instead:
