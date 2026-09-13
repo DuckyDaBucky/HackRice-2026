@@ -68,6 +68,8 @@ export async function generateCandidateQuestions(params: {
     sourceQuestionId: q.sourceQuestionId,
     origin: q.origin,
     rubricId: undefined,
+    intent: q.intent,
+    strongAnswerIndicators: q.strongAnswerIndicators,
   }));
 
   return { questions, packId: pack.id };

@@ -1,7 +1,8 @@
 import "server-only";
 import { db } from "@/lib/db";
 import { requireOrgAccess } from "./access";
-import type { ReportReleaseMask } from "./contracts";
+import type { ApprovedQuestion, ReportReleaseMask } from "./contracts";
+import { buildAnswerGuide, type AnswerGuideEntry } from "./answer-guide";
 import { enqueueSolanaAction } from "@/lib/solana/outbox";
 
 export async function getHrReport(sessionId: string, organizationId: string) {
@@ -82,7 +83,7 @@ export async function getCandidateVisibleReport(sessionId: string, clerkUserId: 
     `SELECT rr.*, rel.*
      FROM report_revisions rr
      LEFT JOIN LATERAL (
-       SELECT * FROM report_releases r WHERE r.report_revision_id = rr.id AND r.revoked_at IS NULL ORDER BY r.released_at DESC LIMIT 1
+        SELECT * FROM report_releases r WHERE r.report_revision_id = rr.id AND r.revoked_at IS NULL ORDER BY r.released_at DESC LIMIT 1
      ) rel ON true
      WHERE rr.session_id = $1 ORDER BY rr.revision DESC LIMIT 1`,
     [sessionId],
@@ -114,4 +115,48 @@ ${params.organizationName} has shared interview feedback with you.
 View your permitted feedback here: ${params.feedbackUrl}
 
 Sign in with the email address your recruiter confirmed.`;
+}
+
+/**
+ * HR-only answer guide: approved pack expectations joined to the frozen
+ * plan and latest evaluation items. Never exposed to candidates —
+ * `getCandidateVisibleReport` selects no pack metadata.
+ */
+export async function getHrAnswerGuide(
+  sessionId: string,
+  organizationId: string,
+): Promise<AnswerGuideEntry[]> {
+  await requireOrgAccess(organizationId);
+
+  const binding = await db.query<{ candidacy_id: string }>(
+    `SELECT b.candidacy_id FROM hiring_session_bindings b
+     JOIN candidacies c ON c.id = b.candidacy_id
+     WHERE b.interview_session_id = $1 AND c.organization_id = $2`,
+    [sessionId, organizationId],
+  );
+  const candidacyId = binding.rows[0]?.candidacy_id;
+  if (!candidacyId) return [];
+
+  const pack = await db.query<{ questions: unknown }>(
+    `SELECT questions FROM approved_question_packs
+     WHERE candidacy_id = $1 ORDER BY revision DESC LIMIT 1`,
+    [candidacyId],
+  );
+  const rawQuestions = pack.rows[0]?.questions;
+  const packQuestions: ApprovedQuestion[] = Array.isArray(rawQuestions) ? (rawQuestions as ApprovedQuestion[]) : [];
+
+  const plan = await db.query<{ id: string; position: number; prompt: string }>(
+    `SELECT id, position, prompt FROM interview_plan_questions
+     WHERE session_id = $1 AND deleted_at IS NULL ORDER BY position`,
+    [sessionId],
+  );
+
+  const report = await db.query<{ summary: unknown }>(
+    `SELECT summary FROM report_revisions
+     WHERE session_id = $1 AND candidacy_id = $2 ORDER BY revision DESC LIMIT 1`,
+    [sessionId, candidacyId],
+  );
+  const summary = report.rows[0]?.summary as { items?: Array<Record<string, unknown>> } | undefined;
+
+  return buildAnswerGuide(packQuestions, plan.rows, summary?.items ?? []);
 }
