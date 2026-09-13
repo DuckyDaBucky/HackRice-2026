@@ -1,4 +1,5 @@
 import Link from "next/link";
+import BorderGlow from "./BorderGlow";
 
 const INDIVIDUAL_POINTS = [
   "Questions built from your actual resume and projects",
@@ -19,11 +20,18 @@ export function TwoAudienceCards() {
     <section className="bg-[#f4f5f7] py-16 sm:py-20">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div
+          <BorderGlow
             id="individuals"
-            className="scroll-mt-20 rounded-2xl bg-[#e9f6f1] p-8 sm:p-10"
+            className="scroll-mt-20 p-8 sm:p-10"
+            backgroundColor="#eef1f6"
+            borderRadius={16}
+            glowRadius={24}
+            glowIntensity={0.5}
+            fillOpacity={0.3}
+            glowColor="222 15 55"
+            colors={["#64748b", "#94a3b8", "#334155"]}
           >
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#3a7a68]">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#4a5568]">
               For individuals
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#0b1120]">
@@ -40,25 +48,32 @@ export function TwoAudienceCards() {
                   key={p}
                   className="flex items-start gap-2.5 text-sm text-[#2b353b]"
                 >
-                  <Check color="#1ec9b3" />
+                  <Check color="#4a5568" />
                   {p}
                 </li>
               ))}
             </ul>
             <Link
               href="/sign-up"
-              className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-[#0b1120] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="mt-8 inline-flex w-fit items-center gap-1.5 self-start rounded-full bg-[#0b1120] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
               Sign up
               <ArrowIcon />
             </Link>
-          </div>
+          </BorderGlow>
 
-          <div
+          <BorderGlow
             id="employers"
-            className="scroll-mt-20 rounded-2xl bg-[#eef1f6] p-8 sm:p-10"
+            className="scroll-mt-20 p-8 sm:p-10"
+            backgroundColor="#e9f6f1"
+            borderRadius={16}
+            glowRadius={24}
+            glowIntensity={0.5}
+            fillOpacity={0.3}
+            glowColor="173 65 55"
+            colors={["#1ec9b3", "#5eead4", "#0f766e"]}
           >
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#4a5568]">
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-[#3a7a68]">
               For employers
             </p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-[#0b1120]">
@@ -74,19 +89,19 @@ export function TwoAudienceCards() {
                   key={p}
                   className="flex items-start gap-2.5 text-sm text-[#2b353b]"
                 >
-                  <Check color="#4a5568" />
+                  <Check color="#1ec9b3" />
                   {p}
                 </li>
               ))}
             </ul>
             <Link
               href="/sign-up"
-              className="mt-8 inline-flex items-center gap-1.5 rounded-full bg-[#0b1120] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
+              className="mt-8 inline-flex w-fit items-center gap-1.5 self-start rounded-full bg-[#0b1120] px-5 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90"
             >
               Sign up
               <ArrowIcon />
             </Link>
-          </div>
+          </BorderGlow>
         </div>
       </div>
     </section>
