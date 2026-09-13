@@ -8,8 +8,7 @@ import type { TranscribeResponse } from "@/lib/transcription/types";
 const TEST_SECONDS = 3;
 
 /**
- * Mic check: prominent live level meter, compact record-and-playback, and an
- * optional server-transcription demo of the recorded clip.
+ * Mic check: live level meter, short record/playback, optional transcription demo.
  */
 export function MicCheck({ stream }: { stream: MediaStream | null }) {
   const barRef = useRef<HTMLDivElement>(null);
@@ -22,8 +21,6 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  // Live level meter — drives the bar directly, no re-renders per frame.
-  // Skipped entirely under reduced motion (OS setting or site toggle).
   useEffect(() => {
     if (!stream || stream.getAudioTracks().length === 0) return;
     const reduced =
@@ -52,7 +49,7 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
       };
       tick();
     } catch {
-      // Meter is a nicety — recording still works without it.
+      // Meter is optional — recording still works.
     }
     return () => {
       cancelAnimationFrame(raf);
@@ -126,20 +123,23 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
   };
 
   return (
-    <section aria-labelledby="mic-check" className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-      <h2 id="mic-check" className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-        <MicrophoneIcon size={17} /> Microphone check
+    <section aria-labelledby="mic-check" className="rounded-2xl border border-zinc-800/90 bg-zinc-900/35 p-5 sm:p-6">
+      <h2 id="mic-check" className="flex items-center gap-2.5 text-[15px] font-medium text-zinc-100">
+        <MicrophoneIcon size={18} /> Microphone
       </h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-zinc-500">
+        Watch the meter while you speak, then optionally record a short clip.
+      </p>
 
-      <div className="mt-3">
-        <div className="flex items-end justify-between gap-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Input level</p>
-          <p className="text-xs text-zinc-500">
+      <div className="mt-5">
+        <div className="flex items-end justify-between gap-3">
+          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-zinc-500">Input level</p>
+          <p className="text-sm text-zinc-400">
             {phase === "recording" ? `Recording… ${countdown}s` : "Speak to test"}
           </p>
         </div>
         <div
-          className="mt-2 h-4 overflow-hidden rounded-full bg-zinc-800 ring-1 ring-inset ring-zinc-700/80"
+          className="mt-3 h-5 overflow-hidden rounded-full bg-zinc-950 ring-1 ring-inset ring-zinc-800"
           role="meter"
           aria-label="Microphone input level"
           aria-valuemin={0}
@@ -148,45 +148,47 @@ export function MicCheck({ stream }: { stream: MediaStream | null }) {
         >
           <div
             ref={barRef}
-            className="h-full w-full origin-left rounded-full bg-gradient-to-r from-sky-500 via-sky-400 to-emerald-300 shadow-[0_0_12px_rgba(56,189,248,0.45)]"
+            className="h-full w-full origin-left rounded-full bg-gradient-to-r from-sky-500 via-sky-400 to-emerald-300 shadow-[0_0_16px_rgba(56,189,248,0.4)]"
             style={{ transform: "scaleX(0)" }}
           />
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={startTest}
-          disabled={phase === "recording"}
-          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-medium transition hover:bg-zinc-800 disabled:opacity-50"
-        >
-          {phase === "recording" ? <StopIcon size={14} weight="fill" /> : <RecordIcon size={14} weight="fill" />}
-          {phase === "recording" ? "Recording…" : "Record 3s"}
-        </button>
-        {clipUrl && (
-          <audio controls src={clipUrl} className="h-8 min-w-0 flex-1" aria-label="Play back your mic test recording" />
-        )}
-        {phase === "ready" && clipUrl && (
+      <div className="mt-5 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <button
             type="button"
-            onClick={() => void runTranscriptionDemo()}
-            disabled={transcribing}
-            className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/40 bg-sky-500/10 px-3 py-1.5 text-xs font-medium text-sky-100 transition hover:bg-sky-500/20 disabled:opacity-50"
+            onClick={startTest}
+            disabled={phase === "recording"}
+            className="inline-flex items-center gap-2 rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium transition hover:bg-zinc-800 disabled:opacity-50"
           >
-            <PlayIcon size={14} weight="fill" />
-            {transcribing ? "Transcribing…" : "Test transcription"}
+            {phase === "recording" ? <StopIcon size={15} weight="fill" /> : <RecordIcon size={15} weight="fill" />}
+            {phase === "recording" ? "Recording…" : "Record 3s"}
           </button>
+          {phase === "ready" && clipUrl && (
+            <button
+              type="button"
+              onClick={() => void runTranscriptionDemo()}
+              disabled={transcribing}
+              className="inline-flex items-center gap-2 rounded-full border border-sky-400/40 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-100 transition hover:bg-sky-500/20 disabled:opacity-50"
+            >
+              <PlayIcon size={15} weight="fill" />
+              {transcribing ? "Transcribing…" : "Test transcription"}
+            </button>
+          )}
+        </div>
+        {clipUrl && (
+          <audio controls src={clipUrl} className="h-10 w-full" aria-label="Play back your mic test recording" />
         )}
       </div>
 
       {transcript && (
-        <p aria-live="polite" className="mt-2 rounded-lg bg-zinc-950 px-3 py-2 text-xs leading-relaxed text-zinc-200">
+        <p aria-live="polite" className="mt-4 rounded-xl bg-zinc-950 px-4 py-3 text-sm leading-relaxed text-zinc-200">
           “{transcript}”
         </p>
       )}
 
-      {note && <p role="status" className="mt-2 text-xs text-amber-300">{note}</p>}
+      {note && <p role="status" className="mt-3 text-sm text-amber-300">{note}</p>}
     </section>
   );
 }
