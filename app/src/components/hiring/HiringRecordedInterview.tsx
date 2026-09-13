@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { CameraRecorder } from "@/components/CameraRecorder";
@@ -34,7 +34,15 @@ export function HiringRecordedInterview({ initialState }: { initialState: V2Resu
   const tts = useTextToSpeech();
   const [joined, setJoined] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() => {
+    // Resume where the candidate left off: a reload must land on the first
+    // unanswered question, not Q1 (whose nav is disabled once submitted,
+    // which would strand the candidate with no way forward).
+    const next = initialState.questions.findIndex(
+      (q) => q.status !== "answered" && q.status !== "skipped",
+    );
+    return next === -1 ? initialState.questions.length : next;
+  });
   const [subtitleSize, setSubtitleSize] = useState<keyof typeof SUBTITLE_CLASS>("medium");
   const [draftBlob, setDraftBlob] = useState<{ blob: Blob; mimeType: string; durationMs: number; transcript: string } | null>(null);
   const [statuses, setStatuses] = useState<QuestionStatus[]>(() =>
@@ -49,11 +57,32 @@ export function HiringRecordedInterview({ initialState }: { initialState: V2Resu
 
   useEffect(() => {
     if (!recorder.stream || joined) return;
-    void beginOrResumePersistedInterview(sessionId).then((started) => {
-      if (!started) setJoinError("This interview is no longer available.");
-      else setJoined(true);
-    });
+    let cancelled = false;
+    void beginOrResumePersistedInterview(sessionId)
+      .then((started) => {
+        if (cancelled) return;
+        if (!started) setJoinError("This interview is no longer available.");
+        else setJoined(true);
+      })
+      .catch(() => {
+        if (!cancelled) setJoinError("We could not start the interview. Please try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [recorder.stream, joined, sessionId]);
+
+  // Self-heal: every question submitted/skipped means finished, even if the
+  // explicit Finish click never landed. Without this a fully-answered hiring
+  // session stays resumable forever and never queues processing.
+  const finishRef = useRef(false);
+  useEffect(() => {
+    if (!done || finishRef.current) return;
+    finishRef.current = true;
+    void completePersistedInterview(sessionId).catch(() => {
+      finishRef.current = false;
+    });
+  }, [done, sessionId]);
 
   if (done) {
     return (

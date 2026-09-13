@@ -110,12 +110,17 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
   const autoCompletedRef = useRef(false);
   useEffect(() => {
     if (!done || questions.length === 0 || autoCompletedRef.current) return;
+    // The optimistic done screen (finishingFinal) is provisional: the agent
+    // decision is still in flight and may un-flip back to a follow-up.
+    // Completing here would close the session under it, and the follow-up
+    // answer would then be rejected (prepare requires in_progress).
+    if (finishingFinal) return;
     if (initialState.session.status === "completed") return;
     autoCompletedRef.current = true;
     void completePersistedInterview(initialState.session.id).catch(() => {
       autoCompletedRef.current = false;
     });
-  }, [done, joined, initialState.session.id, initialState.session.status, questions.length]);
+  }, [done, finishingFinal, joined, initialState.session.id, initialState.session.status, questions.length]);
 
   useEffect(() => {
     if (!recorder.stream || joined) return;
@@ -350,6 +355,9 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
           recorder.release();
           tts.stop();
           await completePersistedInterview(stateRef.current.session.id);
+          // Explicitly completed here: keep the done-screen self-heal from
+          // firing a redundant second completion (and report run) afterwards.
+          autoCompletedRef.current = true;
           if (!mayBeLast) setIndex(nextIndex);
           setFinishingFinal(false);
           return;
