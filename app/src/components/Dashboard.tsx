@@ -45,7 +45,7 @@ function actionFor(session: SessionRecord): { label: string; href: string } {
     return { label: "Try again", href: "/interview/setup" };
   }
   if (session.isDurable && session.status === "completed") {
-    return { label: session.score === null ? "Open report" : "View report", href: `/interview/session/${session.id}/report` };
+    return { label: "View report", href: `/interview/session/${session.id}/report` };
   }
   return { label: "Practice again", href: "/interview/setup" };
 }

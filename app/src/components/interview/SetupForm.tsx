@@ -97,7 +97,10 @@ export function SetupForm() {
       });
       const data = await response.json() as { sessionId?: string; error?: string };
       if (!response.ok || !data.sessionId) throw new Error(data.error ?? "Could not create the interview.");
-      router.push(`/interview/session/${data.sessionId}`);
+      // Replace (not push): going back from the interview must land on the
+      // interviews list, never on this stale form (which would resubmit and
+      // create a duplicate session).
+      router.replace(`/interview/session/${data.sessionId}`);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not create the interview.");
       setSubmitting(false);

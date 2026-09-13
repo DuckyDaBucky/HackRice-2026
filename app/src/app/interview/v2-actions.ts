@@ -130,8 +130,12 @@ export async function completePersistedInterview(sessionId: string) {
     await finish();
     return true;
   }
-  if (state.session.status !== "in_progress") return false;
-  const completed = await transitionOwnedV2Session({ sessionId, clerkUserId: userId, from: "in_progress", to: "completed" });
+  if (state.session.status !== "in_progress" && state.session.status !== "paused") return false;
+  // A paused-but-fully-answered session is finished: completing straight
+  // from paused (clock already stopped) closes the "Resume forever" loop
+  // with no extra join/resume round-trip.
+  const from = state.session.status as "in_progress" | "paused";
+  const completed = await transitionOwnedV2Session({ sessionId, clerkUserId: userId, from, to: "completed" });
   // Report work is recoverable and must never make a completed recording look
   // unfinished. Hiring sessions run their own completion; practice sessions get
   // the evidence report plus the best-effort full review.

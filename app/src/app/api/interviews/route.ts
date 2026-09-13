@@ -14,9 +14,53 @@ import { llmTextModel } from "@/lib/llm/provider";
 
 const PLAN_PROMPT_VERSION = "interview-plan-v1";
 
+function candidateOrigins(request: Request): Set<string> {
+  const candidates = new Set<string>([new URL(request.url).origin]);
+  // Proxied deployments (nginx, tunnels): the public host arrives via
+  // x-forwarded-host while request.url may carry the internal host.
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  if (forwardedHost) {
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+    candidates.add(`${forwardedProto}://${forwardedHost}`);
+  }
+  // Localhost aliases: localhost, 127.0.0.1 and ::1 all reach this server.
+  for (const candidate of [...candidates]) {
+    try {
+      const url = new URL(candidate);
+      if (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]") {
+        candidates.add(`${url.protocol}//localhost:${url.port}`);
+        candidates.add(`${url.protocol}//127.0.0.1:${url.port}`);
+        candidates.add(`${url.protocol}//[::1]:${url.port}`);
+      }
+    } catch {
+      // Ignore malformed candidates; the strict comparison below still applies.
+    }
+  }
+  // Explicit allowlist for preview/tunnel deployments.
+  for (const extra of (process.env.ALLOWED_ORIGINS ?? "").split(",")) {
+    const trimmed = extra.trim();
+    if (trimmed) candidates.add(trimmed);
+  }
+  return candidates;
+}
+
 function sameOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  return !origin || origin === new URL(request.url).origin;
+  if (!origin) return true;
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    return false;
+  }
+  const ok = candidateOrigins(request).has(parsed.origin);
+  if (!ok) {
+    console.warn("Rejected cross-origin interview setup", {
+      origin: parsed.origin,
+      requestOrigin: new URL(request.url).origin,
+    });
+  }
+  return ok;
 }
 
 /** Creates a durable plan before the candidate ever reaches the interview lobby. */

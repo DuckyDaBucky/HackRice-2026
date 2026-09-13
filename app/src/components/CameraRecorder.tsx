@@ -24,7 +24,7 @@ import type { TranscribeResponse } from "@/lib/transcription/types";
 
 const FOLLOW_UP_CHECK_INTERVAL_MS = 500;
 const ANSWER_SILENCE_MS = 5_000;
-const INTER_QUESTION_BUFFER_MS = 2_000;
+const INTER_QUESTION_BUFFER_MS = 800;
 
 export interface AnswerRecordedOutcome {
   followUp?: string;
@@ -112,6 +112,8 @@ interface CameraRecorderProps {
   onLeave: () => void;
   /** Spoken once before the first question so the session opens like a conversation. */
   introLine?: string | null;
+  /** Fired after the intro finishes the single time it plays. */
+  onIntroSpoken?: () => void;
 }
 
 export function CameraRecorder({
@@ -132,6 +134,7 @@ export function CameraRecorder({
   onTimeBudgetReached,
   onLeave,
   introLine,
+  onIntroSpoken,
 }: CameraRecorderProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captions = useLiveCaptions();
@@ -166,6 +169,16 @@ export function CameraRecorder({
   const [transcriptNotice, setTranscriptNotice] = useState<string | null>(null);
   const transcriptPanelRef = useRef<HTMLDivElement | null>(null);
   const currentQuestionRef = useRef<string | null>(null);
+  // The intro is session-opening state, not per-question: once spoken it must
+  // never replay (resume, re-render, recorder reset, follow-up loop).
+  const introSpokenRef = useRef(false);
+  // Held in a ref (not effect deps): a fresh callback identity every render
+  // must never restart the turn effect — that wedges the call on
+  // "Preparing next question…" with the timer running and nothing speaking.
+  const onIntroSpokenRef = useRef(onIntroSpoken);
+  useEffect(() => {
+    onIntroSpokenRef.current = onIntroSpoken;
+  });
   const isRecording = recorderState === "recording";
 
   const stopCaptionsRef = useRef(captions.stop);
@@ -283,9 +296,13 @@ export function CameraRecorder({
       }
       if (cancelled) return;
       // The interviewer opens with a greeting before the first question so
-      // the session feels like a conversation, not a recording widget.
-      if (questionNumber === 1 && introLine) {
+      // the session feels like a conversation, not a recording widget. Gated
+      // to a single play per session via introSpokenRef + the parent's
+      // introPending state (fresh sessions only).
+      if (questionNumber === 1 && introLine && !introSpokenRef.current) {
+        introSpokenRef.current = true;
         await speak(introLine, voiceId, mood);
+        onIntroSpokenRef.current?.();
         if (cancelled) return;
       }
       await speak(questionPrompt, voiceId, mood);

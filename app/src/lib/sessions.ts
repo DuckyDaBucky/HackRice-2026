@@ -75,6 +75,14 @@ function toRecord(row: SessionSelectRow, score: number | null = null): SessionRe
 // count prefers the live plan over the session default, and the report status
 // is the latest non-deleted evaluation report. Kept as SQL fragments because
 // they are correlated subqueries over other tables.
+// NOTE: drizzle renders an interpolated column inside sql`` as a bare
+// quoted name (e.g. "id") with NO table qualifier. Inside a correlated
+// subquery that bare name binds to the INNER table, silently breaking the
+// correlation (plan.id <> session.id, so counts were always 0 and the
+// question count always fell back to the session default). The outer table
+// is therefore referenced literally below — do not "simplify" these back
+// to ${interviewSessions.id}.
+const OUTER_SESSION_ID = sql`"interview_sessions"."id"`;
 function sessionSelection() {
   return {
     id: interviewSessions.id,
@@ -91,11 +99,11 @@ function sessionSelection() {
     customPrompt: interviewSessions.customPrompt,
     voiceId: interviewSessions.voiceId,
     questionCount:
-      sql<number>`coalesce(nullif((select count(*)::int from interview_plan_questions where session_id = ${interviewSessions.id} and deleted_at is null and superseded_at is null), 0), ${interviewSessions.questionCount})`,
+      sql<number>`coalesce(nullif((select count(*)::int from interview_plan_questions where session_id = ${OUTER_SESSION_ID} and deleted_at is null and superseded_at is null), 0), ${interviewSessions.questionCount})`,
     answeredCount:
-      sql<number>`coalesce((select count(*)::int from interview_plan_questions q where q.session_id = ${interviewSessions.id} and q.deleted_at is null and q.superseded_at is null and (q.status = 'answered' or exists (select 1 from interview_turns t where t.session_id = ${interviewSessions.id} and t.plan_question_id = q.id and t.kind = 'candidate_answer' and t.deleted_at is null))), 0)`,
+      sql<number>`coalesce((select count(*)::int from interview_plan_questions q where q.session_id = ${OUTER_SESSION_ID} and q.deleted_at is null and q.superseded_at is null and (q.status = 'answered' or exists (select 1 from interview_turns t where t.session_id = ${OUTER_SESSION_ID} and t.plan_question_id = q.id and t.kind = 'candidate_answer' and t.deleted_at is null))), 0)`,
     reportStatus:
-      sql<SessionRecord["reportStatus"]>`(select status from evaluation_reports where session_id = ${interviewSessions.id} and deleted_at is null order by version desc limit 1)`,
+      sql<SessionRecord["reportStatus"]>`(select status from evaluation_reports where session_id = ${OUTER_SESSION_ID} and deleted_at is null order by version desc limit 1)`,
   };
 }
 

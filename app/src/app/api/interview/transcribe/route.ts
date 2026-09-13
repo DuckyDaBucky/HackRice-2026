@@ -60,7 +60,9 @@ async function transcribeWithGemini(
           },
         ],
         generationConfig: {
-          thinkingConfig: { thinkingBudget: 128 },
+          // Verbatim transcription needs no reasoning; keep thinking off so
+          // the fallback path stays as fast as possible.
+          thinkingConfig: { thinkingBudget: 0 },
         },
       }),
     },

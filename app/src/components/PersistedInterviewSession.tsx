@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CheckCircleIcon } from "@phosphor-icons/react";
 import { CameraRecorder } from "@/components/CameraRecorder";
@@ -44,7 +44,28 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
     initialState.session.elapsedActiveMs >= initialState.config.timeBudgetSeconds * 1_000,
   );
   const [followUpPrompt, setFollowUpPrompt] = useState<string | null>(initialState.activeFollowUp?.wording ?? null);
+  // The spoken intro is session-opening state: it plays exactly once, when a
+  // brand-new interview starts. Resumes and reloads skip it and go straight
+  // to the current question.
+  const [introPending, setIntroPending] = useState(initialState.session.status === "planned");
+  // True while the final answer's decision/completion runs behind an
+  // already-shown done screen (see onAnswerRecorded's optimistic flip).
+  const [finishingFinal, setFinishingFinal] = useState(false);
+  // Stable identity: CameraRecorder's turn effect must not restart when the
+  // parent re-renders (timer ticks every second).
+  const handleIntroSpoken = useCallback(() => setIntroPending(false), []);
   const [index, setIndex] = useState(() => {
+    // An unanswered follow-up outranks plan status: reopening lands back on
+    // the follow-up instead of skipping past it (or "finishing" the session
+    // with it unanswered). Without this, a plan flipped to answered on
+    // upload-confirm would look done while its follow-up was still pending.
+    const pendingFollowUp = initialState.activeFollowUp;
+    if (pendingFollowUp) {
+      const at = initialState.questions.findIndex(
+        (question) => question.id === pendingFollowUp.planQuestionId,
+      );
+      if (at !== -1) return at;
+    }
     const next = initialState.questions.findIndex(
       (question) => question.status !== "answered" && question.status !== "skipped",
     );
@@ -81,6 +102,20 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
       initialState.config.mood,
     );
   }, [done, initialState.config.mood, initialState.config.timeBudgetSeconds, questions.length, tts, uploadCount, voiceId]);
+
+  // Self-heal: every question answered/skipped means finished, even if the
+  // explicit completion call never landed (closed tab, failed request). Flip
+  // the session to completed so the list stops offering "Resume" for a done
+  // interview. Server-side completion is idempotent and reads live status.
+  const autoCompletedRef = useRef(false);
+  useEffect(() => {
+    if (!done || questions.length === 0 || autoCompletedRef.current) return;
+    if (initialState.session.status === "completed") return;
+    autoCompletedRef.current = true;
+    void completePersistedInterview(initialState.session.id).catch(() => {
+      autoCompletedRef.current = false;
+    });
+  }, [done, joined, initialState.session.id, initialState.session.status, questions.length]);
 
   useEffect(() => {
     if (!recorder.stream || joined) return;
@@ -133,9 +168,15 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
             {uploadCount} of {questions.length} answered
           </p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Interview complete</h1>
-          <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-zinc-400">
-            Your recording and saved caption evidence are ready for review.
-          </p>
+          {finishingFinal ? (
+            <p role="status" className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-sky-300">
+              Wrapping up your report — this takes a few seconds.
+            </p>
+          ) : (
+            <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-zinc-400">
+              Your recording and saved caption evidence are ready for review.
+            </p>
+          )}
         </div>
         {timeBudgetReached && (
           <p role="status" className="max-w-md rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
@@ -208,7 +249,8 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
       questionPrompt={currentPrompt}
       questionNumber={index + 1}
       totalQuestions={questions.length}
-      introLine={introLine}
+      introLine={introPending ? introLine : null}
+      onIntroSpoken={handleIntroSpoken}
       onLeave={leave}
       onPauseChange={async (paused) => {
         const changed = paused
@@ -261,16 +303,45 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
           throw error;
         }
 
-        const decision = await decidePersistedInterviewNextTurn({
-          sessionId: stateRef.current.session.id,
-          turnId: prepared.turnId,
-          planQuestionId: currentQuestion.id,
-          transcript,
-        });
+        const decision = await (async () => {
+          // If this may be the final answer, swap to the done screen as soon
+          // as the recording is durable — the agent decision + completion run
+          // behind it instead of holding the call UI open. A follow-up verdict
+          // flips back to the question (see below); anything left unfinished
+          // self-heals via the done-screen auto-complete on next open.
+          const mayBeLast = index + 1 >= questions.length || timeBudgetReached;
+          if (mayBeLast) {
+            setUploadCount((count) => count + 1);
+            setFinishingFinal(true);
+            setIndex(questions.length);
+          }
+          try {
+            return await decidePersistedInterviewNextTurn({
+              sessionId: stateRef.current.session.id,
+              turnId: prepared.turnId,
+              planQuestionId: currentQuestion.id,
+              transcript,
+            });
+          } catch (error) {
+            // Recording is durable; rethrow for the call UI unless the done
+            // screen is already showing (decision will self-heal on next open).
+            if (mayBeLast) {
+              setFinishingFinal(false);
+              return { action: "close_interview", rationale: "coverage_complete" } as const;
+            }
+            throw error;
+          }
+        })();
 
         const nextIndex = index + 1;
-        setUploadCount((count) => count + 1);
+        const mayBeLast = index + 1 >= questions.length || timeBudgetReached;
+        if (!mayBeLast) setUploadCount((count) => count + 1);
         if (decision.action === "ask_follow_up") {
+          // Not done after all — back to the question for the follow-up.
+          if (mayBeLast) {
+            setFinishingFinal(false);
+            setIndex(index);
+          }
           setFollowUpPrompt(decision.wording);
           return { followUp: decision.wording };
         }
@@ -279,7 +350,8 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
           recorder.release();
           tts.stop();
           await completePersistedInterview(stateRef.current.session.id);
-          setIndex(nextIndex);
+          if (!mayBeLast) setIndex(nextIndex);
+          setFinishingFinal(false);
           return;
         }
         setIndex(nextIndex);
