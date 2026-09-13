@@ -227,6 +227,21 @@ export function InterviewLobby({
               </h2>
             </section>
 
+            <div className="flex flex-col items-stretch gap-2">
+              <button
+                type="button"
+                onClick={() => void handleJoin()}
+                disabled={isJoining}
+                className="inline-flex w-full items-center justify-center gap-2.5 rounded-full bg-sky-500 px-10 py-4 text-base font-semibold text-zinc-950 shadow-[0_12px_40px_-12px_rgba(14,165,233,0.55)] transition hover:bg-sky-400 active:scale-[0.98] disabled:opacity-60"
+              >
+                <VideoCameraIcon size={20} weight="fill" />
+                {isJoining ? "Joining…" : joinError ? "Try again" : "Enter call and start"}
+              </button>
+              {!previewStream && !previewError && (
+                <p className="text-center text-sm text-zinc-500">You can join directly — checks are optional but recommended.</p>
+              )}
+            </div>
+
             {previewStream && (
               <section aria-label="Devices" className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <label className="flex flex-col gap-2 text-xs font-medium tracking-wide text-zinc-400">
@@ -324,21 +339,6 @@ export function InterviewLobby({
             </span>
           </div>
         )}
-
-        <footer className="flex flex-col items-center gap-3 border-t border-zinc-900 pt-8 pb-4">
-          <button
-            type="button"
-            onClick={() => void handleJoin()}
-            disabled={isJoining}
-            className="inline-flex items-center gap-2.5 rounded-full bg-sky-500 px-10 py-4 text-base font-semibold text-zinc-950 shadow-[0_12px_40px_-12px_rgba(14,165,233,0.55)] transition hover:bg-sky-400 active:scale-[0.98] disabled:opacity-60"
-          >
-            <VideoCameraIcon size={20} weight="fill" />
-            {isJoining ? "Joining…" : joinError ? "Try again" : "Enter call and start"}
-          </button>
-          {!previewStream && !previewError && (
-            <p className="text-sm text-zinc-500">You can join directly — checks are optional but recommended.</p>
-          )}
-        </footer>
       </div>
     </div>
   );
