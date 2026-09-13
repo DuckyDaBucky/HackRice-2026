@@ -6,6 +6,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { SkillBars } from "@/components/dashboard/SkillBars";
 import { Sparkline } from "@/components/dashboard/Sparkline";
+import CountUp from "@/components/dashboard/CountUp";
 import { listRecentSessions } from "@/lib/sessions";
 import { countUploadedAttemptsBySession } from "@/lib/answer-attempts";
 import {
@@ -83,9 +84,11 @@ export default async function AnalyticsPage() {
           <div className="grid grid-cols-1 gap-8 sm:grid-cols-[180px_1fr]">
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold tabular-nums text-dash-text">
-                  {aggregateOverall}
-                </span>
+                <CountUp
+                  to={aggregateOverall}
+                  duration={1}
+                  className="text-4xl font-bold tabular-nums text-dash-text"
+                />
                 <span className="text-sm text-dash-text-faint">/100</span>
               </div>
               <div className="mt-1 text-xs font-medium text-accent-deep">
