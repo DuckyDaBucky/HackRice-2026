@@ -8,7 +8,7 @@ import {
   mediaArtifacts,
 } from "@/lib/db/schema";
 import type { VideoAnalysis } from "./contracts";
-import { summarizeVideoAnalysis } from "./contracts";
+import { biometricNoteFor, summarizeVideoAnalysis } from "./contracts";
 
 /** Fixed key for the Postgres advisory lock serializing presage-api calls (single SDK session). */
 const PRESAGE_RELAY_LOCK_KEY = 847_291_003;
@@ -161,6 +161,24 @@ export async function withPresageRelayLock<T>(work: () => Promise<T>): Promise<T
     if (error instanceof PresageLockBusy) return null;
     throw error;
   }
+}
+
+/** Compact Presage notes for the live interview LLM: completed analyses only, newest last, bounded. */
+export async function getPresageNotesForSession(sessionId: string): Promise<string | null> {
+  const rows = await orm
+    .select({ status: biometricAnalyses.status, metrics: biometricAnalyses.metrics })
+    .from(biometricAnalyses)
+    .where(and(eq(biometricAnalyses.sessionId, sessionId), eq(biometricAnalyses.status, "completed")))
+    .orderBy(asc(biometricAnalyses.createdAt))
+    .limit(8);
+  const notes = rows
+    .map((row, index) => {
+      const note = biometricNoteFor((row.metrics ?? {}) as Record<string, unknown>);
+      return note ? "Prior answer " + (index + 1) + ": " + note : null;
+    })
+    .filter((note) => Boolean(note));
+  if (notes.length === 0) return null;
+  return notes.join("\n").slice(0, 1500);
 }
 
 export const biometricQueue = {

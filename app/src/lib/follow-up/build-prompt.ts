@@ -1,5 +1,6 @@
 import type { InterviewMode } from "@/lib/questions/types";
 import { MOOD_FOLLOW_UP_INSTRUCTION, type InterviewMood } from "@/lib/interview-config";
+import { buildLiveVisualPromptSection } from "@/lib/biometrics/live-context";
 
 export function buildFollowUpPrompt(input: {
   mode: InterviewMode;
@@ -7,6 +8,8 @@ export function buildFollowUpPrompt(input: {
   transcriptSoFar: string;
   mood?: InterviewMood;
   customPrompt?: string | null;
+  cameraObservations?: string | null;
+  presageNotes?: string | null;
 }): string {
   const toneInstruction = MOOD_FOLLOW_UP_INSTRUCTION[input.mood ?? "neutral"];
   const focusInstruction = input.customPrompt
@@ -21,6 +24,8 @@ The candidate is mid-answer. Here is what they've said so far:
 "${input.transcriptSoFar}"
 
 ${focusInstruction}
+
+${buildLiveVisualPromptSection(input.cameraObservations, input.presageNotes) ?? ""}
 
 Decide whether the original question has been answered with enough relevant,
 specific detail to move on. Return null ONLY when it has. If it is vague,

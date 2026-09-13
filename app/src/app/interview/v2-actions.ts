@@ -185,6 +185,7 @@ export async function decidePersistedInterviewNextTurn(params: {
   turnId: string;
   planQuestionId: string;
   transcript: string;
+  cameraObservations?: string | null;
 }): Promise<AgentDecision> {
   const { principal } = await requireOwnedV2Session(params.sessionId);
   if (principal.kind === "assigned_candidate") {
@@ -208,7 +209,12 @@ export async function decidePersistedInterviewNextTurn(params: {
     return { action: "move_to_next_question", rationale: "coverage_complete" };
   }
   const baseContext = await getAgentContextForTurn(params);
-  const context = { ...baseContext, transcript: params.transcript.slice(0, 12_000) };
+  const { sanitizeVisualNote } = await import("@/lib/biometrics/live-context");
+  const context = {
+    ...baseContext,
+    transcript: params.transcript.slice(0, 12_000),
+    cameraObservations: sanitizeVisualNote(params.cameraObservations),
+  };
   const inputHash = agentInputHash(context);
   const generationId = await beginAgentDecision({
     context,

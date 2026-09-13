@@ -10,6 +10,8 @@ interface FollowUpRequestBody {
   transcriptSoFar: string;
   mood?: unknown;
   customPrompt?: unknown;
+  cameraObservations?: unknown;
+  presageNotes?: unknown;
 }
 
 const FALLBACK_FOLLOW_UP = "Could you expand on that with a little more detail?";
@@ -40,8 +42,11 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid request body" }, { status: 400 });
   }
 
+  const { sanitizeVisualNote } = await import("@/lib/biometrics/live-context");
   const prompt = buildFollowUpPrompt({
     ...body,
+    cameraObservations: sanitizeVisualNote(body.cameraObservations),
+    presageNotes: sanitizeVisualNote(body.presageNotes),
     mood: isInterviewMood(body.mood) ? body.mood : undefined,
     customPrompt:
       typeof body.customPrompt === "string"

@@ -17,6 +17,7 @@ import {
 } from "@/lib/db/schema";
 import type { InterviewContentType, InterviewSetup, TranscriptSegment } from "./contracts";
 import type { AgentContext, AgentDecision } from "./agent-contracts";
+import { getPresageNotesForSession } from "@/lib/biometrics/persistence";
 
 export interface PlannedQuestionInput {
   id?: string;
@@ -568,10 +569,12 @@ export async function getAgentContextForTurn(params: {
         isNull(interviewTurns.deletedAt),
       ),
     );
+  const presageNotes = await getPresageNotesForSession(params.sessionId).catch(() => null);
   return {
     sessionId: row.sessionId,
     turnId: row.turnId,
     planQuestionId: params.planQuestionId,
+    presageNotes,
     sessionStatus: "in_progress",
     questionPrompt: row.prompt,
     questionIntent: row.intent as Record<string, unknown>,

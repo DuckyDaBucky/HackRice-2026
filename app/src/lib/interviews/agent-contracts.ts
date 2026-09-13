@@ -40,4 +40,6 @@ export interface AgentContext {
   elapsedActiveMs: number;
   timeBudgetSeconds: number;
   isLastQuestion: boolean;
+  cameraObservations?: string | null;
+  presageNotes?: string | null;
 }

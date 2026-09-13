@@ -6,6 +6,8 @@ interface QuestionRequestBody {
   mode: InterviewMode;
   questionNumber: number;
   previous: Array<{ question: string; answer: string }>;
+  cameraObservations?: unknown;
+  presageNotes?: unknown;
 }
 
 function isValidBody(body: unknown): body is QuestionRequestBody {
@@ -29,6 +31,14 @@ function isValidBody(body: unknown): body is QuestionRequestBody {
 }
 
 function buildQuestionPrompt(input: QuestionRequestBody) {
+  const camera = typeof input.cameraObservations === "string" ? input.cameraObservations.trim().slice(0, 500) : "";
+  const presage = typeof input.presageNotes === "string" ? input.presageNotes.trim().slice(0, 1500) : "";
+  const visualBlock =
+    camera || presage
+      ? "\nLive visual context (camera + Presage SmartSpectra practice cues only — never score, diagnose, or mention vitals; decide from answers first):\n" +
+        (camera ? "Camera: " + camera + "\n" : "") +
+        (presage ? "Presage: " + presage + "\n" : "")
+      : "";
   const history = input.previous.length
     ? input.previous
         .map(
@@ -43,7 +53,7 @@ function buildQuestionPrompt(input: QuestionRequestBody) {
 Generate exactly one concise, spoken interview question. It must be a new question, avoid repeating the themes already covered, and naturally build on the candidate's prior answers where useful. Do not include an answer, explanation, greeting, label, or multiple questions.
 
 Interview history:
-${history}
+${history}${visualBlock}
 
 Respond with strict JSON only:
 {"question":"<single interview question>"}`;

@@ -6,6 +6,7 @@ import { CheckCircleIcon } from "@phosphor-icons/react";
 import { CameraRecorder } from "@/components/CameraRecorder";
 import { InterviewLobby } from "@/components/InterviewLobby";
 import { useCameraRecorder } from "@/hooks/useCameraRecorder";
+import { useCameraObservations } from "@/hooks/useCameraObservations";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import {
   beginOrResumePersistedInterview,
@@ -32,8 +33,13 @@ function legacyModeFor(state: V2ResumeState): InterviewMode {
 export function PersistedInterviewSession({ initialState }: { initialState: V2ResumeState }) {
   const router = useRouter();
   const recorder = useCameraRecorder();
+  const { summary: cameraSummary } = useCameraObservations(recorder.stream);
   const tts = useTextToSpeech();
   const stateRef = useRef(initialState);
+  const cameraSummaryRef = useRef<string | null>(null);
+  useEffect(() => {
+    cameraSummaryRef.current = cameraSummary;
+  }, [cameraSummary]);
   const cleanupRef = useRef({ release: recorder.release, stop: tts.stop });
   const [joined, setJoined] = useState(initialState.session.status === "in_progress");
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -326,6 +332,7 @@ export function PersistedInterviewSession({ initialState }: { initialState: V2Re
               turnId: prepared.turnId,
               planQuestionId: currentQuestion.id,
               transcript,
+              cameraObservations: cameraSummaryRef.current,
             });
           } catch (error) {
             // Recording is durable; rethrow for the call UI unless the done
